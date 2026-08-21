@@ -9,5 +9,7 @@ yarn-error.log*
 .editor
 
 # Agent skills, installed with: npx skills add decentraland/sdk-skills --all
+agent/
 .agents/
 .claude/
+skills-lock.json
