@@ -3,14 +3,44 @@
 export const TOTAL_ROUNDS = 10
 
 /**
- * How long a round lasts, derived from how big it actually is.
+ * Rough cost of climbing a course, in seconds.
  *
- * A flat four minutes was wrong at both ends: round one is 26 pads and the
- * clock just idled, round ten is 69 pads and 57 metres, where nobody would
- * finish and every round would end in a timeout.
+ * A model, not a playtest: each hop costs the greater of covering its gap at a
+ * realistic 4 m/s - nobody holds jogSpeed 8 across a two metre pad - or the
+ * airtime of a jump, plus hardLandingCooldown on hops that gain real height.
  */
-export function roundSeconds(pads: number): number {
-  return Math.round(Math.min(360, Math.max(75, 40 + pads * 3.2)))
+export function estimateClimbSeconds(
+  pads: { x: number; y: number; z: number; size: number }[]
+): number {
+  const SPEED = 4
+  const JUMP_ARC = 1.1
+  const RECOVER = 0.75
+
+  let seconds = 0
+  for (let i = 1; i < pads.length; i++) {
+    const previous = pads[i - 1]
+    const pad = pads[i]
+    const gap = Math.hypot(pad.x - previous.x, pad.z - previous.z) - pad.size / 2 - previous.size / 2
+    seconds += Math.max(gap / SPEED, JUMP_ARC)
+    if (pad.y - previous.y > 0.3) seconds += RECOVER
+  }
+  return seconds
+}
+
+/**
+ * How long a round lasts, from what the course actually costs to climb.
+ *
+ * Counting pads was a proxy for the wrong thing. Modelling the climb put round
+ * ten at ~120s of clean running against a 261s clock - more than double, so
+ * the round dragged whenever nobody finished. The clock is a backstop for that
+ * case, and ROUND_SLACK is how much room it leaves for falls and retries.
+ */
+export const ROUND_SLACK = 1.7
+
+export function roundSeconds(
+  pads: { x: number; y: number; z: number; size: number }[]
+): number {
+  return Math.round(Math.min(300, Math.max(75, estimateClimbSeconds(pads) * ROUND_SLACK)))
 }
 
 /** How often the server proves it is alive. */
@@ -126,7 +156,22 @@ export const FALL_GRACE = 3.2
 
 export const CHECKPOINT_RADIUS = 2.2
 export const RESPAWN_LIFT = 1.4
-export const RESPAWN_COOLDOWN = 0.9
+/**
+ * Seconds the player cannot move after a fall. This is what makes a fall cost
+ * something: the round clock is the server's wall clock, so lost seconds are
+ * real and cannot be under-reported the way a client-side penalty could be.
+ */
+export const FALL_FREEZE_SECONDS = 1.5
+
+/**
+ * Hazards stay off this long after a respawn. It MUST outlast the freeze.
+ *
+ * At 0.9s against a 1.5s freeze there was a 0.6s window where the player was
+ * both vulnerable and unable to move - and a checkpoint that happens to sit
+ * under a spinning beam turns that into an unbreakable death loop. Derived
+ * from the freeze so the two cannot drift apart again.
+ */
+export const RESPAWN_COOLDOWN = FALL_FREEZE_SECONDS + 0.3
 
 /** Hazards only bite within this vertical window, so jumping over them works. */
 export const HAZARD_CLEARANCE = 0.85

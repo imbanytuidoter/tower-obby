@@ -273,7 +273,7 @@ function playerPosition(address: string): Vector3 | null {
 
 /** A round lasts in proportion to the tower it generated. */
 function lengthOf(round: number): number {
-  return roundSeconds(buildLayout(round).pads.length)
+  return roundSeconds(buildLayout(round).pads)
 }
 
 function finishOf(round: number): Vector3 | null {

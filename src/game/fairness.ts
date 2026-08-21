@@ -1,4 +1,5 @@
 import { AvatarLocomotionSettings, engine, InputModifier } from '@dcl/sdk/ecs'
+import { FALL_FREEZE_SECONDS } from './config'
 
 /**
  * This is a race, so everyone has to move identically.
@@ -38,13 +39,6 @@ export const LOCOMOTION = {
  */
 export const DISABLE_GLIDING = false
 export const DISABLE_DOUBLE_JUMP = false
-
-/**
- * Seconds the player cannot move after a fall. This is what makes a fall cost
- * something: the round clock is the server's wall clock, so lost seconds are
- * real and cannot be under-reported the way a client-side penalty could be.
- */
-export const FALL_FREEZE_SECONDS = 1.5
 
 let frozenFor = 0
 
