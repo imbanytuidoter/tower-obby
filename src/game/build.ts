@@ -107,6 +107,21 @@ const isLandmark = (pad: Pad) => pad.kind === 'checkpoint' || pad.kind === 'fini
 /** Half the pad thickness: the height of a pad's walking surface. */
 export const PAD_TOP = 0.25
 
+/**
+ * Height fade is quantised into a few steps on purpose. A smooth fade gives
+ * every pad its own albedo, and every distinct albedo is a material: on a tall
+ * round that alone blew past the log2(n+1)*20 material budget. Four steps look
+ * the same in motion and cost four materials per section instead of seventy.
+ */
+const HAZE_STEPS = 4
+const SHADOW_STEPS = 3
+const FADE_TOP = 36
+
+function quantise(y: number, steps: number): number {
+  const raw = Math.min(1, Math.max(0, y / FADE_TOP))
+  return Math.round(raw * (steps - 1)) / (steps - 1)
+}
+
 export function buildWorld(layout: Layout): World {
   const entities: Entity[] = []
   const pads: BuiltPad[] = []
@@ -217,7 +232,7 @@ export function clearWorld(world: World | null) {
  * Higher pads cast a larger, fainter blob, which also reads as distance.
  */
 function createGroundShadow(pad: Pad): Entity {
-  const lift = Math.min(1, pad.y / 36)
+  const lift = quantise(pad.y, SHADOW_STEPS)
   const shadow = engine.addEntity()
 
   Transform.create(shadow, {
@@ -419,7 +434,7 @@ export function paintPad(entity: Entity, pad: Pad) {
       // Aerial perspective: the higher a pad sits, the more it washes towards
       // the sky. It reads as height even when nothing else in frame does.
       const base = sectionBody(pad.section)
-      const haze = Math.min(1, pad.y / 36) * 0.45
+      const haze = quantise(pad.y, HAZE_STEPS) * 0.45
       Material.setPbrMaterial(entity, {
         albedoColor: Color4.create(
           base.r + (0.82 - base.r) * haze,

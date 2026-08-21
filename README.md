@@ -73,15 +73,15 @@ same formula in metres for height. This scene uses **25 parcels**:
 | entities | 5000 | 414 | 8 % |
 | triangles | 250 000 | ~12 400 | 5 % |
 | height | 94 m | 72.3 m | 77 % |
-| materials | 94 | see below | ⚠️ |
+| materials | 94 | ~75 | 80 % |
 
 Round 10 is the heaviest: 71 pads (each pad is 4 entities — slab, edge light, strut,
 ground shadow), 9 hazards, 3 checkpoints, plus 87 fixed entities for the lobby, gate,
 leaderboard and perimeter.
 
-**Known issue:** pads fade towards the sky with height and ground shadows fade with it
-too, which produces a unique material per pad. That can exceed the 94-material budget on
-tall rounds. The fix is to quantise both into a handful of steps.
+Height fade is quantised into 4 steps for pads and 3 for shadows. A smooth fade would
+give every pad its own albedo, and every distinct albedo is a material — on round 10 that
+came to roughly 182, well past the budget. The steps are invisible in motion.
 
 ## Verifying changes
 
