@@ -338,10 +338,11 @@ function runSystem(dt: number) {
     const profile = getPlayer()
     room.send('claimFinish', { round: run.round, name: profile?.name ?? 'Guest' })
 
-    // The server owns the record; compare against the copy it already sent us.
+    // The panel is optimistic, the sound is not: it plays when the server
+    // confirms the finish over roundWon, so it can never celebrate a claim
+    // that was rejected.
     const improved = run.personalBest === 0 || run.time < run.personalBest
     completeRound(improved)
-    play('finish')
     return
   }
 

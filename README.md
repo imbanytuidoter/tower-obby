@@ -81,6 +81,11 @@ Decentraland Multiplayer Server (`@dcl/sdk@auth-server`), branched with
   storage writes are capped — and personal bests are kept per wallet, so they
   survive the server shutting down when the scene empties.
 
+Each player is timed from the moment **they** cross the start line, not from the round's
+own start — the server watches the gate plane itself, every frame, so someone who walks
+into the World halfway through a round still races their own clock and a client cannot
+win time by reporting its start late.
+
 Because the server sleeps when the World is empty and takes ~15 s to cold start,
 the client shows a "waking the server up" banner driven by a heartbeat, and
 tracks the time it *observed* the heartbeat change rather than the server's own
@@ -93,14 +98,22 @@ same formula in metres for height. This scene uses **25 parcels**:
 
 | resource | limit | worst round (10) | used |
 |---|---|---|---|
-| entities | 5000 | 414 | 8 % |
-| triangles | 250 000 | ~12 400 | 5 % |
-| height | 94 m | 72.3 m | 77 % |
+| entities | 5000 | ~400 | 8 % |
+| triangles | 250 000 | ~12 000 | 5 % |
+| height | 94 m | 56.9 m | 61 % |
 | materials | 94 | ~75 | 80 % |
 
-Round 10 is the heaviest: 71 pads (each pad is 4 entities — slab, edge light, strut,
-ground shadow), 9 hazards, 3 checkpoints, plus 87 fixed entities for the lobby, gate,
-leaderboard and perimeter.
+Round 10 is the heaviest: 69 pads (each pad is 4 entities — slab, edge light, strut,
+ground shadow), its hazards and 3 checkpoints, plus the fixed lobby, gate, leaderboard
+and perimeter.
+
+Measured geometry, which is what the checks in *Verifying changes* assert:
+
+```
+round  1 | EDGE gap 2.16-2.40m | overlapping pads 0 | top 17.1m
+round  5 | EDGE gap 2.49-2.93m | overlapping pads 0 | top 27.9m
+round 10 | EDGE gap 3.06-3.60m | overlapping pads 0 | top 56.9m
+```
 
 Height fade is quantised into 4 steps for pads and 3 for shadows. A smooth fade would
 give every pad its own albedo, and every distinct albedo is a material — on round 10 that
