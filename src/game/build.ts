@@ -76,17 +76,17 @@ export type World = {
  * safe, red always means it will hurt, gold always means the goal. Only the
  * neutral pad body and its accent follow the round theme.
  */
-const HAZARD_ALBEDO = Color4.create(0.9, 0.16, 0.2, 1)
+const HAZARD_ALBEDO = Color4.fromHexString('#FF3B4DFF')
 const HAZARD_EMISSIVE = Color3.create(1, 0.12, 0.16)
-const CRUMBLE_ALBEDO = Color4.create(0.85, 0.45, 0.16, 1)
+const CRUMBLE_ALBEDO = Color4.fromHexString('#FF9D2EFF')
 const CRUMBLE_EMISSIVE = Color3.create(1, 0.4, 0.08)
-const FINISH_ALBEDO = Color4.create(1, 0.8, 0.25, 1)
+const FINISH_ALBEDO = Color4.fromHexString('#FFD23FFF')
 const FINISH_EMISSIVE = Color3.create(1, 0.7, 0.1)
-const CP_ALBEDO = Color4.create(0.25, 0.9, 1, 1)
-const CP_EMISSIVE = Color3.create(0.15, 0.8, 1)
+const CP_ALBEDO = Color4.fromHexString('#FFD23FFF')
+const CP_EMISSIVE = Color3.create(1, 0.72, 0.15)
 const CP_DONE_ALBEDO = Color4.create(0.35, 1, 0.55, 1)
 const CP_DONE_EMISSIVE = Color3.create(0.25, 1, 0.45)
-const START_ALBEDO = Color4.create(0.3, 0.9, 0.5, 1)
+const START_ALBEDO = Color4.fromHexString('#4EE3F2FF')
 const START_EMISSIVE = Color3.create(0.18, 0.85, 0.42)
 
 /**
@@ -95,44 +95,53 @@ const START_EMISSIVE = Color3.create(0.18, 0.85, 0.42)
  * same trick works here, and it costs nothing.
  */
 /**
- * Zone colour is a continuous ramp, so altitude is readable as hue.
+ * SAFE is a fill, and a plain pad is safe.
  *
- * This was a table of eight colours indexed with a modulo. Against twenty
- * zones that repeated three times over, and a player could not tell zone two
- * from zone ten - which defeats the point of colouring zones at all. The ramp
- * runs cool at the base through warm at the crown, the way height reads in a
- * landscape.
+ * These slabs used to carry a grey-blue ramp that meant altitude and nothing
+ * else, which is why the tower read as rubble: the largest surface in the game
+ * said nothing about the game. The design pass is explicit - cyan means solid
+ * ground you can stand on forever, drawn as a full-face fill. That is what the
+ * player is looking at nine tenths of the time, so that is what it says.
  *
- * ZONE_STEPS is a materials budget, not an aesthetic choice. Every distinct
- * colour is a material, and the scene is allowed 94 across 25 parcels; ten
- * bands over twenty zones still reads as a climb while costing half as much
- * as a colour per zone.
+ * Altitude survives as a hue shift WITHIN the safe family, which keeps the
+ * Tower of Hell section-colour convention without letting a zone's identity
+ * overwrite what the pad means. Nothing here can be mistaken for red, orange
+ * or gold.
  */
+const SAFE_HUE = 185
+const SAFE_HUE_SWING = 26
 const ZONE_STEPS = 10
 
-/** 0 at the gate, 1 at the crown, quantised so the material count is bounded. */
+/** 0 at the gate, 1 at the crown, quantised to bound the material count. */
 function zoneRamp(section: number): number {
   const t = Math.min(1, Math.max(0, (section - 1) / (TOWER_ZONES - 1)))
   return Math.round(t * (ZONE_STEPS - 1)) / (ZONE_STEPS - 1)
 }
 
-/**
- * Muted slab bodies: they are the floor, not the subject. Saturation stays
- * low so the four functional colours - cyan, red, orange, gold - never have
- * to compete with the scenery for attention.
- */
-function sectionBody(section: number): Color4 {
-  const t = zoneRamp(section)
-  return Color4.create(0.4 + t * 0.24, 0.5 - t * 0.05, 0.66 - t * 0.24, 1)
+/** Minimal HSL, only ever called at build time. */
+function hsl(h: number, sat: number, light: number): Color3 {
+  const c = (1 - Math.abs(2 * light - 1)) * sat
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = light - c / 2
+  const seg = Math.floor(h / 60) % 6
+  const rgb =
+    seg === 0 ? [c, x, 0] : seg === 1 ? [x, c, 0] : seg === 2 ? [0, c, x]
+    : seg === 3 ? [0, x, c] : seg === 4 ? [x, 0, c] : [c, 0, x]
+  return Color3.create(rgb[0] + m, rgb[1] + m, rgb[2] + m)
 }
 
-/**
- * The accent is the same ramp with the saturation turned up. It is what edges
- * and glows use, so it is the part a player actually reads at distance.
- */
+function sectionBody(section: number): Color4 {
+  const t = zoneRamp(section)
+  // Azure at the base through green-cyan at the crown. Still unmistakably
+  // "safe" at both ends.
+  const c = hsl(SAFE_HUE + SAFE_HUE_SWING - t * (SAFE_HUE_SWING * 2), 0.72, 0.6 - t * 0.06)
+  return Color4.create(c.r, c.g, c.b, 1)
+}
+
+/** The edge light. Brighter than the face so the lip of a slab reads first. */
 export function sectionAccent(section: number): Color3 {
   const t = zoneRamp(section)
-  return Color3.create(0.25 + t * 0.7, 0.62 + t * 0.28, 1 - t * 0.75)
+  return hsl(SAFE_HUE + SAFE_HUE_SWING - t * (SAFE_HUE_SWING * 2), 0.9, 0.74)
 }
 
 /** Landmarks are round, plain pads are square: readable at a glance. */
@@ -608,10 +617,15 @@ function createCheckpointMarker(pad: Pad, number: number) {
 }
 
 function paintHazard(entity: Entity) {
+  // Intensity 4 pushed the emissive past the albedo and the bars rendered
+  // salmon-pink. Red is the one colour in the vocabulary that has to be
+  // unmistakable at a glance, so it renders as its own colour, lit enough to
+  // read against the sky and no further.
   Material.setPbrMaterial(entity, {
     albedoColor: HAZARD_ALBEDO,
     emissiveColor: HAZARD_EMISSIVE,
-    emissiveIntensity: 4
+    emissiveIntensity: 1.4,
+    roughness: 0.6
   })
 }
 
@@ -655,7 +669,7 @@ export function paintPad(entity: Entity, pad: Pad) {
       // 0.45 washed the top half of the tower to near-white and took the
       // altitude ramp with it. 0.22 still reads as aerial perspective while
       // leaving the zone colour legible from the ground.
-      const haze = quantise(pad.y, HAZE_STEPS) * 0.22
+      const haze = quantise(pad.y, HAZE_STEPS) * 0.1
       Material.setPbrMaterial(entity, {
         albedoColor: Color4.create(
           base.r + (0.82 - base.r) * haze,
@@ -663,10 +677,13 @@ export function paintPad(entity: Entity, pad: Pad) {
           base.b + (0.88 - base.b) * haze,
           1
         ),
+        // The top face points at a bright sky, which bleaches it - and the
+        // top face is the one a climber actually looks at. A little self-lit
+        // colour holds the "safe" reading from directly above.
         emissiveColor: sectionAccent(pad.section),
-        emissiveIntensity: 0.4,
-        metallic: 0.2,
-        roughness: 0.7
+        emissiveIntensity: 1.05,
+        metallic: 0,
+        roughness: 0.75
       })
     }
   }

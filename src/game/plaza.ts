@@ -387,9 +387,11 @@ function createPerimeter() {
     MeshRenderer.setBox(monolith)
     MeshCollider.setBox(monolith)
     Material.setPbrMaterial(monolith, {
-      albedoColor: Color4.create(0.1, 0.11, 0.16, 1),
-      metallic: 0.7,
-      roughness: 0.45
+      // Black slabs standing in open water read as missing geometry. These
+      // are a boundary, not a feature - they should recede, not punch holes.
+      albedoColor: Color4.create(0.44, 0.46, 0.54, 1),
+      metallic: 0.05,
+      roughness: 0.9
     })
 
     // A lit cap, clear of the monolith's top face so the two never z-fight.
