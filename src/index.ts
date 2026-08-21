@@ -38,7 +38,7 @@ import {
   sectionAccent,
   World
 } from './game/build'
-import { applyFairness } from './game/fairness'
+import { applyFairness, freezeAfterFall } from './game/fairness'
 import { buildLayout } from './game/layout'
 import { submit } from './game/leaderboard'
 import { buildPlaza, decorSystem, GATE_LOOK, refreshBoard, showBoard } from './game/plaza'
@@ -337,6 +337,7 @@ function updatePrompt(player: Vector3) {
 function die() {
   run.falls += 1
   play('fall')
+  freezeAfterFall()
   sendToCheckpoint()
 }
 

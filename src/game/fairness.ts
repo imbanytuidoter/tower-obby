@@ -28,13 +28,45 @@ export const LOCOMOTION = {
 export const DISABLE_GLIDING = true
 export const DISABLE_DOUBLE_JUMP = true
 
+/**
+ * Seconds the player cannot move after a fall. This is what makes a fall cost
+ * something: the round clock is the server's wall clock, so lost seconds are
+ * real and cannot be under-reported the way a client-side penalty could be.
+ */
+export const FALL_FREEZE_SECONDS = 1.5
+
+let frozenFor = 0
+
 export function applyFairness() {
   AvatarLocomotionSettings.createOrReplace(engine.PlayerEntity, LOCOMOTION)
 
+  restoreInput()
+  engine.addSystem(freezeSystem, 0, 'freezeSystem')
+}
+
+function restoreInput() {
   InputModifier.createOrReplace(engine.PlayerEntity, {
     mode: InputModifier.Mode.Standard({
       disableGliding: DISABLE_GLIDING,
       disableDoubleJump: DISABLE_DOUBLE_JUMP
     })
   })
+}
+
+/** Called on every fall. Movement returns by itself. */
+export function freezeAfterFall() {
+  frozenFor = FALL_FREEZE_SECONDS
+  InputModifier.createOrReplace(engine.PlayerEntity, {
+    mode: InputModifier.Mode.Standard({ disableAll: true })
+  })
+}
+
+export function isFrozen(): boolean {
+  return frozenFor > 0
+}
+
+function freezeSystem(dt: number) {
+  if (frozenFor <= 0) return
+  frozenFor -= dt
+  if (frozenFor <= 0) restoreInput()
 }
