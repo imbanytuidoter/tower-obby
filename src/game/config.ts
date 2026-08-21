@@ -151,8 +151,21 @@ export const GATE_Z = (LOBBY_Z + START_PAD_Z) / 2 + GATE_DIR_Z * 1.6
  * lobby from it. The first thirty seconds are the whole pitch, and walking is
  * not the game.
  */
-export const LOBBY_SPAWN_X = LOBBY_X + (GATE_X - LOBBY_X) * 0.65
-export const LOBBY_SPAWN_Z = LOBBY_Z + (GATE_Z - LOBBY_Z) * 0.65
+/**
+ * Arrival stands BEHIND the lobby centre, not two thirds of the way to the
+ * gate. From here the gate and the tower are straight ahead and the board sits
+ * 43 degrees off that line - inside peripheral vision on a phone. It used to
+ * be 180 degrees behind, which is why nobody read it.
+ *
+ * tools/verify-layout.mjs asserts that angle so it cannot drift back.
+ */
+export const LOBBY_SPAWN_BACK = 1.5
+export const LOBBY_SPAWN_X = LOBBY_X - GATE_DIR_X * LOBBY_SPAWN_BACK
+export const LOBBY_SPAWN_Z = LOBBY_Z - GATE_DIR_Z * LOBBY_SPAWN_BACK
+
+/** Board placement, relative to the lobby centre, in gate-space. */
+export const BOARD_FORWARD = 5
+export const BOARD_LATERAL = 6
 export const GATE_WIDTH = 9
 
 /** How close the player must be for an approach prompt to appear. */

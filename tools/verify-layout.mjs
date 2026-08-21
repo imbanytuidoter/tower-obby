@@ -101,6 +101,23 @@ for (const round of ROUNDS) {
 note(deadZones === 0, 'finish slab fully responsive', `worst corner ${worstCorner.toFixed(2)}m, ${deadZones} dead zones`)
 note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_RADIUS}m`)
 
+// The first ten seconds. A player arriving alone must see the gate they have
+// to walk through AND the board that tells them why - without turning round.
+// The board used to sit exactly 180 degrees behind the spawn.
+{
+  const sx = -cfg.GATE_DIR_Z, sz = cfg.GATE_DIR_X
+  const BX = cfg.LOBBY_X + cfg.GATE_DIR_X * cfg.BOARD_FORWARD + sx * cfg.BOARD_LATERAL
+  const BZ = cfg.LOBBY_Z + cfg.GATE_DIR_Z * cfg.BOARD_FORWARD + sz * cfg.BOARD_LATERAL
+  const unit = (x, z) => { const l = Math.hypot(x, z) || 1; return [x / l, z / l] }
+  const [lx, lz] = unit(cfg.GATE_X - cfg.LOBBY_SPAWN_X, cfg.GATE_Z - cfg.LOBBY_SPAWN_Z)
+  const [bx, bz] = unit(BX - cfg.LOBBY_SPAWN_X, BZ - cfg.LOBBY_SPAWN_Z)
+  const angle = (Math.acos(Math.max(-1, Math.min(1, lx * bx + lz * bz))) * 180) / Math.PI
+  const dist = Math.hypot(BX - cfg.LOBBY_SPAWN_X, BZ - cfg.LOBBY_SPAWN_Z)
+  note(angle <= 55, 'board visible on arrival', `${angle.toFixed(0)} deg off the gaze, ${dist.toFixed(1)} m away`)
+  // And it must not stand in the doorway it is advertising.
+  note(cfg.BOARD_LATERAL > cfg.GATE_WIDTH / 2 + 1, 'board clear of the gate opening', `${cfg.BOARD_LATERAL} m aside of a ${cfg.GATE_WIDTH} m gate`)
+}
+
 // Determinism: every client builds the tower locally, so the same round must
 // produce byte-identical geometry or players fall through each other's floors.
 const once = JSON.stringify(buildTower())

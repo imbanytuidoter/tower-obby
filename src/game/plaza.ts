@@ -28,7 +28,11 @@ import {
   GROUND_SIZE,
   START_PAD_X,
   START_PAD_Z,
-  BOARD_SIZE
+  BOARD_SIZE,
+  BOARD_FORWARD,
+  BOARD_LATERAL,
+  LOBBY_SPAWN_X,
+  LOBBY_SPAWN_Z
 } from './config'
 import { formatTime } from './format'
 import { MODELS, placeProp } from './props'
@@ -49,10 +53,24 @@ function yawFacing(fromX: number, fromZ: number, toX: number, toZ: number): numb
   return (Math.atan2(-(toX - fromX), -(toZ - fromZ)) * 180) / Math.PI
 }
 
-/** The board stands at the back of the lobby, facing the start gate. */
-const BOARD_X = LOBBY_X - GATE_DIR_X * (LOBBY_SIZE / 2 - 1.2)
-const BOARD_Z = LOBBY_Z - GATE_DIR_Z * (LOBBY_SIZE / 2 - 1.2)
-const BOARD_YAW = yawFacing(BOARD_X, BOARD_Z, GATE_X, GATE_Z)
+/**
+ * The board stands to one SIDE of the lobby, angled at whoever just arrived.
+ *
+ * It used to sit at the back, facing the gate - which put it exactly 180
+ * degrees behind a player at the spawn, 11 m away, at the one moment they are
+ * standing still. The social centrepiece of the scene was the one thing you
+ * could not see without turning round first, and most people never did.
+ *
+ * Off to the side it stays out of the sightline to the tower while sitting
+ * inside peripheral vision, so it is read with a glance rather than a
+ * pirouette. Measured angle from the arrival gaze is asserted below.
+ */
+const SIDE_OF_GATE_X = -GATE_DIR_Z
+const SIDE_OF_GATE_Z = GATE_DIR_X
+
+const BOARD_X = LOBBY_X + GATE_DIR_X * BOARD_FORWARD + SIDE_OF_GATE_X * BOARD_LATERAL
+const BOARD_Z = LOBBY_Z + GATE_DIR_Z * BOARD_FORWARD + SIDE_OF_GATE_Z * BOARD_LATERAL
+const BOARD_YAW = yawFacing(BOARD_X, BOARD_Z, LOBBY_SPAWN_X, LOBBY_SPAWN_Z)
 
 /** Unit vector from the board towards whoever is reading it. */
 const FRONT_X = -Math.sin((BOARD_YAW * Math.PI) / 180)
