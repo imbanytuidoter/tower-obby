@@ -225,8 +225,7 @@ export function buildWorld(layout: Layout): World {
 
   const levers = layout.levers.map((lever) => {
     const pad = createPressurePad(lever, entities)
-    labelPad(lever, 'STAND HERE
-STOPS THE BEAM', entities)
+    labelPad(lever, 'STAND HERE - STOPS THE BEAM', entities)
     return { pad, section: lever.section }
   })
 
@@ -273,10 +272,8 @@ function buildShortcut(layout: Layout, entities: Entity[]): BuiltShortcut | null
 
   const padA = createPressurePad(layout.shortcut.padA, entities)
   const padB = createPressurePad(layout.shortcut.padB, entities)
-  labelPad(layout.shortcut.padA, 'BOTH PADS
-OPENS A SHORTCUT', entities)
-  labelPad(layout.shortcut.padB, 'BOTH PADS
-OPENS A SHORTCUT', entities)
+  labelPad(layout.shortcut.padA, 'BOTH PADS - OPENS A SHORTCUT', entities)
+  labelPad(layout.shortcut.padB, 'BOTH PADS - OPENS A SHORTCUT', entities)
 
   return { route, padA, padB, open: false }
 }
