@@ -451,6 +451,20 @@ export function paintPad(entity: Entity, pad: Pad) {
   }
 }
 
+/**
+ * Flashes a crumbling pad the moment it is triggered. Without this the only
+ * feedback is the floor already being gone, which reads as the game cheating.
+ */
+export function paintCrumbling(entity: Entity, glow: Entity) {
+  const warning = {
+    albedoColor: Color4.create(1, 0.55, 0.15, 1),
+    emissiveColor: Color3.create(1, 0.5, 0.05),
+    emissiveIntensity: 6
+  }
+  Material.setPbrMaterial(entity, warning)
+  Material.setPbrMaterial(glow, warning)
+}
+
 /** Dimmed look while a crumbling pad is gone. */
 export function paintCrumbled(entity: Entity, glow: Entity) {
   const faded = {

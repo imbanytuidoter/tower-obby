@@ -28,6 +28,10 @@ export const room = registerMessages({
     /** Cosmetic label for the live ranking; the server has only addresses. */
     name: Schemas.String
   }),
+  /** The clock ran out and nobody topped out. */
+  roundTimeout: Schemas.Map({
+    round: Schemas.Int
+  }),
   /** Sent back to that one player: their history, restored from storage. */
   stats: Schemas.Map({
     bestSeconds: Schemas.Float,

@@ -32,6 +32,7 @@ import {
   buildWorld,
   clearWorld,
   paintCrumbled,
+  paintCrumbling,
   paintGlow,
   paintPad,
   PAD_TOP,
@@ -80,6 +81,10 @@ function startClient() {
   room.onMessage('roundWon', (data) => {
     announce(data.name + ' reached the top in ' + data.seconds.toFixed(1) + 's')
     play('finish')
+  })
+
+  room.onMessage('roundTimeout', () => {
+    announce('Time up - nobody reached the top')
   })
 
   room.onMessage('stats', (data) => {
@@ -270,6 +275,7 @@ function updateCrumblingPads(dt: number, player: Vector3 | null) {
       if (standing) {
         built.state = 'falling'
         built.timer = CRUMBLE_DELAY
+        paintCrumbling(built.entity, built.glow)
       }
       continue
     }

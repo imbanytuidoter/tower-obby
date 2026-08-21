@@ -90,6 +90,8 @@ function serverSystem(dt: number) {
   if (!current) return
   if (Date.now() < current.endsAt) return
 
+  // Say the round expired. Being teleported with no explanation reads as a bug.
+  room.send('roundTimeout', { round: current.round })
   advance(current.round)
 }
 
