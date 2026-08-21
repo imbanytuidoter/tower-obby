@@ -3,7 +3,6 @@ import {
   BillboardMode,
   engine,
   Entity,
-  LightSource,
   Material,
   MeshCollider,
   MeshRenderer,
@@ -608,21 +607,27 @@ function createDressing() {
     emissiveIntensity: 3
   })
 
-  // The scene's single dynamic light belongs on the one thing players read.
-  // Aimed down at the deck, not at the board: pointing it at the face put a
-  // visible beam across the text and washed the rows out.
-  const light = engine.addEntity()
-  const lightPos = front(3.2)
-  Transform.create(light, {
-    position: Vector3.create(lightPos.x, 5.5, lightPos.z),
-    rotation: Quaternion.fromEulerDegrees(-80, BOARD_YAW + 180, 0)
+  // A pool of light under the board, built from emissive geometry rather than
+  // a LightSource.
+  //
+  // Dynamic lights are not available on mobile, and mobile is the platform
+  // this scene is judged on. A spot light here meant the board sat in a lit
+  // pool on desktop and in flat shade on a phone - the two platforms did not
+  // look like the same place, and the one that mattered got the worse version.
+  // Emissive geometry renders identically on both.
+  const pool = engine.addEntity()
+  const poolPos = front(2.6)
+  Transform.create(pool, {
+    position: Vector3.create(poolPos.x, 0.08, poolPos.z),
+    rotation: Quaternion.fromEulerDegrees(0, BOARD_YAW, 0),
+    scale: Vector3.create(BOARD_W * 1.15, 0.05, 5.2)
   })
-  LightSource.create(light, {
-    type: LightSource.Type.Spot({ innerAngle: 30, outerAngle: 55 }),
-    color: Color3.create(0.8, 0.92, 1),
-    intensity: 450,
-    shadow: false,
-    range: 12
+  MeshRenderer.setBox(pool)
+  Material.setPbrMaterial(pool, {
+    albedoColor: Color4.create(0.62, 0.78, 0.9, 1),
+    emissiveColor: Color3.create(0.4, 0.62, 0.8),
+    emissiveIntensity: 0.9,
+    roughness: 0.6
   })
 }
 
