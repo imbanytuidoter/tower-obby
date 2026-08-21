@@ -7,13 +7,7 @@ import { Quaternion, Vector3 } from '@dcl/sdk/math'
  * actually stands on stays a primitive, so collision is predictable.
  */
 export const MODELS = {
-  lampPost: 'assets/models/LampPostSciFi_01/LampPostSciFi_01.glb',
-  lightColumn: 'assets/models/Light_02/Light_02.glb',
-  floorLight: 'assets/models/Light_04/Light_04.glb',
-  column: 'assets/models/Column_01/Column_01.glb',
-  neonTube: 'assets/models/NeonLightTube_04/NeonLightTube_04.glb',
-  hexFloor: 'assets/models/FloorHexa_01/FloorHexa_01.glb',
-  barrier: 'assets/models/Fence_Straight_01/Fence_Straight_01.glb'
+  lampPost: 'assets/models/LampPostSciFi_01/LampPostSciFi_01.glb'
 } as const
 
 export type PropOptions = {

@@ -145,12 +145,17 @@ src/
     layout.ts       section library and tower generation (pure logic)
     build.ts        turns a layout into entities
     plaza.ts        ground, lobby, start gate, leaderboard monument
-    leaderboard.ts  per-round best times, shared over the message bus
+    fairness.ts     locomotion pinning, no gliding, fall freeze
     sound.ts        feedback cues
     rng.ts          seeded generator, so rounds are reproducible
     state.ts        run state read by the HUD
+  server/
+    server.ts       round clock, finish validation, storage
+  shared/
+    messages.ts     registerMessages definitions
+    schemas.ts      synced components and their server-only guards
 assets/
-  models/           props from the Decentraland Sci-fi asset pack
+  models/           lamp post from the Decentraland Sci-fi asset pack
   sounds/           cues from the Decentraland asset packs
 ```
 

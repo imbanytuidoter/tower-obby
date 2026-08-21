@@ -66,9 +66,6 @@ const INK = Color4.create(0.04, 0.05, 0.09, 1)
 const DIM = Color4.create(0.62, 0.7, 0.8, 1)
 const GOLD4 = Color4.create(1, 0.82, 0.25, 1)
 
-/** Where to point the camera so a player sees the board. */
-export const BOARD_LOOK = Vector3.create(BOARD_X, BOARD_Y, BOARD_Z)
-
 /** Where to point the camera so a player sees the gate they must walk through. */
 export const GATE_LOOK = Vector3.create(GATE_X, LOBBY_Y + 2.6, GATE_Z)
 

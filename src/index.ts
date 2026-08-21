@@ -40,7 +40,6 @@ import {
 } from './game/build'
 import { applyFairness, freezeAfterFall } from './game/fairness'
 import { buildLayout } from './game/layout'
-import { submit } from './game/leaderboard'
 import { buildPlaza, decorSystem, GATE_LOOK, refreshBoard, showBoard } from './game/plaza'
 import { play, setupSound } from './game/sound'
 import { completeRound, Phase, prepareRound, run, startClock } from './game/state'
@@ -324,7 +323,8 @@ function runSystem(dt: number) {
     const profile = getPlayer()
     room.send('claimFinish', { round: run.round, name: profile?.name ?? 'Guest' })
 
-    const improved = submit(run.round, run.time, run.falls)
+    // The server owns the record; compare against the copy it already sent us.
+    const improved = run.personalBest === 0 || run.time < run.personalBest
     completeRound(improved)
     play('finish')
     return

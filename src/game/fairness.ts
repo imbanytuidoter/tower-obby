@@ -61,10 +61,6 @@ export function freezeAfterFall() {
   })
 }
 
-export function isFrozen(): boolean {
-  return frozenFor > 0
-}
-
 function freezeSystem(dt: number) {
   if (frozenFor <= 0) return
   frozenFor -= dt
