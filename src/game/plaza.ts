@@ -83,6 +83,7 @@ export function buildPlaza() {
   createPerimeter()
   createLobby()
   createStartGate()
+  createGuideArrows()
   createBoard()
   createDressing()
   refreshBoard()
@@ -220,6 +221,37 @@ function createStartGate() {
     emissiveColor: Color3.create(0.25, 1, 0.55),
     emissiveIntensity: 4
   })
+}
+
+/**
+ * Chevrons on the deck pointing at the gate. Wordless on purpose: on a phone
+ * nobody reads a briefing, and an arrow works in every language.
+ */
+function createGuideArrows() {
+  const yaw = (Math.atan2(GATE_DIR_X, GATE_DIR_Z) * 180) / Math.PI
+
+  for (let i = 0; i < 3; i++) {
+    const back = 5.5 - i * 1.8
+    const x = GATE_X - GATE_DIR_X * back
+    const z = GATE_Z - GATE_DIR_Z * back
+
+    // Two bars meeting at a point: a chevron, built from what we have.
+    for (const side of [-1, 1]) {
+      const bar = engine.addEntity()
+      Transform.create(bar, {
+        position: Vector3.create(x, LOBBY_Y + 0.04, z),
+        rotation: Quaternion.fromEulerDegrees(0, yaw + side * 45, 0),
+        scale: Vector3.create(1.5, 0.05, 0.28)
+      })
+      MeshRenderer.setBox(bar)
+      Material.setPbrMaterial(bar, {
+        albedoColor: Color4.create(0.35, 1, 0.6, 1),
+        emissiveColor: Color3.create(0.25, 1, 0.55),
+        // Brighter the closer they get to the gate.
+        emissiveIntensity: 1.2 + i * 0.9
+      })
+    }
+  }
 }
 
 /** Slowly turns the two markers flanking the board. */

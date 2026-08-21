@@ -74,6 +74,14 @@ export const GATE_DIR_Z = -Math.sin(startAngle)
 
 export const GATE_X = (LOBBY_X + START_PAD_X) / 2 + GATE_DIR_X * 1.6
 export const GATE_Z = (LOBBY_Z + START_PAD_Z) / 2 + GATE_DIR_Z * 1.6
+
+/**
+ * Where a round drops you: a couple of steps short of the line, not across the
+ * lobby from it. The first thirty seconds are the whole pitch, and walking is
+ * not the game.
+ */
+export const LOBBY_SPAWN_X = LOBBY_X + (GATE_X - LOBBY_X) * 0.65
+export const LOBBY_SPAWN_Z = LOBBY_Z + (GATE_Z - LOBBY_Z) * 0.65
 export const GATE_WIDTH = 9
 
 /** How close the player must be for an approach prompt to appear. */

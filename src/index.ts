@@ -14,9 +14,9 @@ import {
   GATE_WIDTH,
   GATE_X,
   GATE_Z,
-  LOBBY_X,
+  LOBBY_SPAWN_X,
+  LOBBY_SPAWN_Z,
   LOBBY_Y,
-  LOBBY_Z,
   PROMPT_RANGE,
   CRUMBLE_DELAY,
   CRUMBLE_RESPAWN,
@@ -382,7 +382,7 @@ function die() {
 function sendToLobby() {
   run.respawnCooldown = RESPAWN_COOLDOWN
   void movePlayerTo({
-    newRelativePosition: Vector3.create(LOBBY_X, LOBBY_Y + 1.2, LOBBY_Z),
+    newRelativePosition: Vector3.create(LOBBY_SPAWN_X, LOBBY_Y + 1.2, LOBBY_SPAWN_Z),
     cameraTarget: GATE_LOOK
   })
 }
