@@ -89,8 +89,12 @@ function startClient() {
 
   // Somebody else topping out ends the round for everyone. Without this the
   // tower simply vanishes and you are back in the lobby with no explanation.
+  // The round keeps running after somebody tops out, so this is news about a
+  // rival rather than a signal that everything is over. Saying which place
+  // they took is what makes a second and third summit worth chasing.
   room.onMessage('roundWon', (data) => {
-    announce(data.name + ' reached the top in ' + data.seconds.toFixed(1) + 's')
+    const place = data.place <= 1 ? 'first to the top' : ordinal(data.place) + ' to the top'
+    announce(data.name + ' - ' + place + ' in ' + data.seconds.toFixed(1) + 's')
     play('finish')
   })
 
@@ -103,6 +107,12 @@ function startClient() {
     run.climbs = data.climbs
     greeted = true
   })
+}
+
+const ordinal = (n: number) => {
+  const tens = n % 100
+  if (tens >= 11 && tens <= 13) return n + 'th'
+  return n + (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')
 }
 
 /**
@@ -471,7 +481,12 @@ function sendToCheckpoint(lookAt?: Vector3) {
   run.respawnCooldown = RESPAWN_COOLDOWN
 
   // Face the next pad, so a respawn never drops the player looking backwards.
-  const ahead = world.pads[checkpoint.padIndex + 1]
+  // Same class of mistake as the finish gate, though measured as harmless
+  // today: no checkpoint currently sits on a branch. Following the route
+  // rather than the array keeps it that way by construction.
+  const ahead =
+    world.pads.find((built) => built.pad.fromIndex === checkpoint.padIndex) ??
+    world.pads[checkpoint.padIndex + 1]
   const cameraTarget =
     lookAt ??
     (ahead

@@ -203,7 +203,11 @@ export function buildWorld(layout: Layout): World {
       // the slab. Clamped so the client stays inside the server's tolerance.
       const corner = (pad.size / 2) * Math.SQRT2
       finishReach = Math.min(corner + FINISH_TOUCH_MARGIN, FINISH_RADIUS)
-      const previous = layout.pads[padIndex - 1] ?? pad
+      // fromIndex, not padIndex - 1: once a section branches, array order
+      // stops being traversal order, and the gate's yaw comes straight from
+      // the approach direction. Three rounds had it squared to a pad the
+      // route never touches - 28 m away in round 6.
+      const previous = layout.pads[pad.fromIndex] ?? layout.pads[padIndex - 1] ?? pad
       entities.push(...createGoal(pad, previous.x, previous.z))
     }
 

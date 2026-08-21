@@ -21,7 +21,9 @@ export const room = registerMessages({
   /** Server tells everyone who closed the round out. */
   roundWon: Schemas.Map({
     name: Schemas.String,
-    seconds: Schemas.Float
+    seconds: Schemas.Float,
+    /** 1 for the first climber to top out this round, 2 for the next... */
+    place: Schemas.Int
   }),
   /** "I have arrived, send me my saved record." */
   hello: Schemas.Map({

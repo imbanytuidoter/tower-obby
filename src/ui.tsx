@@ -337,10 +337,17 @@ const clearedPanel = () => {
           />
         )}
         <Label
-          value={'Next round for everyone in ' + countdown(run.roundEndsIn)}
+          value={'New tower for everyone in ' + countdown(run.roundEndsIn)}
           fontSize={s.body}
           color={DIM}
         />
+        {run.climbers > 1 && (
+          <Label
+            value={'Still climbing: ' + (run.climbers - 1)}
+            fontSize={s.body}
+            color={DIM}
+          />
+        )}
         {button('CLIMB AGAIN', handlers.retry, GOLD)}
       </UiEntity>
     </UiEntity>

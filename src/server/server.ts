@@ -95,6 +95,9 @@ export async function startServer() {
   console.log('[SERVER] obby ready, round 1')
 }
 
+/** Addresses credited with a summit in the current round. Cleared on advance. */
+const finishedThisRound = new Set<string>()
+
 /** Heartbeat and the round clock. Everything else is event driven. */
 function serverSystem(dt: number) {
   heartbeatTimer += dt
@@ -136,6 +139,11 @@ function handleClaim(round: number, name: string, from: string) {
   const current = RoundState.getOrNull(state)
   if (!current || round !== current.round) return
 
+  // One credited summit per player per round. Without this a finisher could
+  // hit CLIMB AGAIN and fill the whole board by themselves.
+  const address = from.toLowerCase()
+  if (finishedThisRound.has(address)) return
+
   const position = playerPosition(from)
   if (!position) return
 
@@ -153,8 +161,13 @@ function handleClaim(round: number, name: string, from: string) {
   board = board.slice(0, BOARD_SIZE)
   publishBoard()
 
-  room.send('roundWon', { name, seconds })
-  advance(current.round)
+  finishedThisRound.add(address)
+
+  // The round is NOT over. It used to end the instant the first player topped
+  // out, which on a phone meant a fast desktop climber could deny everyone
+  // else a summit, round after round. The clock owns the round; a finish is
+  // something that happens inside it. This is also how Tower of Hell works.
+  room.send('roundWon', { name, seconds, place: finishedThisRound.size })
   void persistBoard()
   void recordClimb(from, seconds)
 }
@@ -334,6 +347,7 @@ function advance(from: number) {
   current.startedAt = now
   current.endsAt = now + lengthOf(next) * 1000
   startedClimb.clear()
+  finishedThisRound.clear()
   console.log('[SERVER] round ' + next + ' started')
 }
 

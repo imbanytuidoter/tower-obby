@@ -26,3 +26,6 @@ agent
 skills-lock.json
 LICENSE
 *.mdc
+tools
+cursor.config
+cursorignore
