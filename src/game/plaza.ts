@@ -9,7 +9,8 @@ import {
   MeshRenderer,
   TextAlignMode,
   TextShape,
-  Transform
+  Transform,
+  SkyboxTime
 } from '@dcl/sdk/ecs'
 import { Color3, Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 import {
@@ -30,6 +31,7 @@ import {
   START_PAD_Z,
   BOARD_SIZE,
   BOARD_FORWARD,
+  SKYBOX_TIME,
   BOARD_LATERAL,
   LOBBY_SPAWN_X,
   LOBBY_SPAWN_Z
@@ -95,6 +97,18 @@ const markers: Entity[] = []
 let spin = 0
 
 export function buildPlaza() {
+  // Pin the time of day.
+  //
+  // The scene was rendering at whatever hour the client happened to be on,
+  // and on a sunset sky every surface goes dark no matter what albedo it
+  // carries - the platforms, the ground and the core all read as near-black
+  // silhouettes. worldConfiguration.skyboxConfig is not applied in local
+  // preview, so the fix has to be the runtime component.
+  //
+  // SkyboxTime, fixedTime in seconds since midnight. Confirmed against the
+  // installed @dcl/ecs typings (components/generated/SkyboxTime.gen.d.ts).
+  SkyboxTime.createOrReplace(engine.RootEntity, { fixedTime: SKYBOX_TIME })
+
   createGround()
   createPerimeter()
   createLobby()
@@ -116,8 +130,10 @@ function createLobby() {
   MeshRenderer.setBox(deck)
   MeshCollider.setBox(deck)
   Material.setPbrMaterial(deck, {
-    albedoColor: Color4.create(0.12, 0.14, 0.2, 1),
-    metallic: 0.6,
+    // Was 0.12 - a black plate under a lit tower, which is what made the yard
+    // look like a hole rather than a floor people stand on.
+    albedoColor: Color4.create(0.34, 0.36, 0.42, 1),
+    metallic: 0.1,
     roughness: 0.5
   })
 
@@ -164,7 +180,7 @@ function createStartGate() {
     MeshRenderer.setCylinder(post)
     MeshCollider.setCylinder(post)
     Material.setPbrMaterial(post, {
-      albedoColor: Color4.create(0.12, 0.14, 0.2, 1),
+      albedoColor: Color4.create(0.28, 0.3, 0.36, 1),
       metallic: 0.85,
       roughness: 0.3
     })
@@ -337,10 +353,13 @@ function createGround() {
   })
   MeshRenderer.setBox(ground)
   MeshCollider.setBox(ground)
+  // Near-black read as a hole cut in the world from any distance, and made
+  // the whole scene look unlit. A mid slate reads as a floor, and gives the
+  // pale slabs something to sit against.
   Material.setPbrMaterial(ground, {
-    albedoColor: Color4.create(0.06, 0.07, 0.11, 1),
-    metallic: 0.3,
-    roughness: 0.85
+    albedoColor: Color4.create(0.5, 0.49, 0.46, 1),
+    metallic: 0.05,
+    roughness: 0.95
   })
 }
 

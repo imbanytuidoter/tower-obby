@@ -173,7 +173,7 @@ export function buildWorld(layout: Layout): World {
 
     Transform.create(entity, {
       position: Vector3.create(pad.x, pad.y, pad.z),
-      scale: Vector3.create(pad.size, 0.5, pad.size)
+      scale: Vector3.create(pad.size, 0.75, pad.size)
     })
     if (isLandmark(pad)) {
       MeshRenderer.setCylinder(entity)
@@ -431,23 +431,34 @@ function createGroundShadow(pad: Pad): Entity {
  * A short column hanging under each pad. Slabs floating in mid-air read as
  * placeholder geometry; give them a support and the round reads as built.
  */
+/**
+ * A short plinth directly under the slab.
+ *
+ * This used to be a 1.4-2.4 m stalk a quarter of the pad wide, in near-black.
+ * From any distance the tower read as a field of dark lollipops - the stalks
+ * were the loudest thing in frame and the platforms looked like paper discs
+ * balanced on wires. A plinth the full width of the slab, only slightly
+ * darker than it, gives the platform mass instead of a stem.
+ */
 function createStrut(pad: Pad, index: number): Entity {
-  const strut = engine.addEntity()
-  const height = 1.4 + (index % 3) * 0.5
+  const plinth = engine.addEntity()
+  const height = 0.8 + (index % 3) * 0.15
 
-  Transform.create(strut, {
-    position: Vector3.create(pad.x, pad.y - 0.45 - height / 2, pad.z),
-    scale: Vector3.create(pad.size * 0.24, height, pad.size * 0.24)
+  Transform.create(plinth, {
+    position: Vector3.create(pad.x, pad.y - 0.25 - height / 2, pad.z),
+    scale: Vector3.create(pad.size * 0.82, height, pad.size * 0.82)
   })
-  if (isLandmark(pad)) MeshRenderer.setCylinder(strut)
-  else MeshRenderer.setBox(strut)
+  if (isLandmark(pad)) MeshRenderer.setCylinder(plinth)
+  else MeshRenderer.setBox(plinth)
 
-  Material.setPbrMaterial(strut, {
-    albedoColor: Color4.create(0.13, 0.14, 0.19, 1),
-    metallic: 0.7,
-    roughness: 0.45
+  // Two thirds of the slab's own colour: it reads as the same object seen in
+  // shadow, rather than as a separate dark thing holding it up.
+  const body = sectionBody(pad.section)
+  Material.setPbrMaterial(plinth, {
+    albedoColor: Color4.create(body.r * 0.86, body.g * 0.86, body.b * 0.9, 1),
+    roughness: 0.85
   })
-  return strut
+  return plinth
 }
 
 /** A thin bright slab tucked under a pad, so every platform has a lit edge. */
@@ -468,36 +479,64 @@ function createGlow(pad: Pad): Entity {
  * A dark mast through the middle of the tower. It gives the scattered pads a
  * vertical anchor, so a round reads as one structure instead of loose boxes.
  */
+/**
+ * The tower's core.
+ *
+ * This was a 0.7 m cylinder standing 80 m tall - at any distance a black wire
+ * with platforms scattered around it, which is why the scene read as debris
+ * rather than as a building. A core needs mass to be a core: 5 m across at the
+ * base tapering to 2.8 m, so the silhouette narrows the way a tower's does and
+ * the climb visibly has something to climb around.
+ *
+ * setCylinder(entity, radiusBottom, radiusTop) - confirmed against the
+ * installed @dcl/ecs MeshRenderer typings, not assumed.
+ *
+ * It stays clear of the pads by construction: SHAFT_MIN_RADIUS is 6 m and the
+ * core's widest half-width is 2.5 m.
+ */
 function createSpine(height: number, accent: Color3): Entity[] {
   const made: Entity[] = []
+  const BASE = 5
+  const TOP = 2.8
 
-  const mast = engine.addEntity()
-  Transform.create(mast, {
+  const core = engine.addEntity()
+  Transform.create(core, {
     position: Vector3.create(CENTER_X, height / 2, CENTER_Z),
-    scale: Vector3.create(0.7, height + 2.5, 0.7)
+    scale: Vector3.create(BASE, height + 2.5, BASE)
   })
-  MeshRenderer.setCylinder(mast)
-  Material.setPbrMaterial(mast, {
-    albedoColor: Color4.create(0.2, 0.22, 0.3, 1),
-    metallic: 0.85,
-    roughness: 0.3
+  MeshRenderer.setCylinder(core, 0.5, (TOP / BASE) * 0.5)
+  // Dark enough to sit behind the platforms, light enough not to punch a
+  // black hole in a bright sky - which is exactly what 0.16 did.
+  Material.setPbrMaterial(core, {
+    albedoColor: Color4.create(0.63, 0.6, 0.55, 1),
+    metallic: 0.1,
+    roughness: 0.8
   })
-  made.push(mast)
+  made.push(core)
 
-  const ringCount = Math.max(3, Math.round(height / 4))
-  for (let i = 1; i <= ringCount; i++) {
-    const ring = engine.addEntity()
-    Transform.create(ring, {
-      position: Vector3.create(CENTER_X, (height / ringCount) * i, CENTER_Z),
-      scale: Vector3.create(1.5, 0.12, 1.5)
+  // One band per zone, coloured by that zone's own accent, so the core itself
+  // carries the altitude ramp and reads as storeys rather than as a pole.
+  for (let zone = 1; zone <= TOWER_ZONES; zone++) {
+    const t = zone / TOWER_ZONES
+    const y = height * t
+    const width = BASE + (TOP - BASE) * t + 1.1
+
+    const band = engine.addEntity()
+    Transform.create(band, {
+      position: Vector3.create(CENTER_X, y, CENTER_Z),
+      scale: Vector3.create(width, 0.35, width)
     })
-    MeshRenderer.setCylinder(ring)
-    Material.setPbrMaterial(ring, {
-      albedoColor: Color4.create(accent.r, accent.g, accent.b, 1),
-      emissiveColor: accent,
-      emissiveIntensity: 2.5
+    MeshRenderer.setCylinder(band, 0.5, 0.5)
+    const tone = sectionAccent(zone)
+    // Full-strength zone colour: the bands are how the core carries the
+    // altitude ramp, and at half strength they just read as grey collars.
+    Material.setPbrMaterial(band, {
+      albedoColor: Color4.create(tone.r, tone.g, tone.b, 1),
+      emissiveColor: tone,
+      emissiveIntensity: 0.9,
+      roughness: 0.4
     })
-    made.push(ring)
+    made.push(band)
   }
 
   return made
@@ -613,7 +652,10 @@ export function paintPad(entity: Entity, pad: Pad) {
       // Aerial perspective: the higher a pad sits, the more it washes towards
       // the sky. It reads as height even when nothing else in frame does.
       const base = sectionBody(pad.section)
-      const haze = quantise(pad.y, HAZE_STEPS) * 0.45
+      // 0.45 washed the top half of the tower to near-white and took the
+      // altitude ramp with it. 0.22 still reads as aerial perspective while
+      // leaving the zone colour legible from the ground.
+      const haze = quantise(pad.y, HAZE_STEPS) * 0.22
       Material.setPbrMaterial(entity, {
         albedoColor: Color4.create(
           base.r + (0.82 - base.r) * haze,

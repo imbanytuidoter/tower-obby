@@ -97,7 +97,10 @@
   },
   "authoritativeMultiplayer": true,
   "worldConfiguration": {
-    "name": "imbanana.dcl.eth"
+    "name": "imbanana.dcl.eth",
+    "skyboxConfig": {
+      "fixedTime": 36000
+    }
   },
   "logsPermissions": [
     "0x79208e620af10537b988a41dd8f5b13d89bdc2b3"

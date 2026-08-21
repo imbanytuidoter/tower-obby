@@ -40,6 +40,14 @@ export function estimateClimbSeconds(
   return seconds
 }
 
+/**
+ * Time of day, seconds since midnight. 36000 is 10:00 - high enough for real
+ * light on every surface, low enough that the tower still throws a shadow and
+ * the silhouette reads. A sunset sky was flattening the whole scene to
+ * near-black regardless of what colours the materials carried.
+ */
+export const SKYBOX_TIME = 36000
+
 /** How often the server proves it is alive. */
 export const HEARTBEAT_SECONDS = 2
 
