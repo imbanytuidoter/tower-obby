@@ -15,6 +15,7 @@ import { Color3, Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 import {
   CENTER_X,
   CENTER_Z,
+  curve,
   GATE_DIR_X,
   GATE_DIR_Z,
   GATE_WIDTH,
@@ -81,6 +82,7 @@ export function buildPlaza() {
   createLobby()
   createStartGate()
   createGuideArrows()
+  createPracticeHops()
   createBoard()
   createDressing()
   refreshBoard()
@@ -218,6 +220,56 @@ function createStartGate() {
     emissiveColor: Color3.create(0.25, 1, 0.55),
     emissiveIntensity: 4
   })
+}
+
+/**
+ * Three pads beside the gate at exactly round one's spacing.
+ *
+ * A thumb on a virtual joystick has to learn the jump somewhere, and learning
+ * it mid-race costs the run. These are the same gap the first round opens with,
+ * so what the player finds out here transfers directly. They also give people
+ * something to do in the lobby between rounds, which is the only place anyone
+ * is ever standing still together.
+ */
+function createPracticeHops() {
+  const c = curve(1)
+  const step = c.jumpGap + c.padSize
+
+  // Off to the side of the walk to the gate, never blocking it.
+  const asideX = -GATE_DIR_Z
+  const asideZ = GATE_DIR_X
+
+  for (let i = 0; i < 3; i++) {
+    const x = GATE_X + asideX * 7 + GATE_DIR_X * (i * step - step)
+    const z = GATE_Z + asideZ * 7 + GATE_DIR_Z * (i * step - step)
+
+    const pad = engine.addEntity()
+    Transform.create(pad, {
+      position: Vector3.create(x, LOBBY_Y + 0.4 + i * 0.5, z),
+      scale: Vector3.create(c.padSize, 0.4, c.padSize)
+    })
+    MeshRenderer.setBox(pad)
+    MeshCollider.setBox(pad)
+    Material.setPbrMaterial(pad, {
+      albedoColor: Color4.create(0.4, 0.46, 0.58, 1),
+      emissiveColor: CYAN3,
+      emissiveIntensity: 0.3
+    })
+  }
+
+  const sign = engine.addEntity()
+  Transform.create(sign, {
+    position: Vector3.create(GATE_X + asideX * 7, LOBBY_Y + 3.4, GATE_Z + asideZ * 7)
+  })
+  TextShape.create(sign, {
+    text: 'TRY A JUMP',
+    fontSize: 2.4,
+    textColor: CYAN4,
+    outlineColor: Color4.Black(),
+    outlineWidth: 0.25,
+    textAlign: TextAlignMode.TAM_MIDDLE_CENTER
+  })
+  Billboard.create(sign, { billboardMode: BillboardMode.BM_Y })
 }
 
 /**
