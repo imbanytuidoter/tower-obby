@@ -40,6 +40,11 @@ export const ShortcutState = engine.defineComponent('obby::shortcut', {
   open: Schemas.Boolean
 })
 
+/** Sections whose beam is currently held still by somebody on a lever pad. */
+export const LeverState = engine.defineComponent('obby::levers', {
+  halted: Schemas.Array(Schemas.Int)
+})
+
 /** Best times of the current session, newest winner first. */
 export const Board = engine.defineComponent('obby::board', {
   names: Schemas.Array(Schemas.String),
@@ -60,6 +65,7 @@ export function protectServerState() {
   RoundState.validateBeforeChange(serverOnly)
   Ranking.validateBeforeChange(serverOnly)
   ShortcutState.validateBeforeChange(serverOnly)
+  LeverState.validateBeforeChange(serverOnly)
   ServerHeartbeat.validateBeforeChange(serverOnly)
   Board.validateBeforeChange(serverOnly)
 }

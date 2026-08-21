@@ -9,6 +9,7 @@ import { room } from './shared/messages'
 import {
   Board,
   protectServerState,
+  LeverState,
   Ranking,
   RoundState,
   ServerHeartbeat,
@@ -129,6 +130,9 @@ function helloSystem(dt: number) {
  * deterministic, so a single integer is enough for every player to build the
  * identical course - no geometry is ever sent over the wire.
  */
+/** Sections whose beam is held still by somebody on a lever pad. */
+let haltedSections: number[] = []
+
 let shownRound = 0
 let lastHeartbeatValue = 0
 let lastHeartbeatSeenAt = 0
@@ -147,6 +151,9 @@ function sharedRoundSystem(dt: number) {
 
     run.serverAlive = Date.now() - lastHeartbeatSeenAt < HEARTBEAT_SECONDS * 3000
     run.roundEndsIn = Math.max(0, (state.endsAt - Date.now()) / 1000)
+
+    const levers = LeverState.getOrNull(entity)
+    haltedSections = levers ? levers.halted : []
 
     const bypass = ShortcutState.getOrNull(entity)
     if (bypass && world?.shortcut) setShortcutOpen(world.shortcut, bypass.open)
@@ -220,6 +227,12 @@ function hazardSystem(dt: number) {
   const live = player && run.phase === Phase.Running && run.respawnCooldown <= 0
 
   for (const spinner of world.spinners) {
+    // Somebody is holding this section's lever: the beam stops, and stops
+    // hurting. Both must be true or the invisible half keeps killing people.
+    const held =
+      spinner.def.leverSection !== undefined && haltedSections.indexOf(spinner.def.leverSection) >= 0
+    if (held) continue
+
     spinner.angle = (spinner.angle + spinner.def.speed * dt) % 360
     Transform.getMutable(spinner.entity).rotation = Quaternion.fromEulerDegrees(0, spinner.angle, 0)
 

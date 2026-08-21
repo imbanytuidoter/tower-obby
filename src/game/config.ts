@@ -183,7 +183,16 @@ export const CRUMBLE_DELAY = 0.7
 export const CRUMBLE_RESPAWN = 4
 
 /** No pad may sit above another one closer than this, or the climb is blocked. */
-export const VERTICAL_CLEARANCE = 3.2
+export const VERTICAL_CLEARANCE = 2.4
+
+/**
+ * The tallest step the generator may ever ask for.
+ *
+ * doubleJumpHeight is 2m, so anything above this is a pad nobody can reach and
+ * a run that ends there. The placement search lifts when it cannot find room,
+ * and those lifts used to stack into 3.5m steps.
+ */
+export const MAX_STEP_RISE = 1.6
 export const HORIZONTAL_CLEARANCE = 1.2
 
 /** A checkpoint every Nth section, not on every one. */

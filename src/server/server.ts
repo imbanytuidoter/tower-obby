@@ -19,7 +19,7 @@ import {
 } from '../game/config'
 import { buildLayout } from '../game/layout'
 import { room } from '../shared/messages'
-import { Board, Ranking, RoundState, ServerHeartbeat, ShortcutState } from '../shared/schemas'
+import { Board, LeverState, Ranking, RoundState, ServerHeartbeat, ShortcutState } from '../shared/schemas'
 
 const STORAGE_KEY = 'obby.board.v1'
 const PLAYER_KEY = 'obby.stats.v1'
@@ -66,6 +66,7 @@ export async function startServer() {
   Board.create(state, { names: [], seconds: [], rounds: [] })
   Ranking.create(state, { names: [], heights: [] })
   ShortcutState.create(state, { open: false })
+  LeverState.create(state, { halted: [] })
 
   // Only the server calls syncEntity in an authoritative scene.
   syncEntity(state, [
@@ -73,7 +74,8 @@ export async function startServer() {
     ServerHeartbeat.componentId,
     Board.componentId,
     Ranking.componentId,
-    ShortcutState.componentId
+    ShortcutState.componentId,
+    LeverState.componentId
   ])
 
   await restoreBoard()
@@ -108,6 +110,7 @@ function serverSystem(dt: number) {
   // hand everyone up to a second of free time off their climb.
   watchGate()
   watchShortcutPads()
+  watchLevers()
 
   rankingTimer += dt
   if (rankingTimer >= RANKING_SECONDS) {
@@ -189,6 +192,40 @@ function publishRanking() {
   const view = Ranking.getMutable(state)
   view.names = top.map((climber) => climber.name)
   view.heights = top.map((climber) => Math.round(climber.height))
+}
+
+/**
+ * A lever pad stops its section's beam while anybody stands on it.
+ *
+ * Unlike the bypass this is not gated on two people: one player can hold it for
+ * everyone else, and a player alone can still beat the beam by timing it. It is
+ * a favour you can do for strangers, not a lock.
+ */
+function watchLevers() {
+  const current = RoundState.getOrNull(state)
+  const view = LeverState.getOrNull(state)
+  if (!current || !view) return
+
+  const levers = buildLayout(current.round).levers
+  if (levers.length === 0) {
+    if (view.halted.length > 0) LeverState.getMutable(state).halted = []
+    return
+  }
+
+  const halted: number[] = []
+  for (const lever of levers) {
+    for (const [entity] of engine.getEntitiesWith(PlayerIdentityData)) {
+      const transform = Transform.getOrNull(entity)
+      if (transform && near(transform.position, lever)) {
+        halted.push(lever.section)
+        break
+      }
+    }
+  }
+
+  // Only write when it actually changed: this runs every frame.
+  const same = halted.length === view.halted.length && halted.every((s, i) => s === view.halted[i])
+  if (!same) LeverState.getMutable(state).halted = halted
 }
 
 /**

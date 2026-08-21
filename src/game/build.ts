@@ -26,6 +26,7 @@ export type BuiltPad = {
 }
 
 export type BuiltSpinner = { entity: Entity; def: SpinnerDef; angle: number }
+export type BuiltLever = { pad: Entity; section: number }
 export type BuiltMover = { entity: Entity; def: MoverDef; clock: number }
 
 export type Checkpoint = {
@@ -55,6 +56,7 @@ export type World = {
   movers: BuiltMover[]
   checkpoints: Checkpoint[]
   finish: Vector3
+  levers: BuiltLever[]
   shortcut: BuiltShortcut | null
   entities: Entity[]
 }
@@ -221,6 +223,11 @@ export function buildWorld(layout: Layout): World {
     return { entity, def, clock: def.phase }
   })
 
+  const levers = layout.levers.map((lever) => ({
+    pad: createPressurePad(lever, entities),
+    section: lever.section
+  }))
+
   const shortcut = buildShortcut(layout, entities)
 
   return {
@@ -230,6 +237,7 @@ export function buildWorld(layout: Layout): World {
     movers,
     checkpoints,
     finish,
+    levers,
     shortcut,
     entities
   }
@@ -335,6 +343,7 @@ export function clearWorld(world: World | null) {
   world.movers = []
   world.checkpoints = []
   world.shortcut = null
+  world.levers = []
 }
 
 /**

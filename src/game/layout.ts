@@ -14,6 +14,7 @@ import {
   LOBBY_Z,
   MAX_PAD_HEIGHT,
   MAX_SHORTCUT_RISE,
+  MAX_STEP_RISE,
   PAD_SEPARATION,
   SHAFT_MAX_RADIUS,
   SHAFT_MIN_RADIUS,
@@ -37,6 +38,15 @@ export type Pad = {
   crumble: boolean
   /** Which section this pad belongs to. Drives its colour. */
   section: number
+  /**
+   * Index of the pad this one is reached from, or -1 for the start.
+   *
+   * Once sections branch, array order stops being traversal order, and a check
+   * that walks the array measures gaps between pads on different arms - which
+   * reported a 24m jump that nobody could actually be asked to make. Recording
+   * the real predecessor keeps the jumpability invariant meaningful.
+   */
+  fromIndex: number
 }
 
 export type SpinnerDef = {
@@ -46,6 +56,16 @@ export type SpinnerDef = {
   length: number
   speed: number
   phase: number
+  /** Set when a lever pad can stop this beam. Matches LeverDef.section. */
+  leverSection?: number
+}
+
+/** A pad that halts its section's beam while anyone stands on it. */
+export type LeverDef = {
+  x: number
+  y: number
+  z: number
+  section: number
 }
 
 export type MoverDef = {
@@ -66,6 +86,7 @@ export type Layout = {
   pads: Pad[]
   spinners: SpinnerDef[]
   movers: MoverDef[]
+  levers: LeverDef[]
   /** Names of the sections stacked this round, bottom to top. */
   sectionNames: string[]
   /** The co-op bypass, or null when this round had no room for one. */
@@ -99,7 +120,11 @@ const SECTION_KINDS = [
   'narrow bridge',
   'crumbling run',
   'piston hall',
-  'zigzag steps'
+  'zigzag steps',
+  // These three ask a question instead of setting a jump.
+  'the fork',
+  'the plunge',
+  'the lever'
 ] as const
 
 type SectionKind = (typeof SECTION_KINDS)[number]
@@ -110,13 +135,14 @@ type Build = {
   pads: Pad[]
   spinners: SpinnerDef[]
   movers: MoverDef[]
+  levers: LeverDef[]
 }
 
 export function buildLayout(round: number): Layout {
   const rng = makeRng(round * 7919)
   const c = curve(round)
 
-  const out: Build = { pads: [], spinners: [], movers: [] }
+  const out: Build = { pads: [], spinners: [], movers: [], levers: [] }
   const sectionNames: string[] = []
 
   // Pad zero never moves: the lobby, the gate and the spawn are built around it.
@@ -127,7 +153,8 @@ export function buildLayout(round: number): Layout {
     z: START_PAD_Z,
     size: Math.max(c.padSize, 3.4),
     crumble: false,
-    section: 0
+    section: 0,
+    fromIndex: -1
   })
 
   const cursor: Cursor = {
@@ -158,6 +185,7 @@ export function buildLayout(round: number): Layout {
     pads: out.pads,
     spinners: out.spinners,
     movers: out.movers,
+    levers: out.levers,
     sectionNames,
     shortcut
   }
@@ -232,7 +260,16 @@ function chordRoute(out: Build, from: Pad, to: Pad, hops: number, size: number):
     const y = from.y + (to.y - from.y) * t
 
     if (!isClear(out, x, y, z, size)) return null
-    route.push({ kind: 'normal', x, y, z, size, crumble: false, section: from.section })
+    route.push({
+      kind: 'normal',
+      x,
+      y,
+      z,
+      size,
+      crumble: false,
+      section: from.section,
+      fromIndex: -1
+    })
   }
 
   return route
@@ -275,6 +312,12 @@ function buildSection(
       return pistonHall(index, cursor, c, rng, out)
     case 'zigzag steps':
       return zigzagSteps(index, cursor, c, rng, out)
+    case 'the fork':
+      return theFork(index, cursor, c, rng, out)
+    case 'the plunge':
+      return thePlunge(index, cursor, c, rng, out)
+    case 'the lever':
+      return theLever(index, cursor, c, rng, out)
     default:
       return gapJumps(index, cursor, c, rng, out)
   }
@@ -430,6 +473,136 @@ function zigzagSteps(index: number, cursor: Cursor, c: ReturnType<typeof curve>,
   closeSection(index, cursor, c, rng, out)
 }
 
+/**
+ * THE FORK - two ways up, and you must pick before you can see how it ends.
+ *
+ * The short arm is two long jumps; the long arm is four short ones and takes
+ * noticeably more time. Both rejoin at the same landing, so choosing wrong
+ * costs seconds rather than the run. Every gap on both arms is inside
+ * jumpGap, which is already bounded well under runJumpHeight 1.5m of reach.
+ */
+function theFork(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rng: Rng, out: Build) {
+  const junction = out.pads[out.pads.length - 1]
+
+  // Bold arm: fewer, longer hops.
+  hop(out, cursor, index, c, { size: c.padSize * 0.85, rise: c.rise, gapScale: 1.35, from: junction })
+  hop(out, cursor, index, c, { size: c.padSize * 0.85, rise: c.rise, gapScale: 1.35 })
+  const boldTip = out.pads[out.pads.length - 1]
+
+  // Safe arm: starts back at the junction, more hops, shorter and wider.
+  const safe: Cursor = { x: junction.x, y: junction.y, z: junction.z, angle: cursor.angle + 1.1 }
+  for (let i = 0; i < 4; i++) {
+    // Half the rise over twice the hops: the two arms end level, so the shared
+    // landing is one jump from either. Taking the max of two different heights
+    // instead put the landing 3m above the lower arm.
+    hop(out, safe, index, c, {
+      size: c.padSize,
+      rise: c.rise * 0.5,
+      turn: rng.range(-0.2, 0.2),
+      gapScale: 0.8,
+      from: i === 0 ? junction : undefined
+    })
+  }
+
+  cursor.x = boldTip.x
+  cursor.y = boldTip.y
+  cursor.z = boldTip.z
+  cursor.angle = Math.atan2(cursor.z - CENTER_Z, cursor.x - CENTER_X)
+  closeSection(index, cursor, c, rng, out, boldTip)
+}
+
+/**
+ * THE PLUNGE - the fast way is downwards.
+ *
+ * A high ledge sits above a landing that is closer to the exit. Dropping is
+ * quicker than walking the rim around, but a drop that misses is a fall, and a
+ * fall costs the freeze plus the climb back. The rim exists so the section is
+ * never a coin flip: it is slower, not safer to ignore.
+ */
+function thePlunge(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rng: Rng, out: Build) {
+  // Climb to the ledge.
+  for (let i = 0; i < 3; i++) {
+    hop(out, cursor, index, c, { size: c.padSize, rise: c.rise * 1.1 })
+  }
+  const ledge = out.pads[out.pads.length - 1]
+
+  // The rim: the long way round, level and safe.
+  const rim: Cursor = { x: ledge.x, y: ledge.y, z: ledge.z, angle: cursor.angle }
+  for (let i = 0; i < 4; i++) {
+    hop(out, rim, index, c, {
+      size: c.padSize * 0.9,
+      rise: 0,
+      turn: 0.55,
+      gapScale: 0.85,
+      from: i === 0 ? ledge : undefined
+    })
+  }
+
+  // The catch pad, below the ledge and already past the rim's arc.
+  const drop = Math.max(2.5, c.rise * 3)
+  const size = Math.max(c.padSize, 3)
+  const target: Cursor = { x: rim.x, y: Math.max(0.4, ledge.y - drop), z: rim.z, angle: rim.angle }
+
+  if (isClear(out, target.x, target.y, target.z, size)) {
+    push(out, target, index, size, false, out.pads.length - 1)
+    cursor.x = target.x
+    cursor.y = target.y
+    cursor.z = target.z
+    cursor.angle = target.angle
+  } else {
+    // Something already occupies the landing zone. Walk on from the rim rather
+    // than dropping a pad on top of the climb.
+    cursor.x = rim.x
+    cursor.y = rim.y
+    cursor.z = rim.z
+    cursor.angle = rim.angle
+  }
+  closeSection(index, cursor, c, rng, out)
+}
+
+/**
+ * THE LEVER - one player can make it easier for everyone.
+ *
+ * A beam sweeps the only pad. A lever pad sits off to the side, and while
+ * anybody stands on it the beam stops. Alone you time the beam; together, one
+ * person holds the lever and the rest walk through. Nothing is gated on a
+ * second player - the beam is always beatable solo.
+ */
+function theLever(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rng: Rng, out: Build) {
+  hop(out, cursor, index, c, { size: Math.max(c.padSize, 3.4), rise: c.rise })
+  const guarded = out.pads[out.pads.length - 1]
+
+  out.spinners.push({
+    x: guarded.x,
+    y: guarded.y + HAZARD_CLEARANCE,
+    z: guarded.z,
+    length: guarded.size + c.spinnerReach,
+    speed: (rng.next() < 0.5 ? -1 : 1) * c.spinnerSpeed,
+    phase: rng.range(0, 360),
+    leverSection: index
+  })
+
+  // The lever sits on its own pad, off the climbing line.
+  const side = cursor.angle + Math.PI / 2
+  const leverCursor: Cursor = {
+    x: guarded.x + Math.cos(side) * (c.jumpGap + c.padSize),
+    y: guarded.y,
+    z: guarded.z + Math.sin(side) * (c.jumpGap + c.padSize),
+    angle: cursor.angle
+  }
+  if (!isClear(out, leverCursor.x, leverCursor.y, leverCursor.z, c.padSize)) {
+    closeSection(index, cursor, c, rng, out, guarded)
+    return
+  }
+  push(out, leverCursor, index, c.padSize, false, out.pads.length - 1)
+  out.levers.push({ x: leverCursor.x, y: leverCursor.y + 0.3, z: leverCursor.z, section: index })
+
+  // From the guarded pad, not the lever off to its side: the cursor stands on
+  // the former while the latter is simply the last thing pushed, and measuring
+  // one against the other recorded an 8.6m jump.
+  closeSection(index, cursor, c, rng, out, guarded)
+}
+
 /* ------------------------------------------------------------------ */
 /* Shared helpers                                                      */
 /* ------------------------------------------------------------------ */
@@ -439,11 +612,25 @@ function zigzagSteps(index: number, cursor: Cursor, c: ReturnType<typeof curve>,
  * checkpoint: one per section meant a save every few jumps, which removed any
  * reason to be careful.
  */
-function closeSection(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rng: Rng, out: Build) {
+function closeSection(
+  index: number,
+  cursor: Cursor,
+  c: ReturnType<typeof curve>,
+  rng: Rng,
+  out: Build,
+  /**
+   * Which pad the landing is jumped from. Branching sections must say: after a
+   * fork the cursor sits on one arm's tip while the last pad in the array is
+   * the other arm's, and measuring one against the other produced recorded
+   * jumps of 17 metres.
+   */
+  from?: Pad
+) {
   hop(out, cursor, index, c, {
     size: Math.max(c.padSize, 3.2),
     rise: c.rise,
-    turn: rng.range(-0.3, 0.3)
+    turn: rng.range(-0.3, 0.3),
+    from
   })
 
   if (index % CHECKPOINT_EVERY_SECTIONS === 0) {
@@ -463,10 +650,22 @@ function hop(
   cursor: Cursor,
   section: number,
   c: ReturnType<typeof curve>,
-  opts: { size: number; rise: number; turn?: number; crumble?: boolean; gapScale?: number }
+  opts: {
+    size: number
+    rise: number
+    turn?: number
+    crumble?: boolean
+    gapScale?: number
+    /**
+     * Measure the jump from this pad instead of the last one placed. Branches
+     * need it: the second arm of a fork starts at the fork itself, not at the
+     * tip of the arm built before it.
+     */
+    from?: Pad
+  }
 ) {
   const size = opts.size
-  const previous = out.pads[out.pads.length - 1]
+  const previous = opts.from ?? out.pads[out.pads.length - 1]
   const gap = c.jumpGap * (opts.gapScale ?? 1)
   // Edge to edge is the jump; centre to centre has to include both half-pads.
   const distance = gap + previous.size / 2 + size / 2
@@ -475,9 +674,10 @@ function hop(
   const fromZ = cursor.z
   cursor.angle += opts.turn ?? 0
 
-  let y = Math.min(MAX_PAD_HEIGHT, cursor.y + opts.rise)
+  const ceiling = Math.min(MAX_PAD_HEIGHT, cursor.y + MAX_STEP_RISE)
+  let y = Math.min(ceiling, cursor.y + opts.rise)
 
-  for (let lift = 0; lift < 3; lift++) {
+  for (let lift = 0; lift < 5; lift++) {
     const heading = cursor.angle + Math.PI / 2
     let stepX = Math.cos(heading) * distance
     let stepZ = Math.sin(heading) * distance
@@ -490,7 +690,7 @@ function hop(
         cursor.z = z
         cursor.y = y
         cursor.angle = Math.atan2(z - CENTER_Z, x - CENTER_X)
-        push(out, cursor, section, size, opts.crumble ?? false)
+        push(out, cursor, section, size, opts.crumble ?? false, out.pads.indexOf(previous))
         return
       }
       const turnBy = Math.PI / 8
@@ -500,12 +700,19 @@ function hop(
       stepZ = rz
     }
     // Nowhere on this level is free: climb a little and sweep again.
-    y = Math.min(MAX_PAD_HEIGHT, y + VERTICAL_CLEARANCE * 0.6)
+    //
+    // The step used to be VERTICAL_CLEARANCE * 0.6, which is 1.9m, and two of
+    // them stacked into rises over 3m - past doubleJumpHeight 2, so the pad was
+    // placed where nobody could reach it. Kept inside a jump, with more
+    // attempts to make up for the smaller step.
+    // Never past what a jump reaches, however many sweeps it takes.
+    if (y >= ceiling) break
+    y = Math.min(ceiling, y + MAX_SHORTCUT_RISE * 0.5)
   }
 
   // Last resort: straight up, still a legal jump.
   cursor.y = y
-  push(out, cursor, section, size, opts.crumble ?? false)
+  push(out, cursor, section, size, opts.crumble ?? false, out.pads.indexOf(previous))
 }
 
 /** Inside the shaft band, and never above the lobby or the gate. */
@@ -528,7 +735,14 @@ function isClear(out: Build, x: number, y: number, z: number, size: number): boo
   return true
 }
 
-function push(out: Build, cursor: Cursor, section: number, size: number, crumble: boolean) {
+function push(
+  out: Build,
+  cursor: Cursor,
+  section: number,
+  size: number,
+  crumble: boolean,
+  fromIndex = out.pads.length - 1
+) {
   out.pads.push({
     kind: 'normal',
     x: cursor.x,
@@ -536,6 +750,7 @@ function push(out: Build, cursor: Cursor, section: number, size: number, crumble
     z: cursor.z,
     size,
     crumble,
-    section
+    section,
+    fromIndex
   })
 }
