@@ -206,7 +206,24 @@ export const VERTICAL_CLEARANCE = 2.4
  * a run that ends there. The placement search lifts when it cannot find room,
  * and those lifts used to stack into 3.5m steps.
  */
-export const MAX_STEP_RISE = 1.6
+/**
+ * What a jump can cover, and the share of it this course is allowed to use.
+ *
+ * The design brief is explicit: every required jump must need at most 70% of
+ * what the ability allows, because the game is judged on a phone and a thumb
+ * on a virtual stick is nothing like a keyboard. The engine's doubleJumpHeight
+ * is 2 m (docs-confirmed). REACH_ABILITY is an estimate, not a documented
+ * figure - it is the horizontal distance a run-jump covers, and it is the one
+ * number here I have not been able to source, so it is deliberately
+ * conservative.
+ */
+export const DOUBLE_JUMP_HEIGHT = 2
+export const REACH_ABILITY = 5.5
+export const DIFFICULTY_BUDGET = 0.7
+
+export const REACH_BUDGET = REACH_ABILITY * DIFFICULTY_BUDGET
+/** 70% of doubleJumpHeight. Was 1.6, which is 80% and broke the brief. */
+export const MAX_STEP_RISE = DOUBLE_JUMP_HEIGHT * DIFFICULTY_BUDGET
 export const HORIZONTAL_CLEARANCE = 1.2
 
 /** A checkpoint every Nth section, not on every one. */

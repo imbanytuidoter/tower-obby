@@ -15,6 +15,7 @@ import {
   MAX_PAD_HEIGHT,
   MAX_SHORTCUT_RISE,
   MAX_STEP_RISE,
+  REACH_BUDGET,
   PAD_SEPARATION,
   SHAFT_MAX_RADIUS,
   SHAFT_MIN_RADIUS,
@@ -666,12 +667,20 @@ function hop(
 ) {
   const size = opts.size
   const previous = opts.from ?? out.pads[out.pads.length - 1]
-  const gap = c.jumpGap * (opts.gapScale ?? 1)
+  // Hard ceiling, applied here so no section can opt out of it. The fork's
+  // bold arm asked for gapScale 1.35, which at the top of the curve is
+  // 3.6 * 1.35 = 4.86 m - the single reason any jump in the game broke the
+  // 70% budget. Capping at the source keeps the arm longer than its safe
+  // twin (2.88 m) without making it unfair on a thumbstick.
+  const gap = Math.min(c.jumpGap * (opts.gapScale ?? 1), REACH_BUDGET)
   // Edge to edge is the jump; centre to centre has to include both half-pads.
   const distance = gap + previous.size / 2 + size / 2
 
-  const fromX = cursor.x
-  const fromZ = cursor.z
+  // Measure from the pad this jump is recorded as starting from. Every caller
+  // currently parks the cursor there first, so this changes no geometry - it
+  // just stops the two from being able to drift apart.
+  const fromX = previous.x
+  const fromZ = previous.z
   cursor.angle += opts.turn ?? 0
 
   const ceiling = Math.min(MAX_PAD_HEIGHT, cursor.y + MAX_STEP_RISE)

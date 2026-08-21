@@ -26,10 +26,15 @@ const req = createRequire(join(out, 'x.cjs'))
 const { buildLayout } = req(join(out, 'layout.js'))
 const cfg = req(join(out, 'config.js'))
 
-// --- limits the player's body actually imposes -----------------------------
-// Docs-confirmed locomotion: runJumpHeight 1.5, doubleJumpHeight 2.
-const MAX_RISE = 2.0
-const MAX_REACH = 5.5
+// --- the brief's budget, not the engine's ceiling ---------------------------
+// "Every required jump must need at most 70% of what jumpHeight 1 /
+// runJumpHeight 1.5 / doubleJumpHeight 2 allow." This harness used to check
+// the full ability instead, which is why 20 hops sat between 70% and 88% for
+// weeks without anything reporting it. EPS absorbs float comparison on a hop
+// that lands exactly on the budget.
+const EPS = 1e-6
+const MAX_RISE = cfg.MAX_STEP_RISE
+const MAX_REACH = cfg.REACH_BUDGET
 
 const fail = []
 const note = (ok, label, detail) => {
@@ -76,8 +81,8 @@ for (const round of ROUNDS) {
 }
 
 console.log(`\nGeometry audit - ${cfg.TOTAL_ROUNDS} rounds, ${hops} hops\n`)
-note(worstReach <= MAX_REACH, 'horizontal gap within reach', `worst ${worstReach.toFixed(2)}m / ${MAX_REACH}m`)
-note(worstRise <= MAX_RISE, 'vertical rise within jump', `worst ${worstRise.toFixed(2)}m / ${MAX_RISE}m`)
+note(worstReach <= MAX_REACH + EPS, 'horizontal gap within reach', `worst ${worstReach.toFixed(2)}m / ${MAX_REACH.toFixed(2)}m budget (70%)`)
+note(worstRise <= MAX_RISE + EPS, 'vertical rise within jump', `worst ${worstRise.toFixed(2)}m / ${MAX_RISE.toFixed(2)}m budget (70%)`)
 note(overlaps === 0, 'no overlapping pads', `${overlaps} pairs`)
 note(maxH <= cfg.MAX_PAD_HEIGHT, 'inside scene height limit', `${maxH.toFixed(1)}m / ${cfg.MAX_PAD_HEIGHT}m`)
 
