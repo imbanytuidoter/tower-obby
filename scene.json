@@ -86,5 +86,6 @@
   "source": {
     "origin": "creator-hub",
     "projectId": "0ea694a1-e16f-463c-998c-5e0bfc7601af"
-  }
+  },
+  "authoritativeMultiplayer": true
 }

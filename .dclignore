@@ -19,3 +19,10 @@ README.md
 *.rar
 *.md
 src
+dclcontext
+agent
+.agents
+.claude
+skills-lock.json
+LICENSE
+*.mdc
