@@ -13,7 +13,7 @@ import {
   RANKING_SECONDS,
   RANKING_SIZE,
   HEARTBEAT_SECONDS,
-  ROUND_SECONDS,
+  roundSeconds,
   TOTAL_ROUNDS
 } from '../game/config'
 import { buildLayout } from '../game/layout'
@@ -53,7 +53,12 @@ let rankingTimer = 0
 export async function startServer() {
   state = engine.addEntity()
 
-  RoundState.create(state, { round: 1, startedAt: Date.now(), endsAt: Date.now() + ROUND_SECONDS * 1000 })
+  const opening = Date.now()
+  RoundState.create(state, {
+    round: 1,
+    startedAt: opening,
+    endsAt: opening + lengthOf(1) * 1000
+  })
   // Pulse once here so the first client to arrive does not wait a full interval
   // before it can tell the server is alive.
   ServerHeartbeat.create(state, { at: Date.now() })
@@ -223,6 +228,11 @@ function playerPosition(address: string): Vector3 | null {
   return null
 }
 
+/** A round lasts in proportion to the tower it generated. */
+function lengthOf(round: number): number {
+  return roundSeconds(buildLayout(round).pads.length)
+}
+
 function finishOf(round: number): Vector3 | null {
   const pad = buildLayout(round).pads.find((candidate) => candidate.kind === 'finish')
   return pad ? Vector3.create(pad.x, pad.y, pad.z) : null
@@ -234,7 +244,7 @@ function advance(from: number) {
   const current = RoundState.getMutable(state)
   current.round = next
   current.startedAt = now
-  current.endsAt = now + ROUND_SECONDS * 1000
+  current.endsAt = now + lengthOf(next) * 1000
   startedClimb.clear()
   console.log('[SERVER] round ' + next + ' started')
 }

@@ -2,8 +2,16 @@
 
 export const TOTAL_ROUNDS = 10
 
-/** Everyone climbs the same round at the same time; this is its length. */
-export const ROUND_SECONDS = 240
+/**
+ * How long a round lasts, derived from how big it actually is.
+ *
+ * A flat four minutes was wrong at both ends: round one is 26 pads and the
+ * clock just idled, round ten is 69 pads and 57 metres, where nobody would
+ * finish and every round would end in a timeout.
+ */
+export function roundSeconds(pads: number): number {
+  return Math.round(Math.min(360, Math.max(75, 40 + pads * 3.2)))
+}
 
 /** How often the server proves it is alive. */
 export const HEARTBEAT_SECONDS = 2
