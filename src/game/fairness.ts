@@ -15,18 +15,29 @@ export const LOCOMOTION = {
   jumpHeight: 1,
   runJumpHeight: 1.5,
   doubleJumpHeight: 2,
+  glidingSpeed: 6,
+  glidingFallingSpeed: 1,
   hardLandingCooldown: 0.75
 } as const
 
 /**
- * Both of these trivialise a tower: the glider turns a climb into a flight
- * straight to the finish pad, and a double jump makes every gap in the course
- * roughly half as wide as it was designed to be.
+ * Both stay ON, and that is a deliberate reversal.
  *
- * Flip either to false to hand the ability back.
+ * I previously turned them off believing the glider let a player fly to the
+ * top. It does not: glidingFallingSpeed is a descent cap, and only a
+ * continuous force applied by the scene can lift a gliding player - this scene
+ * applies none. Gliding here just slows a fall and lets you drift, which on
+ * touch controls is a mercy, not an exploit.
+ *
+ * This game is judged on mobile. A thumb on a virtual joystick is far less
+ * precise than a keyboard, so the honest way to keep a climb hard is wider
+ * margins on the gaps, not stripping the abilities that make an imprecise
+ * input survivable.
+ *
+ * Flip either to true to take the ability away again.
  */
-export const DISABLE_GLIDING = true
-export const DISABLE_DOUBLE_JUMP = true
+export const DISABLE_GLIDING = false
+export const DISABLE_DOUBLE_JUMP = false
 
 /**
  * Seconds the player cannot move after a fall. This is what makes a fall cost
