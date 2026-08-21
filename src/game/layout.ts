@@ -282,16 +282,27 @@ function crumblingRun(index: number, cursor: Cursor, c: ReturnType<typeof curve>
 /** Pads with blocks punching up and down through them. */
 function pistonHall(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rng: Rng, out: Build) {
   const count = 3 + Math.round(c.t * 2)
+
   for (let i = 0; i < count; i++) {
     hop(out, cursor, index, c, { size: c.padSize, rise: c.rise * 0.8 })
 
+    // Every other pad is a breather. A piston on each one left nowhere to
+    // stand and wait, which is what made this section impossible rather than
+    // hard.
+    if (i % 2 === 1) continue
+
+    // The piston covers part of the pad, never all of it: at pad width it
+    // swept the whole standing area and no timing could beat it.
+    const offset = c.padSize * 0.3
+    const side = rng.next() < 0.5 ? 1 : -1
+
     out.movers.push({
-      x: cursor.x,
+      x: cursor.x + Math.cos(cursor.angle) * offset * side,
       y: cursor.y + 1.5,
-      z: cursor.z,
-      sizeX: c.padSize * 0.9,
+      z: cursor.z + Math.sin(cursor.angle) * offset * side,
+      sizeX: c.padSize * 0.5,
       sizeY: HAZARD_THICKNESS,
-      sizeZ: c.padSize * 0.9,
+      sizeZ: c.padSize * 0.5,
       axis: 'y',
       range: 1.4,
       speed: c.moverSpeed * rng.range(0.8, 1.2),

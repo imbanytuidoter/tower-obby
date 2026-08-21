@@ -38,6 +38,7 @@ import {
   sectionAccent,
   World
 } from './game/build'
+import { applyFairness } from './game/fairness'
 import { buildLayout } from './game/layout'
 import { submit } from './game/leaderboard'
 import { buildPlaza, decorSystem, GATE_LOOK, refreshBoard, showBoard } from './game/plaza'
@@ -63,6 +64,7 @@ export function main() {
 }
 
 function startClient() {
+  applyFairness()
   buildPlaza()
   setupSound()
   setupUi({ next: () => {}, retry: retryRound, restart: retryRound })

@@ -52,7 +52,10 @@ function serverSystem(dt: number) {
     ServerHeartbeat.getMutable(state).at = Date.now()
   }
 
-  const current = RoundState.getMutableOrNull(state)
+  // Read with getOrNull. getMutableOrNull marks the component dirty on every
+  // single frame, which re-broadcasts the whole round state ~30 times a second
+  // to every player.
+  const current = RoundState.getOrNull(state)
   if (!current) return
   if (Date.now() < current.endsAt) return
 
