@@ -278,7 +278,7 @@ const readyPanel = () => {
               'Cyan rings save your progress.\n' +
               'Red beams and bars knock you back.\n' +
               'Orange pads crumble under you.\n' +
-              'No gliding and no double jump: everyone climbs the same way.'
+              'Double jump and glide are yours - the gaps assume it.'
         }
         fontSize={s.body}
         color={Color4.White()}
