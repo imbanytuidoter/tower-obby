@@ -101,6 +101,55 @@ for (const round of ROUNDS) {
 note(deadZones === 0, 'finish slab fully responsive', `worst corner ${worstCorner.toFixed(2)}m, ${deadZones} dead zones`)
 note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_RADIUS}m`)
 
+// Sight lines. "From any pad the next target must be visible" - the design
+// brief asks for this measured rather than eyeballed, because on a 6-inch
+// screen a target you cannot see is a target you cannot plan for.
+//
+// A ray is walked from the climber's eye on the source pad to the middle of
+// the target, and every other slab in the tower is tested as a box along it.
+// Pads directly under the line at a shallow angle are the usual offender.
+{
+  const EYE = 1.6
+  const STEP = 0.2
+  const SLAB = 0.75 // pad thickness, from build.ts
+
+  const { pads } = buildTower()
+  const blocked = []
+
+  for (const pad of pads) {
+    if (pad.fromIndex < 0) continue
+    const from = pads[pad.fromIndex]
+    if (!from) continue
+
+    const ax = from.x, ay = from.y + EYE, az = from.z
+    const bx = pad.x, by = pad.y + 0.4, bz = pad.z
+    const span = Math.hypot(bx - ax, by - ay, bz - az)
+    const steps = Math.max(2, Math.ceil(span / STEP))
+
+    let hit = null
+    for (let i = 1; i < steps && !hit; i++) {
+      const t = i / steps
+      const px = ax + (bx - ax) * t
+      const py = ay + (by - ay) * t
+      const pz = az + (bz - az) * t
+      for (const other of pads) {
+        if (other === pad || other === from) continue
+        const half = other.size / 2
+        if (
+          Math.abs(px - other.x) < half &&
+          Math.abs(pz - other.z) < half &&
+          py > other.y - SLAB / 2 &&
+          py < other.y + SLAB / 2
+        ) { hit = other; break }
+      }
+    }
+    if (hit) blocked.push({ from: pads.indexOf(from), to: pads.indexOf(pad), by: pads.indexOf(hit) })
+  }
+
+  const worst = blocked.slice(0, 3).map((b) => `${b.from}->${b.to} behind ${b.by}`).join(', ')
+  note(blocked.length === 0, 'next target always visible', blocked.length ? `${blocked.length} blocked: ${worst}` : `${hops} lines clear`)
+}
+
 // The generator clamps at MAX_PAD_HEIGHT. A couple of pads landing on the cap
 // is the cap doing its job; a crowd of them means whole zones are being
 // flattened against it and the climb stops gaining height.
