@@ -129,15 +129,24 @@ function handleClaim(round: number, name: string, from: string) {
  */
 function publishRanking() {
   const climbers: { name: string; height: number }[] = []
+  const present = new Set<string>()
 
   for (const [entity, identity] of engine.getEntitiesWith(PlayerIdentityData)) {
+    const address = identity.address.toLowerCase()
+    present.add(address)
+
     const transform = Transform.getOrNull(entity)
     if (!transform) continue
     climbers.push({
-      name: names.get(identity.address.toLowerCase()) ?? 'Guest',
+      name: names.get(address) ?? 'Guest',
       height: transform.position.y
     })
   }
+
+  // This server stays up as long as anyone is in the World, so anything keyed
+  // by visitor has to be dropped when they go, or it grows for days.
+  forget(names, present)
+  forget(stats, present)
 
   climbers.sort((a, b) => b.height - a.height)
   const top = climbers.slice(0, RANKING_SIZE)
@@ -145,6 +154,14 @@ function publishRanking() {
   const view = Ranking.getMutable(state)
   view.names = top.map((climber) => climber.name)
   view.heights = top.map((climber) => Math.round(climber.height))
+}
+
+/** Drops cache entries for players who have left. */
+function forget<T>(cache: Map<string, T>, present: Set<string>) {
+  if (cache.size <= present.size) return
+  for (const address of cache.keys()) {
+    if (!present.has(address)) cache.delete(address)
+  }
 }
 
 /** Server-verified position: read from the engine, never from the client. */
@@ -188,13 +205,19 @@ async function sendStats(address: string) {
   room.send('stats', { bestSeconds: mine.bestSeconds, climbs: mine.climbs }, { to: [address] })
 }
 
-async function loadStats(address: string): Promise<PlayerStats> {
+/**
+ * Addresses arrive with inconsistent casing, so every cache key is lowered at
+ * the boundary. Mixing the two spellings meant the ranking prune deleted stats
+ * on every tick while the cache itself never hit.
+ */
+async function loadStats(rawAddress: string): Promise<PlayerStats> {
+  const address = rawAddress.toLowerCase()
   const cached = stats.get(address)
   if (cached) return cached
 
   const fresh: PlayerStats = { version: 1, bestSeconds: 0, climbs: 0 }
   try {
-    const stored = await Storage.player.get<PlayerStats>(address, PLAYER_KEY)
+    const stored = await Storage.player.get<PlayerStats>(rawAddress, PLAYER_KEY)
     if (stored && stored.version === 1 && typeof stored.bestSeconds === 'number') {
       fresh.bestSeconds = stored.bestSeconds
       fresh.climbs = typeof stored.climbs === 'number' ? stored.climbs : 0
@@ -210,6 +233,7 @@ async function loadStats(address: string): Promise<PlayerStats> {
 /** Written on a finish only - one write per climb, never per tick. */
 async function recordClimb(address: string, seconds: number) {
   const mine = await loadStats(address)
+
   mine.climbs += 1
   if (mine.bestSeconds === 0 || seconds < mine.bestSeconds) mine.bestSeconds = seconds
 
