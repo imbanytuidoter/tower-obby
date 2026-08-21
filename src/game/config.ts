@@ -53,6 +53,9 @@ export const SKYBOX_TIME = 36000
  * It falls faster than it rises so stepping off has an immediate consequence
  * and the person still aboard can feel it going.
  */
+/** How close the server needs a player to be to grant the ante. */
+export const COIN_RADIUS = 3
+
 export const PLATE_RISE_RATE = 0.22
 export const PLATE_FALL_RATE = 0.5
 

@@ -98,6 +98,27 @@ export type Layout = {
   forks: ForkDef[]
   /** The tandem plate, or null if the tower had no room for one. */
   plate: PlateDef | null
+  /** The ante: a wager the climb offers, or null if it did not fit. */
+  coin: CoinDef | null
+}
+
+/**
+ * THE ANTE - a coin that buys a section, and a fall if you miss.
+ *
+ * Three crumbling pads lead off the fast line to a gold coin. Taking it grants
+ * one skip token. Missing drops you to the last checkpoint, which is the price.
+ * The wager has to be legible before it is taken, so both halves are drawn:
+ * the decay is visible on the pads, the reward is lit gold at the end of them.
+ */
+export type CoinDef = {
+  /** The detour, in order. Every one of these crumbles. */
+  route: Pad[]
+  /** Where the coin hangs. */
+  x: number
+  y: number
+  z: number
+  /** Checkpoint index the token skips the player to. */
+  skipsToCheckpoint: number
 }
 
 /**
@@ -248,8 +269,77 @@ export function buildTower(): Layout {
     sectionNames,
     shortcut,
     forks: out.forks,
-    plate: buildPlate(out)
+    plate: buildPlate(out),
+    coin: buildCoin(out)
   }
+}
+
+/**
+ * Hangs the ante off an early-middle landing.
+ *
+ * Early enough that the token is worth something - a skip near the crown buys
+ * almost nothing - and late enough that a player has learned to jump before
+ * they are offered a bet on it.
+ */
+function buildCoin(out: Build): CoinDef | null {
+  const landings = out.pads
+    .map((pad, index) => ({ pad, index }))
+    .filter((entry) => entry.pad.kind === 'checkpoint')
+  if (landings.length < 3) return null
+
+  // Search, do not assume. Fixing the detour to one angle off one landing
+  // produced no coin at all - the same mistake the shortcut made before it,
+  // where a single hard-coded target could not satisfy the clearances.
+  for (let choice = 0; choice < landings.length - 1; choice++) {
+    const at = landings[Math.min(landings.length - 2, Math.floor(landings.length * 0.3) + choice)]
+    const base = at.pad
+    const outward = Math.atan2(base.z - CENTER_Z, base.x - CENTER_X)
+
+    for (let turn = -3; turn <= 3; turn++) {
+      const away = outward + turn * 0.42
+      const route: Pad[] = []
+      let x = base.x
+      let z = base.z
+      let y = base.y
+      let ok = true
+
+      for (let i = 0; i < 3 && ok; i++) {
+        const step = 2.2 + base.size * 0.5
+        x += Math.cos(away) * step
+        z += Math.sin(away) * step
+        y += 0.45
+        // The ante is explicitly off the fast line, so it is allowed OUT of
+        // the climbing shaft rather than squeezed into it. Measured: 28 of 35
+        // candidate detours failed on clearance because the 6-17 m band
+        // already holds 120 pads. Out here there is room, and being visibly
+        // away from the route is what makes it read as a detour.
+        const near = i === 0 ? base : route[i - 1]
+        if (!inDetourAir(x, z) || !isClear(out, x, y, z, 2.1, near)) { ok = false; break }
+        route.push({
+          kind: 'normal',
+          x,
+          y,
+          z,
+          size: 2.1,
+          crumble: true,
+          section: base.section,
+          fromIndex: -1
+        })
+      }
+      if (!ok || route.length < 3) continue
+
+      const last = route[route.length - 1]
+      return {
+        route,
+        x: last.x,
+        y: last.y + 1.6,
+        z: last.z,
+        skipsToCheckpoint: Math.min(landings.length - 1, landings.indexOf(at) + 2)
+      }
+    }
+  }
+
+  return null
 }
 
 /**
@@ -864,6 +954,21 @@ function hop(
   push(out, cursor, section, size, opts.crumble ?? false, out.pads.indexOf(previous))
 }
 
+/**
+ * Open air beyond the climbing shaft, still comfortably on the plate.
+ * Used only by the ante, which is meant to hang away from the route.
+ */
+function inDetourAir(x: number, z: number): boolean {
+  // Radius alone is enough, and deliberately so. This used to also test
+  // MIN_XZ/MAX_XZ and threw "MIN_XZ is not defined" at runtime while
+  // type-checking clean: esbuild assigns those inside config's lazy __esm
+  // initializer, and this runs before it. The radius bound already keeps the
+  // detour inside the plate - SHAFT_MAX_RADIUS + 7 is 24 m from centre on an
+  // 80 m square - so the second test was redundant as well as fragile.
+  const radius = Math.hypot(x - CENTER_X, z - CENTER_Z)
+  return radius >= SHAFT_MIN_RADIUS && radius <= SHAFT_MAX_RADIUS + 7
+}
+
 /** Inside the shaft band, and never above the lobby or the gate. */
 function inShaft(x: number, z: number, y: number): boolean {
   const radius = Math.hypot(x - CENTER_X, z - CENTER_Z)
@@ -874,9 +979,17 @@ function inShaft(x: number, z: number, y: number): boolean {
   return Math.hypot(x - GATE_X, z - GATE_Z) >= 5
 }
 
-/** True when no existing pad sits close above or below this spot. */
-function isClear(out: Build, x: number, y: number, z: number, size: number): boolean {
+/**
+ * True when no existing pad sits close above or below this spot.
+ *
+ * `except` is the pad being jumped FROM. It has to be excluded or the first
+ * step of any detour fails against its own parent: measured, all 35 candidate
+ * ante detours were rejected 0.05 m short, by the very landing they hang off.
+ * A normal hop never hits this because it measures edge to edge.
+ */
+function isClear(out: Build, x: number, y: number, z: number, size: number, except?: Pad): boolean {
   for (const pad of out.pads) {
+    if (pad === except) continue
     if (Math.abs(pad.y - y) > VERTICAL_CLEARANCE) continue
     const needed = pad.size / 2 + size / 2 + HORIZONTAL_CLEARANCE
     if (Math.hypot(pad.x - x, pad.z - z) < needed) return false

@@ -1,4 +1,11 @@
-import { engine, MeshCollider, Transform } from '@dcl/sdk/ecs'
+import {
+  engine,
+  InputAction,
+  inputSystem,
+  MeshCollider,
+  PointerEventType,
+  Transform
+} from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 import { isServer, isStateSyncronized } from '@dcl/sdk/network'
 import { getPlayer } from '@dcl/sdk/players'
@@ -115,6 +122,18 @@ function startClient() {
         : data.name + ' reached the crown in ' + formatTime(data.seconds)
     )
     play('finish')
+  })
+
+  // The server verified the player actually reached the coin. Nothing is
+  // spent yet - the token is held until they decide it is worth using.
+  room.onMessage('token', (data) => {
+    run.token = 1
+    run.tokenSkipsTo = data.skipsToCheckpoint
+    if (world?.coin) {
+      world.coin.taken = true
+      Transform.getMutable(world.coin.entity).scale = Vector3.Zero()
+    }
+    play('checkpoint')
   })
 
   room.onMessage('stats', (data) => {
@@ -366,6 +385,8 @@ function runSystem(dt: number) {
 
   updatePrompt(player)
   noteForkChoice(player)
+  reachForCoin(player)
+  spendToken()
 
   if (run.phase === Phase.Ready) {
     if (run.respawnCooldown <= 0 && crossedStartLine(player)) {
@@ -451,6 +472,49 @@ function shortcutPrompt(player: Vector3): string {
 }
 
 /**
+ * Claims the ante when the player gets to it.
+ *
+ * The client only ever says "I am here" - the server knows where the coin
+ * hangs, reads the player's engine-verified position and decides. Throttled,
+ * because standing next to it would otherwise send one claim per frame.
+ */
+let coinTimer = 0
+function reachForCoin(player: Vector3) {
+  if (!world?.coin || world.coin.taken || run.token > 0) return
+
+  coinTimer -= 1 / 30
+  if (coinTimer > 0) return
+
+  if (horizontalDistance(player, world.coin.at) < 2 && Math.abs(player.y - world.coin.at.y) < 2.5) {
+    coinTimer = 0.5
+    room.send('claimCoin', {})
+  }
+}
+
+/**
+ * Button 1 spends the token: it lifts the player to the checkpoint the coin
+ * paid for, skipping what is between.
+ *
+ * There is no legend and no tutorial for this. The button does nothing until
+ * a token is held and the prompt appears the moment one is - the control
+ * teaches itself by going live, which is the only way to teach a button set
+ * on a phone without spending a HUD line on it.
+ */
+function spendToken() {
+  if (run.token <= 0 || !world) return
+  if (!inputSystem.isTriggered(InputAction.IA_ACTION_3, PointerEventType.PET_DOWN)) return
+
+  const target = world.checkpoints[Math.min(run.tokenSkipsTo, world.checkpoints.length - 1)]
+  if (!target) return
+
+  run.token = 0
+  run.checkpoint = Math.max(run.checkpoint, world.checkpoints.indexOf(target))
+  activateCheckpoint(target)
+  play('checkpoint')
+  sendToCheckpoint()
+}
+
+/**
  * Records which arm of a fork the player actually took.
  *
  * Standing on a pad is the answer - there is nothing to press and nothing to
@@ -504,6 +568,11 @@ function updatePrompt(player: Vector3) {
     const coop = shortcutPrompt(player)
     if (coop !== '') {
       run.prompt = coop
+      return
+    }
+
+    if (run.token > 0) {
+      run.prompt = 'PRESS 1 TO SPEND THE COIN AND SKIP AHEAD'
       return
     }
 

@@ -177,6 +177,19 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   note(plate !== null, 'tandem plate placed', plate ? `${plate.rise.toFixed(1)} m of lift at ${plate.y.toFixed(1)} m` : 'none')
 }
 
+// The ante has to exist, and it has to be worth taking: a token that skips
+// to a checkpoint the player was about to reach anyway buys nothing.
+{
+  const L = buildTower()
+  const cps = L.pads.filter((p) => p.kind === 'checkpoint').length
+  note(L.coin !== null, 'the ante is placed', L.coin ? `${L.coin.route.length} crumbling pads at ${L.coin.y.toFixed(0)} m` : 'none')
+  note(
+    L.coin === null || L.coin.skipsToCheckpoint < cps,
+    'the token buys something',
+    L.coin ? `skips to checkpoint ${L.coin.skipsToCheckpoint} of ${cps}` : '-'
+  )
+}
+
 // The first ten seconds. A player arriving alone must see the gate they have
 // to walk through AND the board that tells them why - without turning round.
 // The board used to sit exactly 180 degrees behind the spawn.

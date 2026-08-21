@@ -60,6 +60,13 @@ export type BuiltFork = {
   saves: number
 }
 
+export type BuiltCoin = {
+  entity: Entity
+  at: Vector3
+  skipsToCheckpoint: number
+  taken: boolean
+}
+
 export type BuiltPlate = {
   entity: Entity
   /** Resting position and travel, so the client can place it from `lift`. */
@@ -92,6 +99,8 @@ export type World = {
   forks: BuiltFork[]
   /** The tandem plate, or null when the tower had no room for one. */
   plate: BuiltPlate | null
+  /** The ante, or null when it did not fit. */
+  coin: BuiltCoin | null
   entities: Entity[]
 }
 
@@ -310,6 +319,7 @@ export function buildWorld(layout: Layout): World {
   const shortcut = buildShortcut(layout, entities)
   const forks = buildForks(layout, entities)
   const plate = buildPlate(layout, entities)
+  const coin = buildCoin(layout, entities)
 
   return {
     sectionNames: layout.sectionNames,
@@ -323,6 +333,7 @@ export function buildWorld(layout: Layout): World {
     shortcut,
     forks,
     plate,
+    coin,
     entities
   }
 }
@@ -356,6 +367,60 @@ const SHORTCUT_CLOSED = Color4.create(0.3, 0.34, 0.42, 0.25)
  * says the rule in one line - there is no other way to learn it, and a rules
  * panel is a player already leaving.
  */
+/**
+ * THE ANTE - three crumbling pads out into open air, and a coin at the end.
+ *
+ * The wager has to be readable before it is taken, so both halves are drawn:
+ * the pads are orange because orange means it stops holding, and the coin is
+ * gold because gold means go here. Nothing explains the trade; the two colours
+ * already do, and the fall is the price.
+ */
+function buildCoin(layout: Layout, entities: Entity[]): BuiltCoin | null {
+  const def = layout.coin
+  if (!def) return null
+
+  for (const pad of def.route) {
+    const slab = engine.addEntity()
+    entities.push(slab)
+    Transform.create(slab, {
+      position: Vector3.create(pad.x, pad.y, pad.z),
+      scale: Vector3.create(pad.size, 0.5, pad.size)
+    })
+    MeshRenderer.setBox(slab)
+    MeshCollider.setBox(slab)
+    Material.setPbrMaterial(slab, {
+      albedoColor: CRUMBLE_ALBEDO,
+      emissiveColor: CRUMBLE_EMISSIVE,
+      emissiveIntensity: 1.2,
+      roughness: 0.7
+    })
+    entities.push(createGroundShadow(pad))
+  }
+
+  const entity = engine.addEntity()
+  entities.push(entity)
+  Transform.create(entity, {
+    position: Vector3.create(def.x, def.y, def.z),
+    scale: Vector3.create(1.1, 1.1, 1.1)
+  })
+  MeshRenderer.setSphere(entity)
+  Material.setPbrMaterial(entity, {
+    albedoColor: FINISH_ALBEDO,
+    emissiveColor: FINISH_EMISSIVE,
+    emissiveIntensity: 4
+  })
+
+  const anchor = def.route[def.route.length - 1]
+  entities.push(...routeSign(anchor, 'THE ANTE', 'TAKE THE COIN, SKIP A SECTION', FINISH_EMISSIVE))
+
+  return {
+    entity,
+    at: Vector3.create(def.x, def.y, def.z),
+    skipsToCheckpoint: def.skipsToCheckpoint,
+    taken: false
+  }
+}
+
 function buildPlate(layout: Layout, entities: Entity[]): BuiltPlate | null {
   const def = layout.plate
   if (!def) return null

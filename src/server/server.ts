@@ -14,6 +14,7 @@ import {
   RANKING_SECONDS,
   RANKING_SIZE,
   HEARTBEAT_SECONDS,
+  COIN_RADIUS,
   PLATE_RISE_RATE,
   PLATE_FALL_RATE
 } from '../game/config'
@@ -69,6 +70,9 @@ let daily: Entry[] = []
  * per-frame watcher was pure waste - buildTower() walks 132 pads.
  */
 const tower = buildTower()
+
+/** Who has taken the ante this climb. Cleared when their climb ends. */
+const tookCoin = new Set<string>()
 let heartbeatTimer = 0
 let rankingTimer = 0
 
@@ -101,6 +105,27 @@ export async function startServer() {
   room.onMessage('claimFinish', (data, context) => {
     if (!context) return
     handleClaim(data.name, context.from)
+  })
+
+  // The coin is a claim like any other: the server knows where it hangs,
+  // reads the player's verified position and decides. One per climb, and
+  // only for somebody who actually crossed the gate.
+  room.onMessage('claimCoin', (unused, context) => {
+    if (!context) return
+    const address = context.from.toLowerCase()
+    if (!tower.coin || tookCoin.has(address)) return
+    if (!startedClimb.has(address)) return
+
+    const position = playerPosition(context.from)
+    if (!position) return
+    const at = Vector3.create(tower.coin.x, tower.coin.y, tower.coin.z)
+    if (Vector3.distance(position, at) > COIN_RADIUS) {
+      console.log('[SERVER] rejected coin claim from ' + context.from + ': too far')
+      return
+    }
+
+    tookCoin.add(address)
+    room.send('token', { skipsToCheckpoint: tower.coin.skipsToCheckpoint }, { to: [context.from] })
   })
 
   room.onMessage('hello', (data, context) => {
@@ -196,6 +221,7 @@ function handleClaim(name: string, from: string) {
 
   // They have to walk back through the gate to start another climb.
   startedClimb.delete(address)
+  tookCoin.delete(address)
 
   room.send('summit', { name, seconds, record })
   void persistBoard()
@@ -228,6 +254,7 @@ function publishRanking() {
   forget(names, present)
   forget(stats, present)
   forget(startedClimb, present)
+  forgetSet(tookCoin, present)
 
   climbers.sort((a, b) => b.height - a.height)
   const top = climbers.slice(0, RANKING_SIZE)
@@ -341,6 +368,14 @@ function noteGateCrossing(address: string, position: Vector3) {
 function forget<T>(cache: Map<string, T>, present: Set<string>) {
   if (cache.size <= present.size) return
   for (const address of cache.keys()) {
+    if (!present.has(address)) cache.delete(address)
+  }
+}
+
+/** Same prune, for the caches that only need membership. */
+function forgetSet(cache: Set<string>, present: Set<string>) {
+  if (cache.size <= present.size) return
+  for (const address of cache) {
     if (!present.has(address)) cache.delete(address)
   }
 }

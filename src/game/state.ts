@@ -36,6 +36,12 @@ export const run = {
   /** How many people are standing on the tandem plate right now. */
   plateRiders: 0,
   /**
+   * The skip token, granted by the server when it verifies you reached the
+   * coin. Held, not spent, until the player decides where it is worth using.
+   */
+  token: 0,
+  tokenSkipsTo: 0,
+  /**
    * The decisions this run made, in the order they were made.
    *
    * A time on its own says nothing about how it was earned. Naming the
@@ -61,6 +67,8 @@ export function prepareRound(totalCheckpoints: number, sections: string[]) {
   run.totalSections = sections.length
   run.sectionName = sections[0] ?? ''
   run.choices = []
+  run.token = 0
+  run.tokenSkipsTo = 0
 }
 
 export function startClock() {

@@ -24,6 +24,12 @@ export const room = registerMessages({
     /** True when this climb is the fastest anyone has ever done it. */
     record: Schemas.Boolean
   }),
+  /** "I am standing at the coin." The server checks where the player is. */
+  claimCoin: Schemas.Map({}),
+  /** Server grants the skip token, and says which checkpoint it is worth. */
+  token: Schemas.Map({
+    skipsToCheckpoint: Schemas.Int
+  }),
   /** "I have arrived, send me my saved record." */
   hello: Schemas.Map({
     /** Cosmetic label for the live ranking; the server has only addresses. */
