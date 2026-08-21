@@ -76,6 +76,21 @@ export type World = {
  * safe, red always means it will hurt, gold always means the goal. Only the
  * neutral pad body and its accent follow the round theme.
  */
+/**
+ * CHOICE - the fifth meaning, and the only one that is never a fill.
+ *
+ * It is a line and a glyph drawn ON TOP of a pad that already carries one of
+ * the four fills, so it can mark "the level is asking you something here"
+ * without overwriting whether the pad is safe, unstable or a goal. Using it as
+ * a face colour would break the one-colour-one-meaning rule the whole
+ * vocabulary rests on.
+ */
+/** The one fill that means "you can stand here". Shared with the plaza. */
+export const SAFE_FILL = Color4.fromHexString('#4EE3F2FF')
+
+export const CHOICE_EDGE = Color4.fromHexString('#CFC6FFFF')
+export const CHOICE_EDGE_3 = Color3.create(0.81, 0.78, 1)
+
 const HAZARD_ALBEDO = Color4.fromHexString('#FF3B4DFF')
 const HAZARD_EMISSIVE = Color3.create(1, 0.12, 0.16)
 const CRUMBLE_ALBEDO = Color4.fromHexString('#FF9D2EFF')

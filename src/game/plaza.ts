@@ -12,6 +12,7 @@ import {
   SkyboxTime
 } from '@dcl/sdk/ecs'
 import { Color3, Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
+import { CHOICE_EDGE, CHOICE_EDGE_3, SAFE_FILL } from './build'
 import {
   CENTER_X,
   CENTER_Z,
@@ -30,6 +31,7 @@ import {
   START_PAD_Z,
   BOARD_SIZE,
   BOARD_FORWARD,
+  REACH_ABILITY,
   SKYBOX_TIME,
   BOARD_LATERAL,
   LOBBY_SPAWN_X,
@@ -82,7 +84,10 @@ const SIDE_Z = -Math.sin((BOARD_YAW * Math.PI) / 180)
 
 const CYAN3 = Color3.create(0.2, 0.8, 1)
 const CYAN4 = Color4.create(0.3, 0.9, 1, 1)
-const INK = Color4.create(0.04, 0.05, 0.09, 1)
+// The board face. Near-black read as an unfinished slab rather than as a
+// screen; this is dark enough for white rows to carry and light enough to
+// look like an object somebody built.
+const INK = Color4.create(0.13, 0.16, 0.24, 1)
 const DIM = Color4.create(0.62, 0.7, 0.8, 1)
 const GOLD4 = Color4.create(1, 0.82, 0.25, 1)
 
@@ -95,7 +100,7 @@ let rowEntities: Row[] = []
 const markers: Entity[] = []
 let spin = 0
 
-export function buildPlaza() {
+export function buildPlaza(opening: Opening) {
   // Pin the time of day.
   //
   // The scene was rendering at whatever hour the client happened to be on,
@@ -113,7 +118,7 @@ export function buildPlaza() {
   createLobby()
   createStartGate()
   createGuideArrows()
-  createPracticeHops()
+  createPracticeHops(opening)
   createBoard()
   createDressing()
   refreshBoard()
@@ -264,46 +269,107 @@ function createStartGate() {
  * something to do in the lobby between rounds, which is the only place anyone
  * is ever standing still together.
  */
-function createPracticeHops() {
-  const c = curve(0)
-  const step = c.jumpGap + c.padSize
+/**
+ * The warm-up pad: the race's own first jump, at ground level.
+ *
+ * It used to be three pads sized from curve(0) - close to the opening gap but
+ * not it, and signed "TRY A JUMP" with no number on it at all. The design pass
+ * is specific: the exact gap the race opens with, with the ground underneath,
+ * labelled in metres and as a share of what the jump allows.
+ *
+ * Failing here costs nothing, so the first real jump of a run is never a
+ * player's first attempt at it. That is the entire tutorial - no modal, no
+ * card, no HUD line spent.
+ */
+/**
+ * The opening jump, measured from the tower and handed in.
+ *
+ * plaza.ts must not call buildTower() itself. esbuild wraps layout.ts in a
+ * lazy __esm initializer - the scene uses a dynamic import for the server
+ * branch, which forces that scheme - so a call from here runs before the
+ * initializer does and throws "buildTower is not defined" at runtime while
+ * type-checking perfectly. Caught in the client console, which is the only
+ * place it appears.
+ */
+export type Opening = { gap: number; size: number }
 
-  // Off to the side of the walk to the gate, never blocking it.
-  const asideX = -GATE_DIR_Z
-  const asideZ = GATE_DIR_X
+function createPracticeHops(opening: Opening) {
+  const gap = Math.max(1, opening.gap)
+  const size = opening.size
+  const share = Math.round((gap / REACH_ABILITY) * 100)
 
-  for (let i = 0; i < 3; i++) {
-    const x = GATE_X + asideX * 7 + GATE_DIR_X * (i * step - step)
-    const z = GATE_Z + asideZ * 7 + GATE_DIR_Z * (i * step - step)
+  // Opposite side of the walk from the leaderboard: the two things a new
+  // arrival reads should not be stacked on top of each other.
+  const asideX = GATE_DIR_Z
+  const asideZ = -GATE_DIR_X
+  const originX = GATE_X + asideX * 8.5 - GATE_DIR_X * 2
+  const originZ = GATE_Z + asideZ * 8.5 - GATE_DIR_Z * 2
+  const step = gap + size
+
+  // Two pads, one gap: the jump the tower opens with and nothing else.
+  for (let i = 0; i < 2; i++) {
+    const x = originX + GATE_DIR_X * (i * step - step / 2)
+    const z = originZ + GATE_DIR_Z * (i * step - step / 2)
 
     const pad = engine.addEntity()
     Transform.create(pad, {
-      position: Vector3.create(x, LOBBY_Y + 0.4 + i * 0.5, z),
-      scale: Vector3.create(c.padSize, 0.4, c.padSize)
+      position: Vector3.create(x, LOBBY_Y + 0.45, z),
+      scale: Vector3.create(size, 0.5, size)
     })
     MeshRenderer.setBox(pad)
     MeshCollider.setBox(pad)
     Material.setPbrMaterial(pad, {
-      albedoColor: Color4.create(0.4, 0.46, 0.58, 1),
+      albedoColor: SAFE_FILL,
       emissiveColor: CYAN3,
-      emissiveIntensity: 0.3
+      emissiveIntensity: 0.9,
+      roughness: 0.75
     })
   }
 
-  const sign = engine.addEntity()
-  Transform.create(sign, {
-    position: Vector3.create(GATE_X + asideX * 7, LOBBY_Y + 3.4, GATE_Z + asideZ * 7)
+  // The span itself, drawn on the ground in the choice colour. This is the
+  // 70% rule made visible - it teaches the budget without a word of HUD.
+  const span = engine.addEntity()
+  Transform.create(span, {
+    position: Vector3.create(originX, LOBBY_Y + 0.12, originZ),
+    rotation: Quaternion.fromEulerDegrees(0, -yawFacing(originX, originZ, originX + GATE_DIR_X, originZ + GATE_DIR_Z), 0),
+    scale: Vector3.create(0.18, 0.04, gap)
   })
+  MeshRenderer.setBox(span)
+  Material.setPbrMaterial(span, {
+    albedoColor: CHOICE_EDGE,
+    emissiveColor: CHOICE_EDGE_3,
+    emissiveIntensity: 1.6
+  })
+
+  // TextShape height scales with fontSize, so the gaps have to scale with it
+  // too - at 0.7 m apart these three lines were drawn through each other.
+  label(originX, LOBBY_Y + 5.2, originZ, 'FREE PRACTICE', CYAN4, 2.4)
+  label(
+    originX,
+    LOBBY_Y + 3.9,
+    originZ,
+    gap.toFixed(1) + ' m  -  ' + share + '% OF YOUR JUMP',
+    CHOICE_EDGE,
+    1.8
+  )
+  label(originX, LOBBY_Y + 3.0, originZ, 'THE RACE OPENS WITH THIS JUMP', DIM, 1.4)
+}
+
+/** A billboarded line of text standing in the world. */
+function label(x: number, y: number, z: number, text: string, colour: Color4, fontSize: number) {
+  const sign = engine.addEntity()
+  Transform.create(sign, { position: Vector3.create(x, y, z) })
   TextShape.create(sign, {
-    text: 'TRY A JUMP',
-    fontSize: 2.4,
-    textColor: CYAN4,
+    text,
+    fontSize,
+    textColor: colour,
     outlineColor: Color4.Black(),
     outlineWidth: 0.25,
     textAlign: TextAlignMode.TAM_MIDDLE_CENTER
   })
   Billboard.create(sign, { billboardMode: BillboardMode.BM_Y })
 }
+
 
 /**
  * Chevrons on the deck pointing at the gate. Wordless on purpose: on a phone
