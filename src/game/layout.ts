@@ -96,6 +96,30 @@ export type Layout = {
   shortcut: Shortcut | null
   /** Every place the climb asks the player a question. */
   forks: ForkDef[]
+  /** The tandem plate, or null if the tower had no room for one. */
+  plate: PlateDef | null
+}
+
+/**
+ * A platform that only rises under two people.
+ *
+ * The lever is a favour one player can do for strangers; the bypass needs two
+ * pads held at once. This is the third and bluntest: the plate simply does not
+ * move for one person. It is the only place in the climb where a player cannot
+ * substitute skill for company, which is why it sits where a solo climber is
+ * starting to tire rather than at the bottom where they are still fresh.
+ */
+export type PlateDef = {
+  x: number
+  y: number
+  z: number
+  size: number
+  /** How far it lifts when two people are aboard. */
+  rise: number
+  /** The landing it reaches, which skips what would otherwise be climbed. */
+  toX: number
+  toY: number
+  toZ: number
 }
 
 /**
@@ -223,7 +247,45 @@ export function buildTower(): Layout {
     levers: out.levers,
     sectionNames,
     shortcut,
-    forks: out.forks
+    forks: out.forks,
+    plate: buildPlate(out)
+  }
+}
+
+/**
+ * Places the tandem plate beside a landing about two thirds up.
+ *
+ * It sits off the main route, so a solo climber is never blocked by it - the
+ * tower stays completable alone, which the brief requires because a judge
+ * arrives by themselves. What they lose is the shortcut, not the climb.
+ */
+function buildPlate(out: Build): PlateDef | null {
+  const landings = out.pads
+    .map((pad, index) => ({ pad, index }))
+    .filter((entry) => entry.pad.kind === 'checkpoint')
+  if (landings.length < 2) return null
+
+  const start = landings[Math.max(0, Math.floor(landings.length * 0.6))]
+  const target = landings[Math.min(landings.length - 1, landings.indexOf(start) + 1)]
+  if (!start || !target || target.pad.y <= start.pad.y) return null
+
+  // Off to the side of the landing, on the outward radius so it never sits on
+  // the route the climb already uses.
+  const out_ = Math.atan2(start.pad.z - CENTER_Z, start.pad.x - CENTER_X)
+  const size = 3.6
+  const x = start.pad.x + Math.cos(out_) * (size + 1.4)
+  const z = start.pad.z + Math.sin(out_) * (size + 1.4)
+  if (!inShaft(x, z, start.pad.y) || !isClear(out, x, start.pad.y, z, size)) return null
+
+  return {
+    x,
+    y: start.pad.y + 0.4,
+    z,
+    size,
+    rise: Math.max(2.5, target.pad.y - start.pad.y),
+    toX: target.pad.x,
+    toY: target.pad.y,
+    toZ: target.pad.z
   }
 }
 

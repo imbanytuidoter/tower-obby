@@ -33,6 +33,8 @@ export const run = {
   climbers: 0,
   /** How many of the two co-op pads are occupied, server-counted. */
   shortcutHeld: 0,
+  /** How many people are standing on the tandem plate right now. */
+  plateRiders: 0,
   /**
    * The decisions this run made, in the order they were made.
    *

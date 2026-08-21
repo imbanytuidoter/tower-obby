@@ -13,11 +13,21 @@ import {
   GATE_Z,
   RANKING_SECONDS,
   RANKING_SIZE,
-  HEARTBEAT_SECONDS
+  HEARTBEAT_SECONDS,
+  PLATE_RISE_RATE,
+  PLATE_FALL_RATE
 } from '../game/config'
 import { buildTower } from '../game/layout'
 import { room } from '../shared/messages'
-import { Board, DailyBoard, LeverState, Ranking, ServerHeartbeat, ShortcutState } from '../shared/schemas'
+import {
+  Board,
+  DailyBoard,
+  LeverState,
+  Ranking,
+  ServerHeartbeat,
+  ShortcutState,
+  TandemState
+} from '../shared/schemas'
 
 const STORAGE_KEY = 'obby.board.v2'
 const DAILY_KEY = 'obby.daily.v1'
@@ -73,6 +83,7 @@ export async function startServer() {
   Ranking.create(state, { names: [], heights: [], climbers: 0 })
   ShortcutState.create(state, { open: false })
   LeverState.create(state, { halted: [] })
+  TandemState.create(state, { lift: 0, riders: 0 })
 
   // Only the server calls syncEntity in an authoritative scene.
   syncEntity(state, [
@@ -81,7 +92,8 @@ export async function startServer() {
     DailyBoard.componentId,
     Ranking.componentId,
     ShortcutState.componentId,
-    LeverState.componentId
+    LeverState.componentId,
+    TandemState.componentId
   ])
 
   await restoreBoard()
@@ -117,6 +129,7 @@ function serverSystem(dt: number) {
   watchGate()
   watchShortcutPads()
   watchLevers()
+  watchPlate(dt)
 
   rankingTimer += dt
   if (rankingTimer >= RANKING_SECONDS) {
@@ -346,6 +359,43 @@ function playerPosition(address: string): Vector3 | null {
 function finishOf(): Vector3 | null {
   const pad = tower.pads.find((candidate) => candidate.kind === 'finish')
   return pad ? Vector3.create(pad.x, pad.y, pad.z) : null
+}
+
+/**
+ * The plate rises only with two DIFFERENT people aboard, and sinks the moment
+ * it is down to one. It moves at a fixed rate rather than snapping, so a
+ * climber can see it responding to the person who just stepped on.
+ */
+function watchPlate(dt: number) {
+  const plate = tower.plate
+  const view = TandemState.getOrNull(state)
+  if (!plate || !view) return
+
+  const aboard = new Set<string>()
+  for (const [entity, identity] of engine.getEntitiesWith(PlayerIdentityData)) {
+    const transform = Transform.getOrNull(entity)
+    if (!transform) continue
+    const deck = plate.y + view.lift * plate.rise
+    if (
+      Math.abs(transform.position.x - plate.x) < plate.size / 2 + 0.4 &&
+      Math.abs(transform.position.z - plate.z) < plate.size / 2 + 0.4 &&
+      Math.abs(transform.position.y - deck) < 2.2
+    ) {
+      aboard.add(identity.address.toLowerCase())
+    }
+  }
+
+  const target = aboard.size >= 2 ? 1 : 0
+  const speed = target > view.lift ? PLATE_RISE_RATE : PLATE_FALL_RATE
+  const next = Math.max(0, Math.min(1, view.lift + Math.sign(target - view.lift) * speed * dt))
+
+  // Written only on a real change: this runs every frame and a component write
+  // re-broadcasts to every client.
+  if (Math.abs(next - view.lift) > 0.002 || view.riders !== aboard.size) {
+    const mutable = TandemState.getMutable(state)
+    mutable.lift = next
+    mutable.riders = aboard.size
+  }
 }
 
 function publishBoard() {

@@ -48,6 +48,14 @@ export function estimateClimbSeconds(
  */
 export const SKYBOX_TIME = 36000
 
+/**
+ * How fast the tandem plate travels, as a share of its full lift per second.
+ * It falls faster than it rises so stepping off has an immediate consequence
+ * and the person still aboard can feel it going.
+ */
+export const PLATE_RISE_RATE = 0.22
+export const PLATE_FALL_RATE = 0.5
+
 /** How often the server proves it is alive. */
 export const HEARTBEAT_SECONDS = 2
 

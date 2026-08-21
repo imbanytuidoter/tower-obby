@@ -60,6 +60,13 @@ export type BuiltFork = {
   saves: number
 }
 
+export type BuiltPlate = {
+  entity: Entity
+  /** Resting position and travel, so the client can place it from `lift`. */
+  baseY: number
+  rise: number
+}
+
 export type BuiltShortcut = {
   /** Route pads, solid only while the bypass is open. */
   route: Entity[]
@@ -83,6 +90,8 @@ export type World = {
   shortcut: BuiltShortcut | null
   /** Which pads belong to which arm, so a run can tell what it chose. */
   forks: BuiltFork[]
+  /** The tandem plate, or null when the tower had no room for one. */
+  plate: BuiltPlate | null
   entities: Entity[]
 }
 
@@ -300,6 +309,7 @@ export function buildWorld(layout: Layout): World {
 
   const shortcut = buildShortcut(layout, entities)
   const forks = buildForks(layout, entities)
+  const plate = buildPlate(layout, entities)
 
   return {
     sectionNames: layout.sectionNames,
@@ -312,6 +322,7 @@ export function buildWorld(layout: Layout): World {
     levers,
     shortcut,
     forks,
+    plate,
     entities
   }
 }
@@ -337,6 +348,58 @@ const SHORTCUT_CLOSED = Color4.create(0.3, 0.34, 0.42, 0.25)
  * same climb model the round length uses, so the sign cannot drift from the
  * geometry.
  */
+/**
+ * The tandem plate: a slab that only goes up under two people.
+ *
+ * It is drawn as safe ground with a choice edge, because standing on it is
+ * safe and what it is asking you is whether you can find somebody. The sign
+ * says the rule in one line - there is no other way to learn it, and a rules
+ * panel is a player already leaving.
+ */
+function buildPlate(layout: Layout, entities: Entity[]): BuiltPlate | null {
+  const def = layout.plate
+  if (!def) return null
+
+  const entity = engine.addEntity()
+  entities.push(entity)
+  Transform.create(entity, {
+    position: Vector3.create(def.x, def.y, def.z),
+    scale: Vector3.create(def.size, 0.6, def.size)
+  })
+  MeshRenderer.setCylinder(entity, 0.5, 0.5)
+  MeshCollider.setCylinder(entity)
+  Material.setPbrMaterial(entity, {
+    albedoColor: SAFE_FILL,
+    emissiveColor: CHOICE_EDGE_3,
+    emissiveIntensity: 1.2,
+    roughness: 0.6
+  })
+
+  // The line it is trying to reach, drawn in gold at the top of its travel so
+  // the point of standing on it is visible from the ground.
+  const mark = engine.addEntity()
+  entities.push(mark)
+  Transform.create(mark, {
+    position: Vector3.create(def.x, def.y + def.rise + 0.9, def.z),
+    scale: Vector3.create(def.size * 1.25, 0.12, def.size * 1.25)
+  })
+  MeshRenderer.setCylinder(mark, 0.5, 0.5)
+  Material.setPbrMaterial(mark, {
+    albedoColor: FINISH_ALBEDO,
+    emissiveColor: FINISH_EMISSIVE,
+    emissiveIntensity: 2
+  })
+
+  entities.push(...routeSign(
+    { ...def, kind: 'normal', crumble: false, section: 0, fromIndex: -1 } as Pad,
+    'TANDEM PLATE',
+    'IT ONLY RISES WITH TWO',
+    CHOICE_EDGE_3
+  ))
+
+  return { entity, baseY: def.y, rise: def.rise }
+}
+
 function buildForks(layout: Layout, entities: Entity[]): BuiltFork[] {
   const built: BuiltFork[] = []
 

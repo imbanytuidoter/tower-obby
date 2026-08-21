@@ -169,6 +169,14 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   note(unpriced === 0, 'every fork has a price', `${unpriced} unpriced`)
 }
 
+// The tandem plate is the one thing in the climb a player cannot substitute
+// skill for company on, so its absence is a silent loss of the strongest
+// social mechanic in the game.
+{
+  const plate = buildTower().plate
+  note(plate !== null, 'tandem plate placed', plate ? `${plate.rise.toFixed(1)} m of lift at ${plate.y.toFixed(1)} m` : 'none')
+}
+
 // The first ten seconds. A player arriving alone must see the gate they have
 // to walk through AND the board that tells them why - without turning round.
 // The board used to sit exactly 180 degrees behind the spawn.

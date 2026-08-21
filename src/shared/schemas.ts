@@ -42,6 +42,19 @@ export const ShortcutState = engine.defineComponent('obby::shortcut', {
   held: Schemas.Int
 })
 
+/**
+ * The tandem plate: how far it has lifted, and how many are aboard.
+ *
+ * Server-owned for the same reason the bypass is - a client asked "are two
+ * people standing here?" would be asked to report on somebody else, which is
+ * exactly the question a client should never be trusted with.
+ */
+export const TandemState = engine.defineComponent('obby::tandem', {
+  /** 0 to 1. Clients interpolate the plate's transform from this. */
+  lift: Schemas.Float,
+  riders: Schemas.Int
+})
+
 /** Sections whose beam is currently held still by somebody on a lever pad. */
 export const LeverState = engine.defineComponent('obby::levers', {
   halted: Schemas.Array(Schemas.Int)
@@ -81,6 +94,7 @@ export function protectServerState() {
   Ranking.validateBeforeChange(serverOnly)
   ShortcutState.validateBeforeChange(serverOnly)
   LeverState.validateBeforeChange(serverOnly)
+  TandemState.validateBeforeChange(serverOnly)
   ServerHeartbeat.validateBeforeChange(serverOnly)
   Board.validateBeforeChange(serverOnly)
   DailyBoard.validateBeforeChange(serverOnly)

@@ -13,7 +13,8 @@ import {
   LeverState,
   Ranking,
   ServerHeartbeat,
-  ShortcutState
+  ShortcutState,
+  TandemState
 } from './shared/schemas'
 import {
   CHECKPOINT_RADIUS,
@@ -182,6 +183,15 @@ function sharedRoundSystem(dt: number) {
     const bypass = ShortcutState.getOrNull(entity)
     run.shortcutHeld = bypass ? bypass.held : 0
     if (bypass && world?.shortcut) setShortcutOpen(world.shortcut, bypass.open)
+
+    // The plate's height is the server's answer to "are two people aboard",
+    // so the client only ever renders it - it never decides it.
+    const tandem = TandemState.getOrNull(entity)
+    if (tandem && world?.plate) {
+      const transform = Transform.getMutable(world.plate.entity)
+      transform.position.y = world.plate.baseY + tandem.lift * world.plate.rise
+      run.plateRiders = tandem.riders
+    }
 
     const ranking = Ranking.getOrNull(entity)
     if (ranking) {
