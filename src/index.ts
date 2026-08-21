@@ -1,12 +1,15 @@
 import {
   engine,
+  Entity,
   InputAction,
   inputSystem,
+  Material,
   MeshCollider,
+  MeshRenderer,
   PointerEventType,
   Transform
 } from '@dcl/sdk/ecs'
-import { Quaternion, Vector3 } from '@dcl/sdk/math'
+import { Color3, Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 import { isServer, isStateSyncronized } from '@dcl/sdk/network'
 import { getPlayer } from '@dcl/sdk/players'
 import { movePlayerTo } from '~system/RestrictedActions'
@@ -16,6 +19,7 @@ import { room } from './shared/messages'
 import {
   Board,
   DailyBoard,
+  Ghost,
   protectServerState,
   LeverState,
   Ranking,
@@ -42,7 +46,9 @@ import {
   HAZARD_HALF_WIDTH,
   RESPAWN_COOLDOWN,
   RESPAWN_LIFT,
-  HEARTBEAT_SECONDS
+  HEARTBEAT_SECONDS,
+  GHOST_SAMPLE_SECONDS,
+  GHOST_MAX_SAMPLES
 } from './game/config'
 import {
   activateCheckpoint,
@@ -66,6 +72,10 @@ import { announce, completeRound, Phase, prepareRound, run, startClock, tickAnno
 import { setupUi } from './ui'
 
 let world: World | null = null
+
+/** The replayed path and the mote that walks it. Empty until a record exists. */
+let ghostPath: number[] = []
+let ghostMote: Entity | null = null
 
 export function main() {
   protectServerState()
@@ -107,6 +117,7 @@ function startClient() {
   engine.addSystem(decorSystem, 3, 'decorSystem')
   engine.addSystem(sharedRoundSystem, 4, 'sharedRoundSystem')
   engine.addSystem(helloSystem, 5, 'helloSystem')
+  engine.addSystem(ghostSystem, 6, 'ghostSystem')
 
   // Somebody else topping out ends the round for everyone. Without this the
   // tower simply vanishes and you are back in the lobby with no explanation.
@@ -210,6 +221,15 @@ function sharedRoundSystem(dt: number) {
       const transform = Transform.getMutable(world.plate.entity)
       transform.position.y = world.plate.baseY + tandem.lift * world.plate.rise
       run.plateRiders = tandem.riders
+    }
+
+    const ghost = Ghost.getOrNull(entity)
+    if (ghost && ghost.path.length !== ghostPath.length) {
+      ghostPath = [...ghost.path]
+      ghostClock = 0
+      run.ghostName = ghost.name
+      run.ghostSeconds = ghost.seconds
+      if (!ghostMote && ghostPath.length >= 6) ghostMote = createGhostMote()
     }
 
     const ranking = Ranking.getOrNull(entity)
@@ -397,6 +417,7 @@ function runSystem(dt: number) {
   if (run.phase !== Phase.Running) return
 
   run.time += dt
+  sampleGhost(dt, player)
 
   for (let i = world.checkpoints.length - 1; i > run.checkpoint; i--) {
     const checkpoint = world.checkpoints[i]
@@ -422,6 +443,9 @@ function runSystem(dt: number) {
     // round number and checks our verified position before crediting anything.
     const profile = getPlayer()
     room.send('claimFinish', { name: profile?.name ?? 'Guest' })
+    // Offered unconditionally; the server keeps it only if this climb landed
+    // on top of today's board, which is a decision a client must not make.
+    if (run.path.length >= 12) room.send('ghostPath', { path: run.path })
 
     // The panel is optimistic, the sound is not: it plays when the server
     // confirms the finish over roundWon, so it can never celebrate a claim
@@ -469,6 +493,62 @@ function shortcutPrompt(player: Vector3): string {
 
   if (run.shortcutHeld >= 2) return 'SHORTCUT OPEN - GO'
   return 'WAITING FOR A SECOND CLIMBER ON THE OTHER PAD'
+}
+
+/** A small gold light that walks the record run's path. */
+function createGhostMote(): Entity {
+  const mote = engine.addEntity()
+  Transform.create(mote, {
+    position: Vector3.create(0, -50, 0),
+    scale: Vector3.create(0.55, 0.55, 0.55)
+  })
+  MeshRenderer.setSphere(mote)
+  Material.setPbrMaterial(mote, {
+    albedoColor: Color4.create(1, 0.85, 0.35, 0.75),
+    emissiveColor: Color3.create(1, 0.78, 0.2),
+    emissiveIntensity: 5
+  })
+  return mote
+}
+
+/**
+ * Samples this climb's path, so a record run can be replayed for everyone.
+ *
+ * Two a second, capped, and thrown away if the climb does not end on top of
+ * today's board - the server decides that, and only invites a path from the
+ * climber it decided about.
+ */
+let ghostTimer = 0
+function sampleGhost(dt: number, player: Vector3) {
+  ghostTimer -= dt
+  if (ghostTimer > 0) return
+  ghostTimer = GHOST_SAMPLE_SECONDS
+  if (run.path.length >= GHOST_MAX_SAMPLES * 3) return
+  run.path.push(player.x, player.y, player.z)
+}
+
+/**
+ * Replays the day's fastest climb as a mote of light moving up the tower.
+ *
+ * Not an avatar - an avatar reads as a player you can talk to, and this one
+ * cannot answer. A light on the route says "somebody did this, faster than
+ * you" and nothing else, which is exactly what it is for.
+ */
+let ghostClock = 0
+function ghostSystem(dt: number) {
+  if (ghostPath.length < 6 || !ghostMote) return
+
+  ghostClock += dt
+  const frames = ghostPath.length / 3
+  const span = frames * GHOST_SAMPLE_SECONDS
+  const t = (ghostClock % span) / GHOST_SAMPLE_SECONDS
+  const i = Math.min(frames - 2, Math.floor(t))
+  const f = t - i
+
+  const transform = Transform.getMutable(ghostMote)
+  transform.position.x = ghostPath[i * 3] + (ghostPath[i * 3 + 3] - ghostPath[i * 3]) * f
+  transform.position.y = ghostPath[i * 3 + 1] + (ghostPath[i * 3 + 4] - ghostPath[i * 3 + 1]) * f + 1
+  transform.position.z = ghostPath[i * 3 + 2] + (ghostPath[i * 3 + 5] - ghostPath[i * 3 + 2]) * f
 }
 
 /**

@@ -55,6 +55,20 @@ export const TandemState = engine.defineComponent('obby::tandem', {
   riders: Schemas.Int
 })
 
+/**
+ * The ghost: the path of today's fastest climb, replayed for everyone.
+ *
+ * "Your run becomes a lobby ghost, so leaving still leaves something behind."
+ * It is stored flat - x, y, z, x, y, z - because an array of Vector3 costs
+ * more to serialise than three floats do, and this component is written once
+ * per record rather than per frame.
+ */
+export const Ghost = engine.defineComponent('obby::ghost', {
+  name: Schemas.String,
+  seconds: Schemas.Float,
+  path: Schemas.Array(Schemas.Float)
+})
+
 /** Sections whose beam is currently held still by somebody on a lever pad. */
 export const LeverState = engine.defineComponent('obby::levers', {
   halted: Schemas.Array(Schemas.Int)
@@ -95,6 +109,7 @@ export function protectServerState() {
   ShortcutState.validateBeforeChange(serverOnly)
   LeverState.validateBeforeChange(serverOnly)
   TandemState.validateBeforeChange(serverOnly)
+  Ghost.validateBeforeChange(serverOnly)
   ServerHeartbeat.validateBeforeChange(serverOnly)
   Board.validateBeforeChange(serverOnly)
   DailyBoard.validateBeforeChange(serverOnly)

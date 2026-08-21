@@ -41,6 +41,11 @@ export const run = {
    */
   token: 0,
   tokenSkipsTo: 0,
+  /** This climb's path, sampled for the ghost. */
+  path: [] as number[],
+  /** Who set the ghost, and in what time. */
+  ghostName: '',
+  ghostSeconds: 0,
   /**
    * The decisions this run made, in the order they were made.
    *
@@ -69,6 +74,7 @@ export function prepareRound(totalCheckpoints: number, sections: string[]) {
   run.choices = []
   run.token = 0
   run.tokenSkipsTo = 0
+  run.path = []
 }
 
 export function startClock() {

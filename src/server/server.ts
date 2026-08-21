@@ -15,6 +15,7 @@ import {
   RANKING_SIZE,
   HEARTBEAT_SECONDS,
   COIN_RADIUS,
+  GHOST_MAX_SAMPLES,
   PLATE_RISE_RATE,
   PLATE_FALL_RATE
 } from '../game/config'
@@ -25,6 +26,7 @@ import {
   DailyBoard,
   LeverState,
   Ranking,
+  Ghost,
   ServerHeartbeat,
   ShortcutState,
   TandemState
@@ -73,6 +75,9 @@ const tower = buildTower()
 
 /** Who has taken the ante this climb. Cleared when their climb ends. */
 const tookCoin = new Set<string>()
+
+/** Climbers the server has invited to upload a path, because they lead today. */
+const pendingGhost = new Map<string, { name: string; seconds: number }>()
 let heartbeatTimer = 0
 let rankingTimer = 0
 
@@ -88,6 +93,7 @@ export async function startServer() {
   ShortcutState.create(state, { open: false })
   LeverState.create(state, { halted: [] })
   TandemState.create(state, { lift: 0, riders: 0 })
+  Ghost.create(state, { name: '', seconds: 0, path: [] })
 
   // Only the server calls syncEntity in an authoritative scene.
   syncEntity(state, [
@@ -97,7 +103,8 @@ export async function startServer() {
     Ranking.componentId,
     ShortcutState.componentId,
     LeverState.componentId,
-    TandemState.componentId
+    TandemState.componentId,
+    Ghost.componentId
   ])
 
   await restoreBoard()
@@ -126,6 +133,29 @@ export async function startServer() {
 
     tookCoin.add(address)
     room.send('token', { skipsToCheckpoint: tower.coin.skipsToCheckpoint }, { to: [context.from] })
+  })
+
+  /**
+   * A path arrives only from somebody who just took the top of today's board.
+   * The server checks that itself rather than trusting the claim: `pendingGhost`
+   * is set inside handleClaim and cleared here, so an unsolicited path is
+   * dropped.
+   */
+  room.onMessage('ghostPath', (data, context) => {
+    if (!context) return
+    const address = context.from.toLowerCase()
+    const pending = pendingGhost.get(address)
+    if (!pending) return
+    pendingGhost.delete(address)
+
+    if (!Array.isArray(data.path) || data.path.length < 12 || data.path.length % 3 !== 0) return
+    if (data.path.length > GHOST_MAX_SAMPLES * 3) return
+
+    const view = Ghost.getMutable(state)
+    view.name = pending.name
+    view.seconds = pending.seconds
+    view.path = data.path
+    console.log('[SERVER] ghost replaced by ' + pending.name + ' (' + pending.seconds.toFixed(1) + 's)')
   })
 
   room.onMessage('hello', (data, context) => {
@@ -223,6 +253,12 @@ function handleClaim(name: string, from: string) {
   startedClimb.delete(address)
   tookCoin.delete(address)
 
+  // Only the day's leader gets asked for a path, so the ghost is always the
+  // run people are actually chasing.
+  if (daily.length > 0 && daily[0] === entry) {
+    pendingGhost.set(address, { name: entry.name, seconds })
+  }
+
   room.send('summit', { name, seconds, record })
   void persistBoard()
   void recordClimb(from, seconds)
@@ -255,6 +291,7 @@ function publishRanking() {
   forget(stats, present)
   forget(startedClimb, present)
   forgetSet(tookCoin, present)
+  forget(pendingGhost, present)
 
   climbers.sort((a, b) => b.height - a.height)
   const top = climbers.slice(0, RANKING_SIZE)

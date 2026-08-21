@@ -53,6 +53,13 @@ export const SKYBOX_TIME = 36000
  * It falls faster than it rises so stepping off has an immediate consequence
  * and the person still aboard can feel it going.
  */
+/**
+ * Ghost sampling. Two a second for at most five minutes: 600 samples, 1800
+ * floats, about 7 KB - inside the 13 KB the transport will carry.
+ */
+export const GHOST_SAMPLE_SECONDS = 0.5
+export const GHOST_MAX_SAMPLES = 600
+
 /** How close the server needs a player to be to grant the ante. */
 export const COIN_RADIUS = 3
 

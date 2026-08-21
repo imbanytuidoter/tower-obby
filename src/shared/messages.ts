@@ -30,6 +30,14 @@ export const room = registerMessages({
   token: Schemas.Map({
     skipsToCheckpoint: Schemas.Int
   }),
+  /**
+   * The path of a climb, sent once when it lands on the board. Flat floats
+   * rather than Vector3s: a 200-second run at two samples a second is 1200
+   * numbers, about 4.8 KB, comfortably inside the 13 KB message ceiling.
+   */
+  ghostPath: Schemas.Map({
+    path: Schemas.Array(Schemas.Float)
+  }),
   /** "I have arrived, send me my saved record." */
   hello: Schemas.Map({
     /** Cosmetic label for the live ranking; the server has only addresses. */
