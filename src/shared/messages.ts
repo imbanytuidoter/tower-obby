@@ -22,5 +22,14 @@ export const room = registerMessages({
   roundWon: Schemas.Map({
     name: Schemas.String,
     seconds: Schemas.Float
+  }),
+  /** "I have arrived, send me my saved record." */
+  hello: Schemas.Map({
+    ping: Schemas.Int
+  }),
+  /** Sent back to that one player: their history, restored from storage. */
+  stats: Schemas.Map({
+    bestSeconds: Schemas.Float,
+    climbs: Schemas.Int
   })
 })

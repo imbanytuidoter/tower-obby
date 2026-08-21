@@ -1,6 +1,6 @@
 import { engine, MeshCollider, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
-import { isServer } from '@dcl/sdk/network'
+import { isServer, isStateSyncronized } from '@dcl/sdk/network'
 import { getPlayer } from '@dcl/sdk/players'
 import { movePlayerTo } from '~system/RestrictedActions'
 // Static, never lazy: registerMessages and defineComponent must both run
@@ -74,6 +74,34 @@ function startClient() {
   engine.addSystem(runSystem, 2, 'runSystem')
   engine.addSystem(decorSystem, 3, 'decorSystem')
   engine.addSystem(sharedRoundSystem, 4, 'sharedRoundSystem')
+  engine.addSystem(helloSystem, 5, 'helloSystem')
+
+  room.onMessage('stats', (data) => {
+    run.personalBest = data.bestSeconds
+    run.climbs = data.climbs
+    greeted = true
+  })
+}
+
+/**
+ * Asks the server for this player's saved record, and keeps asking.
+ *
+ * A message sent before the room is synced is silently dropped, and a cold
+ * server takes ~15s to boot, so a single send on startup would leave a player
+ * who arrived first with no record at all.
+ */
+let greeted = false
+let helloTimer = 0
+
+function helloSystem(dt: number) {
+  if (greeted) return
+
+  helloTimer -= dt
+  if (helloTimer > 0) return
+  helloTimer = 2
+
+  if (!isStateSyncronized()) return
+  room.send('hello', { ping: 1 })
 }
 
 /**

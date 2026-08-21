@@ -14,8 +14,15 @@ import { room } from '../shared/messages'
 import { Board, RoundState, ServerHeartbeat } from '../shared/schemas'
 
 const STORAGE_KEY = 'obby.board.v1'
+const PLAYER_KEY = 'obby.stats.v1'
 
 type Entry = { name: string; seconds: number; round: number }
+
+/** Versioned from day one: storage outlives deploys, so old shapes will turn up. */
+type PlayerStats = { version: number; bestSeconds: number; climbs: number }
+
+/** Loaded once per player per session, then kept in memory. */
+const stats = new Map<string, PlayerStats>()
 
 let state = engine.addEntity()
 let board: Entry[] = []
@@ -38,6 +45,11 @@ export async function startServer() {
   room.onMessage('claimFinish', (data, context) => {
     if (!context) return
     handleClaim(data.round, data.name, context.from)
+  })
+
+  room.onMessage('hello', (_data, context) => {
+    if (!context) return
+    void sendStats(context.from)
   })
 
   engine.addSystem(serverSystem)
@@ -89,6 +101,7 @@ function handleClaim(round: number, name: string, from: string) {
   room.send('roundWon', { name, seconds })
   advance(current.round)
   void persistBoard()
+  void recordClimb(from, seconds)
 }
 
 /** Server-verified position: read from the engine, never from the client. */
@@ -121,6 +134,46 @@ function publishBoard() {
   view.names = board.map((entry) => entry.name)
   view.seconds = board.map((entry) => entry.seconds)
   view.rounds = board.map((entry) => entry.round)
+}
+
+/**
+ * A player's own history. This is the reason to come back: the shared board
+ * resets with the world, a personal best does not.
+ */
+async function sendStats(address: string) {
+  const mine = await loadStats(address)
+  room.send('stats', { bestSeconds: mine.bestSeconds, climbs: mine.climbs }, { to: [address] })
+}
+
+async function loadStats(address: string): Promise<PlayerStats> {
+  const cached = stats.get(address)
+  if (cached) return cached
+
+  const fresh: PlayerStats = { version: 1, bestSeconds: 0, climbs: 0 }
+  try {
+    const stored = await Storage.player.get<PlayerStats>(address, PLAYER_KEY)
+    if (stored && stored.version === 1 && typeof stored.bestSeconds === 'number') {
+      fresh.bestSeconds = stored.bestSeconds
+      fresh.climbs = typeof stored.climbs === 'number' ? stored.climbs : 0
+    }
+  } catch (error) {
+    console.log('[SERVER] stats unreadable for ' + address + ': ' + error)
+  }
+
+  stats.set(address, fresh)
+  return fresh
+}
+
+/** Written on a finish only - one write per climb, never per tick. */
+async function recordClimb(address: string, seconds: number) {
+  const mine = await loadStats(address)
+  mine.climbs += 1
+  if (mine.bestSeconds === 0 || seconds < mine.bestSeconds) mine.bestSeconds = seconds
+
+  const ok = await Storage.player.set<PlayerStats>(address, PLAYER_KEY, mine)
+  if (!ok) console.log('[SERVER] stats did not persist for ' + address)
+
+  room.send('stats', { bestSeconds: mine.bestSeconds, climbs: mine.climbs }, { to: [address] })
 }
 
 type Stored = { version: number; board: Entry[] }

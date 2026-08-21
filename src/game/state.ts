@@ -24,7 +24,10 @@ export const run = {
   sectionName: '',
   /** Shared-round facts, filled from the server-owned component. */
   serverAlive: false,
-  roundEndsIn: 0
+  roundEndsIn: 0,
+  /** Restored from the server's per-player storage, survives everything. */
+  personalBest: 0,
+  climbs: 0
 }
 
 export function prepareRound(round: number, totalCheckpoints: number, sections: string[]) {

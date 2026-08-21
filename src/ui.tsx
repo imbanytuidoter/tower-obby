@@ -3,7 +3,6 @@ import { Color4 } from '@dcl/sdk/math'
 import { isMobile } from '@dcl/sdk/platform'
 import { TOTAL_ROUNDS } from './game/config'
 import { formatTime } from './game/format'
-import { bestFor } from './game/leaderboard'
 import { Phase, run } from './game/state'
 
 type Handlers = { next: () => void; retry: () => void; restart: () => void }
@@ -91,7 +90,6 @@ const button = (text: string, onClick: () => void, color: Color4 = NEON) => {
  */
 const hud = () => {
   const s = style()
-  const best = bestFor(run.round)
 
   return (
     <UiEntity
@@ -123,14 +121,16 @@ const hud = () => {
         color={run.roundEndsIn < 30 ? WARN : NEON}
         textAlign="middle-left"
       />
-      {!compact && (
-        <Label
-          value={'BEST  ' + (best ? formatTime(best.time) : '--:--.--')}
-          fontSize={s.line}
-          color={DIM}
-          textAlign="middle-left"
-        />
-      )}
+      <Label
+        value={
+          'BEST ' +
+          (run.personalBest > 0 ? formatTime(run.personalBest) : '--:--.--') +
+          (run.climbs > 0 ? '   CLIMBS ' + run.climbs : '')
+        }
+        fontSize={s.line}
+        color={DIM}
+        textAlign="middle-left"
+      />
     </UiEntity>
   )
 }

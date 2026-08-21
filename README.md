@@ -63,6 +63,29 @@ picks a fresh sequence of named sections, so no two climbs are the same. Section
 Every tunable number lives in `src/game/config.ts`: parcel geometry, the difficulty
 curve per round, jump gaps, hazard sizes, crumble timings, respawn behaviour.
 
+## Multiplayer
+
+Everyone in the World climbs the same round at the same time. The scene runs a
+Decentraland Multiplayer Server (`@dcl/sdk@auth-server`), branched with
+`isServer()`:
+
+- the **server** owns the round number, its clock and the shared board;
+- the **tower is never sent over the wire**. The generator is deterministic and
+  imports no SDK, so the server runs the same `buildLayout(round)` the clients
+  do — broadcasting one integer gives everybody an identical course;
+- a finish is a **claim**, not a score. The client says "I am on the finish pad";
+  the server re-derives where that pad is, reads the player's engine-verified
+  `Transform`, and only then credits anything. A client-reported time is never
+  trusted;
+- the board is written to `Storage` when a round is won — never per tick, since
+  storage writes are capped — and personal bests are kept per wallet, so they
+  survive the server shutting down when the scene empties.
+
+Because the server sleeps when the World is empty and takes ~15 s to cold start,
+the client shows a "waking the server up" banner driven by a heartbeat, and
+tracks the time it *observed* the heartbeat change rather than the server's own
+timestamp — a stale snapshot from an older server run must not read as alive.
+
 ## Budget against the scene limits
 
 Limits are `n × 200` entities, `n × 10000` triangles, `log2(n+1) × 20` materials and the
