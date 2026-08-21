@@ -27,7 +27,9 @@ export const run = {
   roundEndsIn: 0,
   /** Restored from the server's per-player storage, survives everything. */
   personalBest: 0,
-  climbs: 0
+  climbs: 0,
+  /** Who is highest in the tower right now, straight from the server. */
+  ranking: [] as { name: string; height: number }[]
 }
 
 export function prepareRound(round: number, totalCheckpoints: number, sections: string[]) {

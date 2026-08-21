@@ -58,6 +58,7 @@ const countdown = (seconds: number) => {
 const uiRoot = () => (
   <UiEntity uiTransform={{ width: '100%', height: '100%', positionType: 'absolute' }}>
     {hud()}
+    {run.ranking.length > 0 && rankingPanel()}
     {!run.serverAlive && wakingBanner()}
     {run.prompt !== '' && promptBanner()}
     {run.phase === Phase.Ready && readyPanel()}
@@ -131,6 +132,38 @@ const hud = () => {
         color={DIM}
         textAlign="middle-left"
       />
+    </UiEntity>
+  )
+}
+
+/**
+ * Who is highest in the tower right now. This is the point of playing here
+ * rather than alone: the people above you are real and you can catch them.
+ */
+const rankingPanel = () => {
+  const s = style()
+
+  return (
+    <UiEntity
+      uiTransform={{
+        positionType: 'absolute',
+        position: { top: s.edge, right: s.edge },
+        width: compact ? 320 : 340,
+        flexDirection: 'column',
+        padding: compact ? 14 : 16
+      }}
+      uiBackground={{ color: PANEL }}
+    >
+      <Label value="HIGHEST NOW" fontSize={s.line} color={NEON} textAlign="middle-left" />
+      {run.ranking.map((climber, index) => (
+        <Label
+          key={index}
+          value={index + 1 + '. ' + climber.name + '   ' + climber.height + 'm'}
+          fontSize={s.line}
+          color={index === 0 ? GOLD : Color4.White()}
+          textAlign="middle-left"
+        />
+      ))}
     </UiEntity>
   )
 }

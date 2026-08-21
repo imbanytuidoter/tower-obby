@@ -25,7 +25,8 @@ export const room = registerMessages({
   }),
   /** "I have arrived, send me my saved record." */
   hello: Schemas.Map({
-    ping: Schemas.Int
+    /** Cosmetic label for the live ranking; the server has only addresses. */
+    name: Schemas.String
   }),
   /** Sent back to that one player: their history, restored from storage. */
   stats: Schemas.Map({

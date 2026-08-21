@@ -6,7 +6,7 @@ import { movePlayerTo } from '~system/RestrictedActions'
 // Static, never lazy: registerMessages and defineComponent must both run
 // during module load, before the engine seals.
 import { room } from './shared/messages'
-import { Board, protectServerState, RoundState, ServerHeartbeat } from './shared/schemas'
+import { Board, protectServerState, Ranking, RoundState, ServerHeartbeat } from './shared/schemas'
 import {
   CHECKPOINT_RADIUS,
   GATE_DIR_X,
@@ -101,7 +101,8 @@ function helloSystem(dt: number) {
   helloTimer = 2
 
   if (!isStateSyncronized()) return
-  room.send('hello', { ping: 1 })
+  const profile = getPlayer()
+  room.send('hello', { name: profile?.name ?? 'Guest' })
 }
 
 /**
@@ -125,6 +126,14 @@ function sharedRoundSystem() {
 
     run.serverAlive = Date.now() - lastHeartbeatSeenAt < HEARTBEAT_SECONDS * 3000
     run.roundEndsIn = Math.max(0, (state.endsAt - Date.now()) / 1000)
+
+    const ranking = Ranking.getOrNull(entity)
+    if (ranking) {
+      run.ranking = ranking.names.map((name, index) => ({
+        name,
+        height: ranking.heights[index] ?? 0
+      }))
+    }
 
     const board = Board.getOrNull(entity)
     if (board) {

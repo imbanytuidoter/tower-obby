@@ -14,6 +14,10 @@ export const FINISH_RADIUS = 3.5
 /** Rows kept on the shared board. */
 export const BOARD_SIZE = 10
 
+/** Live "who is highest" ranking: how many climbers, refreshed how often. */
+export const RANKING_SIZE = 3
+export const RANKING_SECONDS = 1
+
 /** Hard ceiling for pad height. The 3x3 parcel scene allows about 66m. */
 export const MAX_PAD_HEIGHT = 85
 

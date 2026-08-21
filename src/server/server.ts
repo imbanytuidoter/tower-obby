@@ -5,13 +5,15 @@ import { Storage } from '@dcl/sdk/server'
 import {
   BOARD_SIZE,
   FINISH_RADIUS,
+  RANKING_SECONDS,
+  RANKING_SIZE,
   HEARTBEAT_SECONDS,
   ROUND_SECONDS,
   TOTAL_ROUNDS
 } from '../game/config'
 import { buildLayout } from '../game/layout'
 import { room } from '../shared/messages'
-import { Board, RoundState, ServerHeartbeat } from '../shared/schemas'
+import { Board, Ranking, RoundState, ServerHeartbeat } from '../shared/schemas'
 
 const STORAGE_KEY = 'obby.board.v1'
 const PLAYER_KEY = 'obby.stats.v1'
@@ -24,9 +26,13 @@ type PlayerStats = { version: number; bestSeconds: number; climbs: number }
 /** Loaded once per player per session, then kept in memory. */
 const stats = new Map<string, PlayerStats>()
 
+/** Addresses are all the engine gives the server; names come from `hello`. */
+const names = new Map<string, string>()
+
 let state = engine.addEntity()
 let board: Entry[] = []
 let heartbeatTimer = 0
+let rankingTimer = 0
 
 export async function startServer() {
   state = engine.addEntity()
@@ -36,9 +42,15 @@ export async function startServer() {
   // before it can tell the server is alive.
   ServerHeartbeat.create(state, { at: Date.now() })
   Board.create(state, { names: [], seconds: [], rounds: [] })
+  Ranking.create(state, { names: [], heights: [] })
 
   // Only the server calls syncEntity in an authoritative scene.
-  syncEntity(state, [RoundState.componentId, ServerHeartbeat.componentId, Board.componentId])
+  syncEntity(state, [
+    RoundState.componentId,
+    ServerHeartbeat.componentId,
+    Board.componentId,
+    Ranking.componentId
+  ])
 
   await restoreBoard()
 
@@ -47,8 +59,9 @@ export async function startServer() {
     handleClaim(data.round, data.name, context.from)
   })
 
-  room.onMessage('hello', (_data, context) => {
+  room.onMessage('hello', (data, context) => {
     if (!context) return
+    names.set(context.from.toLowerCase(), data.name.slice(0, 24) || 'Guest')
     void sendStats(context.from)
   })
 
@@ -67,6 +80,12 @@ function serverSystem(dt: number) {
   // Read with getOrNull. getMutableOrNull marks the component dirty on every
   // single frame, which re-broadcasts the whole round state ~30 times a second
   // to every player.
+  rankingTimer += dt
+  if (rankingTimer >= RANKING_SECONDS) {
+    rankingTimer = 0
+    publishRanking()
+  }
+
   const current = RoundState.getOrNull(state)
   if (!current) return
   if (Date.now() < current.endsAt) return
@@ -102,6 +121,30 @@ function handleClaim(round: number, name: string, from: string) {
   advance(current.round)
   void persistBoard()
   void recordClimb(from, seconds)
+}
+
+/**
+ * Who is highest right now, read straight from the engine. This is the whole
+ * social hook: you can see the people you are racing without asking them.
+ */
+function publishRanking() {
+  const climbers: { name: string; height: number }[] = []
+
+  for (const [entity, identity] of engine.getEntitiesWith(PlayerIdentityData)) {
+    const transform = Transform.getOrNull(entity)
+    if (!transform) continue
+    climbers.push({
+      name: names.get(identity.address.toLowerCase()) ?? 'Guest',
+      height: transform.position.y
+    })
+  }
+
+  climbers.sort((a, b) => b.height - a.height)
+  const top = climbers.slice(0, RANKING_SIZE)
+
+  const view = Ranking.getMutable(state)
+  view.names = top.map((climber) => climber.name)
+  view.heights = top.map((climber) => Math.round(climber.height))
 }
 
 /** Server-verified position: read from the engine, never from the client. */

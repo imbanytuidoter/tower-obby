@@ -22,6 +22,16 @@ export const ServerHeartbeat = engine.defineComponent('obby::heartbeat', {
   at: Schemas.Int64
 })
 
+/**
+ * Who is highest in the tower right now. Rewritten about once a second, so it
+ * is its own component - bundling it with the board would resend the board on
+ * every tick.
+ */
+export const Ranking = engine.defineComponent('obby::ranking', {
+  names: Schemas.Array(Schemas.String),
+  heights: Schemas.Array(Schemas.Float)
+})
+
 /** Best times of the current session, newest winner first. */
 export const Board = engine.defineComponent('obby::board', {
   names: Schemas.Array(Schemas.String),
@@ -40,6 +50,7 @@ export function protectServerState() {
     value.senderAddress.toLowerCase() === AUTH_SERVER_PEER_ID.toLowerCase()
 
   RoundState.validateBeforeChange(serverOnly)
+  Ranking.validateBeforeChange(serverOnly)
   ServerHeartbeat.validateBeforeChange(serverOnly)
   Board.validateBeforeChange(serverOnly)
 }
