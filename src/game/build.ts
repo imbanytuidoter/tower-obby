@@ -12,7 +12,14 @@ import {
 } from '@dcl/sdk/ecs'
 import { Color3, Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 import { ColliderLayer, TriggerArea, triggerAreaEventsSystem } from '@dcl/sdk/ecs'
-import { CENTER_X, CENTER_Z, HAZARD_THICKNESS, PAD_RADIUS } from './config'
+import {
+  CENTER_X,
+  CENTER_Z,
+  FINISH_RADIUS,
+  FINISH_TOUCH_MARGIN,
+  HAZARD_THICKNESS,
+  PAD_RADIUS
+} from './config'
 import { Layout, MoverDef, Pad, SpinnerDef } from './layout'
 
 export type BuiltPad = {
@@ -56,6 +63,8 @@ export type World = {
   movers: BuiltMover[]
   checkpoints: Checkpoint[]
   finish: Vector3
+  /** Touch radius for this round's finish slab, derived from its real size. */
+  finishReach: number
   levers: BuiltLever[]
   shortcut: BuiltShortcut | null
   entities: Entity[]
@@ -140,6 +149,7 @@ export function buildWorld(layout: Layout): World {
   const pads: BuiltPad[] = []
   const checkpoints: Checkpoint[] = []
   let finish = Vector3.create(8, 1, 8)
+  let finishReach = FINISH_RADIUS
   let tallest = 0
 
   for (let padIndex = 0; padIndex < layout.pads.length; padIndex++) {
@@ -189,6 +199,10 @@ export function buildWorld(layout: Layout): World {
 
     if (pad.kind === 'finish') {
       finish = top
+      // Half-diagonal: the furthest point a player can legitimately stand on
+      // the slab. Clamped so the client stays inside the server's tolerance.
+      const corner = (pad.size / 2) * Math.SQRT2
+      finishReach = Math.min(corner + FINISH_TOUCH_MARGIN, FINISH_RADIUS)
       const previous = layout.pads[padIndex - 1] ?? pad
       entities.push(...createGoal(pad, previous.x, previous.z))
     }
@@ -238,6 +252,7 @@ export function buildWorld(layout: Layout): World {
     movers,
     checkpoints,
     finish,
+    finishReach,
     levers,
     shortcut,
     entities

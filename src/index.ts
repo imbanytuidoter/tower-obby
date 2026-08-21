@@ -25,10 +25,12 @@ import {
   LOBBY_SPAWN_X,
   LOBBY_SPAWN_Z,
   LOBBY_Y,
+  PAD_RADIUS,
   PROMPT_RANGE,
   CRUMBLE_DELAY,
   CRUMBLE_RESPAWN,
   FALL_GRACE,
+  FINISH_TOUCH_RISE,
   HAZARD_HALF_WIDTH,
   RESPAWN_COOLDOWN,
   RESPAWN_LIFT,
@@ -156,6 +158,7 @@ function sharedRoundSystem(dt: number) {
     haltedSections = levers ? levers.halted : []
 
     const bypass = ShortcutState.getOrNull(entity)
+    run.shortcutHeld = bypass ? bypass.held : 0
     if (bypass && world?.shortcut) setShortcutOpen(world.shortcut, bypass.open)
 
     const ranking = Ranking.getOrNull(entity)
@@ -164,6 +167,7 @@ function sharedRoundSystem(dt: number) {
         name,
         height: ranking.heights[index] ?? 0
       }))
+      run.climbers = ranking.climbers
     }
 
     const board = Board.getOrNull(entity)
@@ -356,7 +360,10 @@ function runSystem(dt: number) {
     }
   }
 
-  if (Math.abs(player.y - world.finish.y) < 1.6 && horizontalDistance(player, world.finish) <= 1.8) {
+  if (
+    Math.abs(player.y - world.finish.y) < FINISH_TOUCH_RISE &&
+    horizontalDistance(player, world.finish) <= world.finishReach
+  ) {
     // Claim it and let the server decide. It re-derives the finish pad from the
     // round number and checks our verified position before crediting anything.
     const profile = getPlayer()
@@ -385,6 +392,31 @@ function crossedStartLine(player: Vector3): boolean {
   return lateral < GATE_WIDTH
 }
 
+/**
+ * What the co-op pad has to say, if the player is standing on one.
+ *
+ * The pad already carries a sign, but a sign cannot tell you that somebody is
+ * on the other pad right now, waiting. That is the whole point of the
+ * mechanic, and it is invisible without the server's count - which is why
+ * `held` is broadcast separately from `open`.
+ */
+function shortcutPrompt(player: Vector3): string {
+  if (!world?.shortcut) return ''
+
+  const onPad = [world.shortcut.padA, world.shortcut.padB].some((entity) => {
+    const at = Transform.getOrNull(entity)
+    if (!at) return false
+    return (
+      horizontalDistance(player, at.position) < PAD_RADIUS &&
+      Math.abs(player.y - at.position.y) < 3
+    )
+  })
+  if (!onPad) return ''
+
+  if (run.shortcutHeld >= 2) return 'SHORTCUT OPEN - GO'
+  return 'WAITING FOR A SECOND CLIMBER ON THE OTHER PAD'
+}
+
 /** Approach hints: what happens next, shown just before it happens. */
 function updatePrompt(player: Vector3) {
   if (!world) {
@@ -402,6 +434,12 @@ function updatePrompt(player: Vector3) {
   }
 
   if (run.phase === Phase.Running) {
+    const coop = shortcutPrompt(player)
+    if (coop !== '') {
+      run.prompt = coop
+      return
+    }
+
     const distance = horizontalDistance(player, world.finish)
     const climb = world.finish.y - player.y
     run.prompt = distance < PROMPT_RANGE && climb < 6 ? 'FINISH LINE AHEAD' : ''

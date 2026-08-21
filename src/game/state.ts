@@ -30,6 +30,10 @@ export const run = {
   climbs: 0,
   /** Who is highest in the tower right now, straight from the server. */
   ranking: [] as { name: string; height: number }[],
+  /** Everyone in the World, including those below the top three. */
+  climbers: 0,
+  /** How many of the two co-op pads are occupied, server-counted. */
+  shortcutHeld: 0,
   /** A line about something another player just did. Fades on its own. */
   announcement: '',
   announcementFor: 0

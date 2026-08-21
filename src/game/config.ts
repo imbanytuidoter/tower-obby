@@ -49,6 +49,20 @@ export const HEARTBEAT_SECONDS = 2
 /** How close the server needs a player to be to accept a finish claim. */
 export const FINISH_RADIUS = 3.5
 
+/**
+ * How far past the slab's own corner still counts as touching the finish.
+ *
+ * The client used to test a flat 1.8 m while the server accepted 3.5 m, so a
+ * player standing on the corner of a 3.2 m pad - 2.26 m from its centre, and
+ * unambiguously on it - triggered nothing at all. The radius is now derived
+ * from the pad the round actually generated, and clamped below FINISH_RADIUS
+ * so the client can never claim something the server would reject.
+ */
+export const FINISH_TOUCH_MARGIN = 0.6
+
+/** Vertical slack for the same test: enough for a landing, not for a flyby. */
+export const FINISH_TOUCH_RISE = 1.6
+
 /** Rows kept on the shared board. */
 export const BOARD_SIZE = 10
 

@@ -149,7 +149,12 @@ const rankingPanel = () => {
       }}
       uiBackground={{ color: PANEL }}
     >
-      <Label value="HIGHEST NOW" fontSize={s.line} color={NEON} textAlign="middle-left" />
+      <Label
+        value={run.climbers > 1 ? 'HIGHEST NOW   ' + run.climbers + ' CLIMBING' : 'HIGHEST NOW'}
+        fontSize={s.line}
+        color={NEON}
+        textAlign="middle-left"
+      />
       {run.ranking.map((climber, index) => (
         <Label
           key={index}
@@ -319,6 +324,18 @@ const clearedPanel = () => {
           fontSize={s.body}
           color={Color4.White()}
         />
+        {/*
+          The server has counted every summit this wallet has ever reached and
+          was already sending the number - it just had nowhere to appear. This
+          is the one moment a player cares about it.
+        */}
+        {run.climbs > 0 && (
+          <Label
+            value={run.climbs === 1 ? 'Your first summit.' : 'Summit number ' + run.climbs + '.'}
+            fontSize={s.body}
+            color={GOLD}
+          />
+        )}
         <Label
           value={'Next round for everyone in ' + countdown(run.roundEndsIn)}
           fontSize={s.body}

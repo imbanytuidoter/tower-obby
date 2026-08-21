@@ -29,7 +29,14 @@ export const ServerHeartbeat = engine.defineComponent('obby::heartbeat', {
  */
 export const Ranking = engine.defineComponent('obby::ranking', {
   names: Schemas.Array(Schemas.String),
-  heights: Schemas.Array(Schemas.Float)
+  heights: Schemas.Array(Schemas.Float),
+  /**
+   * Everyone in the World right now, not just the three shown. A player alone
+   * on a tower has no way to tell whether the place is dead or whether the
+   * others are simply below them, and that is the difference between staying
+   * and leaving.
+   */
+  climbers: Schemas.Int
 })
 
 /**
@@ -37,7 +44,13 @@ export const Ranking = engine.defineComponent('obby::ranking', {
  * cannot be trusted to say two people are standing on two pads.
  */
 export const ShortcutState = engine.defineComponent('obby::shortcut', {
-  open: Schemas.Boolean
+  open: Schemas.Boolean,
+  /**
+   * How many of the two pads are occupied. `open` alone cannot distinguish
+   * "nobody has found this" from "somebody is standing here waiting for you",
+   * and only the second one is worth telling a player about.
+   */
+  held: Schemas.Int
 })
 
 /** Sections whose beam is currently held still by somebody on a lever pad. */

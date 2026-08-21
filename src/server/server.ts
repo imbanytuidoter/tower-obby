@@ -192,6 +192,7 @@ function publishRanking() {
   const view = Ranking.getMutable(state)
   view.names = top.map((climber) => climber.name)
   view.heights = top.map((climber) => Math.round(climber.height))
+  view.climbers = climbers.length
 }
 
 /**
@@ -260,7 +261,14 @@ function watchShortcutPads() {
   }
 
   const open = onA !== null && onB !== null && onA !== onB
-  if (view.open !== open) ShortcutState.getMutable(state).open = open
+  const held = (onA !== null ? 1 : 0) + (onB !== null ? 1 : 0)
+  // Written only on a change: this runs every frame, and a component write
+  // re-broadcasts the whole thing to every client.
+  if (view.open !== open || view.held !== held) {
+    const mutable = ShortcutState.getMutable(state)
+    mutable.open = open
+    mutable.held = held
+  }
 }
 
 function near(position: Vector3, pad: { x: number; y: number; z: number }): boolean {

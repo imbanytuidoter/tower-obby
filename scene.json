@@ -9,11 +9,19 @@
   },
   "owner": "",
   "contact": {
-    "name": "SDK",
+    "name": "Serhii Vasylevskyi",
     "email": ""
   },
   "main": "bin/index.js",
-  "tags": [],
+  "tags": [
+    "game",
+    "parkour",
+    "obby",
+    "multiplayer",
+    "mobile",
+    "competitive",
+    "friendzone"
+  ],
   "scene": {
     "parcels": [
       "0,0",
