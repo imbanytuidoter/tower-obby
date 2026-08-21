@@ -29,7 +29,10 @@ export const run = {
   personalBest: 0,
   climbs: 0,
   /** Who is highest in the tower right now, straight from the server. */
-  ranking: [] as { name: string; height: number }[]
+  ranking: [] as { name: string; height: number }[],
+  /** A line about something another player just did. Fades on its own. */
+  announcement: '',
+  announcementFor: 0
 }
 
 export function prepareRound(round: number, totalCheckpoints: number, sections: string[]) {
@@ -54,4 +57,16 @@ export function startClock() {
 export function completeRound(wasBest: boolean) {
   run.lastWasBest = wasBest
   run.phase = run.round >= TOTAL_ROUNDS ? Phase.AllDone : Phase.RoundDone
+}
+
+/** Shows a line about someone else for a few seconds, then clears itself. */
+export function announce(text: string, seconds = 5) {
+  run.announcement = text
+  run.announcementFor = seconds
+}
+
+export function tickAnnouncement(dt: number) {
+  if (run.announcementFor <= 0) return
+  run.announcementFor -= dt
+  if (run.announcementFor <= 0) run.announcement = ''
 }

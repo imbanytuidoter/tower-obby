@@ -42,7 +42,7 @@ import { applyFairness, freezeAfterFall } from './game/fairness'
 import { buildLayout } from './game/layout'
 import { buildPlaza, decorSystem, GATE_LOOK, refreshBoard, showBoard } from './game/plaza'
 import { play, setupSound } from './game/sound'
-import { completeRound, Phase, prepareRound, run, startClock } from './game/state'
+import { announce, completeRound, Phase, prepareRound, run, startClock, tickAnnouncement } from './game/state'
 import { setupUi } from './ui'
 
 let world: World | null = null
@@ -74,6 +74,13 @@ function startClient() {
   engine.addSystem(decorSystem, 3, 'decorSystem')
   engine.addSystem(sharedRoundSystem, 4, 'sharedRoundSystem')
   engine.addSystem(helloSystem, 5, 'helloSystem')
+
+  // Somebody else topping out ends the round for everyone. Without this the
+  // tower simply vanishes and you are back in the lobby with no explanation.
+  room.onMessage('roundWon', (data) => {
+    announce(data.name + ' reached the top in ' + data.seconds.toFixed(1) + 's')
+    play('finish')
+  })
 
   room.onMessage('stats', (data) => {
     run.personalBest = data.bestSeconds
@@ -113,7 +120,9 @@ let shownRound = 0
 let lastHeartbeatValue = 0
 let lastHeartbeatSeenAt = 0
 
-function sharedRoundSystem() {
+function sharedRoundSystem(dt: number) {
+  tickAnnouncement(dt)
+
   for (const [entity, state] of engine.getEntitiesWith(RoundState)) {
     const beat = ServerHeartbeat.getOrNull(entity)
     if (beat && beat.at !== lastHeartbeatValue) {

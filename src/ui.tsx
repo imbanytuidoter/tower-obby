@@ -60,6 +60,7 @@ const uiRoot = () => (
     {hud()}
     {run.ranking.length > 0 && rankingPanel()}
     {!run.serverAlive && wakingBanner()}
+    {run.announcement !== '' && announcementBanner()}
     {run.prompt !== '' && promptBanner()}
     {run.phase === Phase.Ready && readyPanel()}
     {(run.phase === Phase.RoundDone || run.phase === Phase.AllDone) && clearedPanel()}
@@ -195,6 +196,36 @@ const wakingBanner = () => {
   )
 }
 
+/** Someone else just did something. Sits high, out of the climbing sightline. */
+const announcementBanner = () => {
+  const s = style()
+  return (
+    <UiEntity
+      uiTransform={{
+        positionType: 'absolute',
+        width: '100%',
+        height: 80,
+        position: { top: compact ? 130 : 170 },
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+    >
+      <UiEntity
+        uiTransform={{
+          height: 72,
+          minWidth: compact ? 480 : 560,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: { left: 30, right: 30 }
+        }}
+        uiBackground={{ color: GOLD }}
+      >
+        <Label value={run.announcement} fontSize={s.line} color={Color4.Black()} />
+      </UiEntity>
+    </UiEntity>
+  )
+}
+
 /** Contextual line near a gate. Sits low so it never covers the climb. */
 const promptBanner = () => {
   const s = style()
@@ -294,7 +325,11 @@ const clearedPanel = () => {
           fontSize={s.body}
           color={Color4.White()}
         />
-        <Label value="Everyone starts the next round together." fontSize={s.body} color={DIM} />
+        <Label
+          value={'Next round for everyone in ' + countdown(run.roundEndsIn)}
+          fontSize={s.body}
+          color={DIM}
+        />
         {button('CLIMB AGAIN', handlers.retry, GOLD)}
       </UiEntity>
     </UiEntity>
