@@ -2,6 +2,18 @@
 
 export const TOTAL_ROUNDS = 10
 
+/** Everyone climbs the same round at the same time; this is its length. */
+export const ROUND_SECONDS = 240
+
+/** How often the server proves it is alive. */
+export const HEARTBEAT_SECONDS = 2
+
+/** How close the server needs a player to be to accept a finish claim. */
+export const FINISH_RADIUS = 3.5
+
+/** Rows kept on the shared board. */
+export const BOARD_SIZE = 10
+
 /** Hard ceiling for pad height. The 3x3 parcel scene allows about 66m. */
 export const MAX_PAD_HEIGHT = 85
 

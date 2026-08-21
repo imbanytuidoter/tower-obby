@@ -1,6 +1,12 @@
 import { engine, MeshCollider, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
+import { isServer } from '@dcl/sdk/network'
+import { getPlayer } from '@dcl/sdk/players'
 import { movePlayerTo } from '~system/RestrictedActions'
+// Static, never lazy: registerMessages and defineComponent must both run
+// during module load, before the engine seals.
+import { room } from './shared/messages'
+import { Board, protectServerState, RoundState, ServerHeartbeat } from './shared/schemas'
 import {
   CHECKPOINT_RADIUS,
   GATE_DIR_X,
@@ -18,6 +24,7 @@ import {
   HAZARD_HALF_WIDTH,
   RESPAWN_COOLDOWN,
   RESPAWN_LIFT,
+  HEARTBEAT_SECONDS,
   TOTAL_ROUNDS
 } from './game/config'
 import {
@@ -33,7 +40,7 @@ import {
 } from './game/build'
 import { buildLayout } from './game/layout'
 import { submit } from './game/leaderboard'
-import { buildPlaza, decorSystem, GATE_LOOK, refreshBoard } from './game/plaza'
+import { buildPlaza, decorSystem, GATE_LOOK, refreshBoard, showBoard } from './game/plaza'
 import { play, setupSound } from './game/sound'
 import { completeRound, Phase, prepareRound, run, startClock } from './game/state'
 import { setupUi } from './ui'
@@ -41,14 +48,73 @@ import { setupUi } from './ui'
 let world: World | null = null
 
 export function main() {
+  protectServerState()
+
+  if (isServer()) {
+    // Only the server branch may pull in @dcl/sdk/server, and it defines no
+    // components of its own, so importing it after the seal is safe.
+    import('./server/server')
+      .then((module) => module.startServer())
+      .catch((error) => console.log('[SERVER] failed to start: ' + error))
+    return
+  }
+
+  startClient()
+}
+
+function startClient() {
   buildPlaza()
   setupSound()
-  setupUi({ next: nextRound, retry: retryRound, restart: restartAll })
+  setupUi({ next: () => {}, retry: retryRound, restart: retryRound })
   loadRound(1)
 
   engine.addSystem(hazardSystem, 1, 'hazardSystem')
   engine.addSystem(runSystem, 2, 'runSystem')
   engine.addSystem(decorSystem, 3, 'decorSystem')
+  engine.addSystem(sharedRoundSystem, 4, 'sharedRoundSystem')
+}
+
+/**
+ * The server owns which round everyone is on. The tower generator is
+ * deterministic, so a single integer is enough for every player to build the
+ * identical course - no geometry is ever sent over the wire.
+ */
+let shownRound = 0
+let lastHeartbeatValue = 0
+let lastHeartbeatSeenAt = 0
+
+function sharedRoundSystem() {
+  for (const [entity, state] of engine.getEntitiesWith(RoundState)) {
+    const beat = ServerHeartbeat.getOrNull(entity)
+    if (beat && beat.at !== lastHeartbeatValue) {
+      lastHeartbeatValue = beat.at
+      // Client-observed time, not the server's stamp: a stale snapshot from a
+      // server run that already ended must not read as alive.
+      lastHeartbeatSeenAt = Date.now()
+    }
+
+    run.serverAlive = Date.now() - lastHeartbeatSeenAt < HEARTBEAT_SECONDS * 3000
+    run.roundEndsIn = Math.max(0, (state.endsAt - Date.now()) / 1000)
+
+    const board = Board.getOrNull(entity)
+    if (board) {
+      showBoard(
+        board.names.map((name, index) => ({
+          name,
+          seconds: board.seconds[index] ?? 0,
+          round: board.rounds[index] ?? 0
+        }))
+      )
+    }
+
+    if (state.round !== shownRound) {
+      shownRound = state.round
+      loadRound(state.round)
+    }
+    return
+  }
+
+  run.serverAlive = false
 }
 
 function loadRound(round: number) {
@@ -60,17 +126,10 @@ function loadRound(round: number) {
   sendToLobby()
 }
 
-function nextRound() {
-  if (run.round >= TOTAL_ROUNDS) return
-  loadRound(run.round + 1)
-}
-
+/** Your own attempt restarts; the shared round keeps running for everyone. */
 function retryRound() {
-  loadRound(run.round)
-}
-
-function restartAll() {
-  loadRound(1)
+  prepareRound(run.round, world ? world.checkpoints.length - 1 : 0, world ? world.sectionNames : [])
+  sendToLobby()
 }
 
 function playerPosition(): Vector3 | null {
@@ -221,8 +280,12 @@ function runSystem(dt: number) {
   }
 
   if (Math.abs(player.y - world.finish.y) < 1.6 && horizontalDistance(player, world.finish) <= 1.8) {
+    // Claim it and let the server decide. It re-derives the finish pad from the
+    // round number and checks our verified position before crediting anything.
+    const profile = getPlayer()
+    room.send('claimFinish', { round: run.round, name: profile?.name ?? 'Guest' })
+
     const improved = submit(run.round, run.time, run.falls)
-    refreshBoard()
     completeRound(improved)
     play('finish')
     return

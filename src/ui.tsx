@@ -20,9 +20,41 @@ const NEON = Color4.create(0.3, 0.95, 1, 1)
 const GOLD = Color4.create(1, 0.82, 0.25, 1)
 const DIM = Color4.create(1, 1, 1, 0.45)
 
+/** mm:ss for the shared round clock. */
+const countdown = (seconds: number) => {
+  const whole = Math.max(0, Math.floor(seconds))
+  const rest = whole % 60
+  return Math.floor(whole / 60) + ':' + (rest < 10 ? '0' + rest : rest)
+}
+
+/**
+ * A cold server takes about 15 seconds to boot and swallows anything sent
+ * before it is up, so say so rather than letting the scene look broken.
+ */
+const wakingBanner = () => (
+  <UiEntity
+    uiTransform={{
+      positionType: 'absolute',
+      width: '100%',
+      height: 80,
+      position: { top: 300 },
+      alignItems: 'center',
+      justifyContent: 'center'
+    }}
+  >
+    <UiEntity
+      uiTransform={{ height: 76, minWidth: 560, alignItems: 'center', justifyContent: 'center', padding: 24 }}
+      uiBackground={{ color: PANEL }}
+    >
+      <Label value="Waking the server up..." fontSize={28} color={GOLD} />
+    </UiEntity>
+  </UiEntity>
+)
+
 const uiRoot = () => (
   <UiEntity uiTransform={{ width: '100%', height: '100%', positionType: 'absolute' }}>
     {hud()}
+    {!run.serverAlive && wakingBanner()}
     {run.prompt !== '' && promptBanner()}
     {run.phase === Phase.Ready && readyOverlay()}
     {run.phase === Phase.RoundDone && roundDoneOverlay()}
@@ -52,7 +84,7 @@ const hud = () => (
       positionType: 'absolute',
       position: { top: 28, left: 28 },
       width: 400,
-      height: 245,
+      height: 280,
       flexDirection: 'column',
       padding: 18
     }}
@@ -81,6 +113,12 @@ const hud = () => (
       value={'SECTION ' + run.section + ' / ' + run.totalSections + '   ' + run.sectionName.toUpperCase()}
       fontSize={21}
       color={GOLD}
+      textAlign="middle-left"
+    />
+    <Label
+      value={'EVERYONE ENDS IN  ' + countdown(run.roundEndsIn)}
+      fontSize={22}
+      color={run.roundEndsIn < 30 ? Color4.create(1, 0.45, 0.4, 1) : NEON}
       textAlign="middle-left"
     />
   </UiEntity>
@@ -188,9 +226,13 @@ const roundDoneOverlay = () =>
         fontSize={22}
         color={NEON}
       />
+      <Label
+        value="The next round starts for everyone at once."
+        fontSize={22}
+        color={Color4.White()}
+      />
       <UiEntity uiTransform={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-        {button('NEXT ROUND', handlers.next)}
-        {button('RETRY', handlers.retry, GOLD)}
+        {button('CLIMB AGAIN', handlers.retry, GOLD)}
       </UiEntity>
     </UiEntity>
   )

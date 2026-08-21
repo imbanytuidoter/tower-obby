@@ -30,7 +30,6 @@ import {
   TOTAL_ROUNDS
 } from './config'
 import { formatTime } from './format'
-import { rows } from './leaderboard'
 import { MODELS, placeProp } from './props'
 
 /**
@@ -509,18 +508,35 @@ function createDressing() {
   })
 }
 
-/** Redraws the table. Called whenever a round result lands. */
-export function refreshBoard() {
+export type BoardRow = { name: string; seconds: number; round: number }
+
+/**
+ * Redraws the monument from the server-owned board. Rows are wins, newest
+ * first - a shared record of who closed each round out, not this player's
+ * private history.
+ */
+export function showBoard(entries: BoardRow[]) {
   if (rowEntities.length === 0) return
 
-  const data = rows()
   for (let i = 0; i < rowEntities.length; i++) {
-    const row = data[i]
-    const entry = row.entry
-
-    TextShape.getMutable(rowEntities[i].label).text = 'ROUND ' + row.round
+    const entry = entries[i]
+    const label = TextShape.getMutable(rowEntities[i].label)
     const value = TextShape.getMutable(rowEntities[i].value)
-    value.text = entry ? formatTime(entry.time) + '   ' + entry.name : '- - : - -'
-    value.textColor = entry ? Color4.White() : DIM
+
+    if (!entry) {
+      label.text = ''
+      value.text = '- - : - -'
+      value.textColor = DIM
+      continue
+    }
+
+    label.text = 'R' + entry.round + '  ' + entry.name
+    value.text = formatTime(entry.seconds)
+    value.textColor = Color4.White()
   }
+}
+
+/** Draws the empty board before the server has sent anything. */
+export function refreshBoard() {
+  showBoard([])
 }

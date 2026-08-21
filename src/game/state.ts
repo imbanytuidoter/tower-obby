@@ -21,7 +21,10 @@ export const run = {
   /** Which stacked section the player is climbing, and what it is called. */
   section: 1,
   totalSections: 1,
-  sectionName: ''
+  sectionName: '',
+  /** Shared-round facts, filled from the server-owned component. */
+  serverAlive: false,
+  roundEndsIn: 0
 }
 
 export function prepareRound(round: number, totalCheckpoints: number, sections: string[]) {

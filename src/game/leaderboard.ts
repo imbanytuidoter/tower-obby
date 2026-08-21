@@ -1,5 +1,4 @@
 import { getPlayer } from '@dcl/sdk/players'
-import { MessageBus } from '@dcl/sdk/message-bus'
 import { TOTAL_ROUNDS } from './config'
 
 export type Entry = {
@@ -9,16 +8,15 @@ export type Entry = {
   name: string
 }
 
-/** Best run per round, shared with everyone currently in the scene. */
+/**
+ * This player's own best per round, used for the HUD's BEST line.
+ *
+ * The shared leaderboard is server-owned and lives in the Board component -
+ * it is not maintained here. An earlier version broadcast records over
+ * MessageBus, which constructs at module scope and throws
+ * "RemoteError: not implemented" on the headless server.
+ */
 const best = new Map<number, Entry>()
-
-const bus = new MessageBus()
-const CHANNEL = 'obby-record'
-
-bus.on(CHANNEL, (payload: Entry) => {
-  if (!payload || typeof payload.round !== 'number' || typeof payload.time !== 'number') return
-  record(payload)
-})
 
 export function playerName(): string {
   const player = getPlayer()
@@ -26,12 +24,9 @@ export function playerName(): string {
   return player.name
 }
 
-/** Stores a result and tells the other players. Returns true if it is a new best. */
+/** Stores a personal result. Returns true if it beat this player's own best. */
 export function submit(round: number, time: number, falls: number): boolean {
-  const entry: Entry = { round, time, falls, name: playerName() }
-  const improved = record(entry)
-  if (improved) bus.emit(CHANNEL, entry as unknown as Record<string, unknown>)
-  return improved
+  return record({ round, time, falls, name: playerName() })
 }
 
 function record(entry: Entry): boolean {
