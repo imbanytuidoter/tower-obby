@@ -47,6 +47,19 @@ export type Checkpoint = {
   padIndex: number
 }
 
+/**
+ * A fork as the client needs it: the two arms as pad indices, and what the
+ * bold one is worth. A run is a series of these answers, and naming them back
+ * at the finish is the difference between "you took 3:12" and "you took 3:12
+ * BECAUSE you played it safe twice".
+ */
+export type BuiltFork = {
+  zone: number
+  bold: number[]
+  safe: number[]
+  saves: number
+}
+
 export type BuiltShortcut = {
   /** Route pads, solid only while the bypass is open. */
   route: Entity[]
@@ -68,6 +81,8 @@ export type World = {
   finishReach: number
   levers: BuiltLever[]
   shortcut: BuiltShortcut | null
+  /** Which pads belong to which arm, so a run can tell what it chose. */
+  forks: BuiltFork[]
   entities: Entity[]
 }
 
@@ -284,7 +299,7 @@ export function buildWorld(layout: Layout): World {
   })
 
   const shortcut = buildShortcut(layout, entities)
-  buildForks(layout, entities)
+  const forks = buildForks(layout, entities)
 
   return {
     sectionNames: layout.sectionNames,
@@ -296,6 +311,7 @@ export function buildWorld(layout: Layout): World {
     finishReach,
     levers,
     shortcut,
+    forks,
     entities
   }
 }
@@ -321,7 +337,9 @@ const SHORTCUT_CLOSED = Color4.create(0.3, 0.34, 0.42, 0.25)
  * same climb model the round length uses, so the sign cannot drift from the
  * geometry.
  */
-function buildForks(layout: Layout, entities: Entity[]) {
+function buildForks(layout: Layout, entities: Entity[]): BuiltFork[] {
+  const built: BuiltFork[] = []
+
   for (const fork of layout.forks) {
     const junction = layout.pads[fork.junction]
     const bold = layout.pads[fork.boldFirst]
@@ -333,7 +351,18 @@ function buildForks(layout: Layout, entities: Entity[]) {
       ...routeSign(bold, 'BOLD', fork.boldPads + ' pads   -' + fork.savesSeconds.toFixed(1) + 's', CRUMBLE_EMISSIVE),
       ...routeSign(safe, 'SAFE', fork.safePads + ' pads   no drop', CP_EMISSIVE)
     )
+
+    const range = (start: number, count: number) =>
+      Array.from({ length: count }, (unused, i) => start + i)
+    built.push({
+      zone: junction.section,
+      bold: range(fork.boldFirst, fork.boldPads),
+      safe: range(fork.safeFirst, fork.safePads),
+      saves: fork.savesSeconds
+    })
   }
+
+  return built
 }
 
 /** A ring of choice colour around a pad's lip. Line only - never a fill. */

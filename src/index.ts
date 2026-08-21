@@ -355,6 +355,7 @@ function runSystem(dt: number) {
   if (run.respawnCooldown > 0) run.respawnCooldown -= dt
 
   updatePrompt(player)
+  noteForkChoice(player)
 
   if (run.phase === Phase.Ready) {
     if (run.respawnCooldown <= 0 && crossedStartLine(player)) {
@@ -437,6 +438,40 @@ function shortcutPrompt(player: Vector3): string {
 
   if (run.shortcutHeld >= 2) return 'SHORTCUT OPEN - GO'
   return 'WAITING FOR A SECOND CLIMBER ON THE OTHER PAD'
+}
+
+/**
+ * Records which arm of a fork the player actually took.
+ *
+ * Standing on a pad is the answer - there is nothing to press and nothing to
+ * confirm. Recorded once per fork per run, because a player who steps back
+ * onto the other arm has still committed to the first one they landed on.
+ */
+function noteForkChoice(player: Vector3) {
+  if (!world || run.phase !== Phase.Running) return
+
+  for (const fork of world.forks) {
+    if (run.choices.some((choice) => choice.zone === fork.zone)) continue
+
+    const standingOn = (indices: number[]) =>
+      indices.some((index) => {
+        const built = world?.pads[index]
+        if (!built) return false
+        const pad = built.pad
+        return (
+          Math.abs(player.y - (pad.y + PAD_TOP)) < 1.4 &&
+          Math.abs(player.x - pad.x) < pad.size / 2 + 0.4 &&
+          Math.abs(player.z - pad.z) < pad.size / 2 + 0.4
+        )
+      })
+
+    if (standingOn(fork.bold)) {
+      run.choices.push({ zone: fork.zone, bold: true, delta: -fork.saves })
+      play('checkpoint')
+    } else if (standingOn(fork.safe)) {
+      run.choices.push({ zone: fork.zone, bold: false, delta: fork.saves })
+    }
+  }
 }
 
 /** Approach hints: what happens next, shown just before it happens. */

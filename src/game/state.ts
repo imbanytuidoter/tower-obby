@@ -33,6 +33,14 @@ export const run = {
   climbers: 0,
   /** How many of the two co-op pads are occupied, server-counted. */
   shortcutHeld: 0,
+  /**
+   * The decisions this run made, in the order they were made.
+   *
+   * A time on its own says nothing about how it was earned. Naming the
+   * choices back at the finish - "played it safe, +3.7s" - is what turns a
+   * result into a reason to climb again.
+   */
+  choices: [] as { zone: number; bold: boolean; delta: number }[],
   /** A line about something another player just did. Fades on its own. */
   announcement: '',
   announcementFor: 0
@@ -50,6 +58,7 @@ export function prepareRound(totalCheckpoints: number, sections: string[]) {
   run.section = 1
   run.totalSections = sections.length
   run.sectionName = sections[0] ?? ''
+  run.choices = []
 }
 
 export function startClock() {

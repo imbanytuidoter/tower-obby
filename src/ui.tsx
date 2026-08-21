@@ -350,6 +350,23 @@ const clearedPanel = () => {
           fontSize={s.body}
           color={DIM}
         />
+        {/*
+          The deltas, and the reason this panel exists at all. A time on its
+          own is a number; the same time next to "played it safe twice, +7.4s"
+          is an argument for climbing again.
+        */}
+        {run.choices.map((choice, index) => (
+          <Label
+            key={index}
+            value={
+              'Zone ' + choice.zone + '  -  ' +
+              (choice.bold ? 'took the bold arm  ' : 'played it safe  ') +
+              (choice.delta < 0 ? '' : '+') + choice.delta.toFixed(1) + 's'
+            }
+            fontSize={s.body * 0.92}
+            color={choice.bold ? GOLD : DIM}
+          />
+        ))}
         {run.climbers > 1 && (
           <Label
             value={'Still climbing: ' + (run.climbers - 1)}
