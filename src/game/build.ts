@@ -15,6 +15,7 @@ import { ColliderLayer, TriggerArea, triggerAreaEventsSystem } from '@dcl/sdk/ec
 import {
   CENTER_X,
   CENTER_Z,
+  TOWER_ZONES,
   FINISH_RADIUS,
   FINISH_TOUCH_MARGIN,
   HAZARD_THICKNESS,
@@ -93,34 +94,45 @@ const START_EMISSIVE = Color3.create(0.18, 0.85, 0.42)
  * section its own colour so a climb reads as a stack of distinct places; the
  * same trick works here, and it costs nothing.
  */
-const SECTION_BODIES: Color4[] = [
-  Color4.create(0.44, 0.52, 0.66, 1),
-  Color4.create(0.38, 0.58, 0.56, 1),
-  Color4.create(0.56, 0.46, 0.64, 1),
-  Color4.create(0.62, 0.54, 0.44, 1),
-  Color4.create(0.4, 0.5, 0.42, 1),
-  Color4.create(0.58, 0.44, 0.5, 1),
-  Color4.create(0.46, 0.48, 0.58, 1),
-  Color4.create(0.5, 0.58, 0.48, 1)
-]
+/**
+ * Zone colour is a continuous ramp, so altitude is readable as hue.
+ *
+ * This was a table of eight colours indexed with a modulo. Against twenty
+ * zones that repeated three times over, and a player could not tell zone two
+ * from zone ten - which defeats the point of colouring zones at all. The ramp
+ * runs cool at the base through warm at the crown, the way height reads in a
+ * landscape.
+ *
+ * ZONE_STEPS is a materials budget, not an aesthetic choice. Every distinct
+ * colour is a material, and the scene is allowed 94 across 25 parcels; ten
+ * bands over twenty zones still reads as a climb while costing half as much
+ * as a colour per zone.
+ */
+const ZONE_STEPS = 10
 
-const SECTION_ACCENTS: Color3[] = [
-  Color3.create(0.3, 0.65, 1),
-  Color3.create(0.2, 0.9, 0.75),
-  Color3.create(0.7, 0.4, 1),
-  Color3.create(1, 0.7, 0.3),
-  Color3.create(0.5, 0.9, 0.4),
-  Color3.create(1, 0.45, 0.6),
-  Color3.create(0.6, 0.7, 1),
-  Color3.create(0.75, 1, 0.4)
-]
-
-function sectionBody(section: number): Color4 {
-  return SECTION_BODIES[section % SECTION_BODIES.length]
+/** 0 at the gate, 1 at the crown, quantised so the material count is bounded. */
+function zoneRamp(section: number): number {
+  const t = Math.min(1, Math.max(0, (section - 1) / (TOWER_ZONES - 1)))
+  return Math.round(t * (ZONE_STEPS - 1)) / (ZONE_STEPS - 1)
 }
 
+/**
+ * Muted slab bodies: they are the floor, not the subject. Saturation stays
+ * low so the four functional colours - cyan, red, orange, gold - never have
+ * to compete with the scenery for attention.
+ */
+function sectionBody(section: number): Color4 {
+  const t = zoneRamp(section)
+  return Color4.create(0.4 + t * 0.24, 0.5 - t * 0.05, 0.66 - t * 0.24, 1)
+}
+
+/**
+ * The accent is the same ramp with the saturation turned up. It is what edges
+ * and glows use, so it is the part a player actually reads at distance.
+ */
 export function sectionAccent(section: number): Color3 {
-  return SECTION_ACCENTS[section % SECTION_ACCENTS.length]
+  const t = zoneRamp(section)
+  return Color3.create(0.25 + t * 0.7, 0.62 + t * 0.28, 1 - t * 0.75)
 }
 
 /** Landmarks are round, plain pads are square: readable at a glance. */
