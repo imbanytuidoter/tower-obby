@@ -5,6 +5,11 @@ import { Storage } from '@dcl/sdk/server'
 import {
   BOARD_SIZE,
   FINISH_RADIUS,
+  GATE_DIR_X,
+  GATE_DIR_Z,
+  GATE_WIDTH,
+  GATE_X,
+  GATE_Z,
   RANKING_SECONDS,
   RANKING_SIZE,
   HEARTBEAT_SECONDS,
@@ -28,6 +33,17 @@ const stats = new Map<string, PlayerStats>()
 
 /** Addresses are all the engine gives the server; names come from `hello`. */
 const names = new Map<string, string>()
+
+/**
+ * When each player crossed the start line, by the server's clock.
+ *
+ * Timing everyone from the round's own start punishes anyone who walked into
+ * the World halfway through it - and the scene has to work for people
+ * arriving at any moment. The server watches the gate itself rather than
+ * taking a client's word for when it started, since a client that reported
+ * late would be handing itself a better time.
+ */
+const startedClimb = new Map<string, number>()
 
 let state = engine.addEntity()
 let board: Entry[] = []
@@ -80,6 +96,10 @@ function serverSystem(dt: number) {
   // Read with getOrNull. getMutableOrNull marks the component dirty on every
   // single frame, which re-broadcasts the whole round state ~30 times a second
   // to every player.
+  // Every frame, unlike the ranking: sampling the gate once a second would
+  // hand everyone up to a second of free time off their climb.
+  watchGate()
+
   rankingTimer += dt
   if (rankingTimer >= RANKING_SECONDS) {
     rankingTimer = 0
@@ -114,7 +134,9 @@ function handleClaim(round: number, name: string, from: string) {
     return
   }
 
-  const seconds = (Date.now() - current.startedAt) / 1000
+  // Their own climb, not the round's age.
+  const began = startedClimb.get(from.toLowerCase()) ?? current.startedAt
+  const seconds = (Date.now() - began) / 1000
   board.unshift({ name: name.slice(0, 24) || 'Guest', seconds, round: current.round })
   board = board.slice(0, BOARD_SIZE)
   publishBoard()
@@ -139,6 +161,7 @@ function publishRanking() {
 
     const transform = Transform.getOrNull(entity)
     if (!transform) continue
+
     climbers.push({
       name: names.get(address) ?? 'Guest',
       height: transform.position.y
@@ -149,6 +172,7 @@ function publishRanking() {
   // by visitor has to be dropped when they go, or it grows for days.
   forget(names, present)
   forget(stats, present)
+  forget(startedClimb, present)
 
   climbers.sort((a, b) => b.height - a.height)
   const top = climbers.slice(0, RANKING_SIZE)
@@ -156,6 +180,29 @@ function publishRanking() {
   const view = Ranking.getMutable(state)
   view.names = top.map((climber) => climber.name)
   view.heights = top.map((climber) => Math.round(climber.height))
+}
+
+/** Watches every player for the moment they step past the start line. */
+function watchGate() {
+  for (const [entity, identity] of engine.getEntitiesWith(PlayerIdentityData)) {
+    const address = identity.address.toLowerCase()
+    if (startedClimb.has(address)) continue
+
+    const transform = Transform.getOrNull(entity)
+    if (transform) noteGateCrossing(address, transform.position)
+  }
+}
+
+/** Records the first moment a player is past the gate plane, inside its width. */
+function noteGateCrossing(address: string, position: Vector3) {
+  if (startedClimb.has(address)) return
+
+  const dx = position.x - GATE_X
+  const dz = position.z - GATE_Z
+  if (dx * GATE_DIR_X + dz * GATE_DIR_Z <= 0) return
+  if (Math.abs(dx * -GATE_DIR_Z + dz * GATE_DIR_X) > GATE_WIDTH) return
+
+  startedClimb.set(address, Date.now())
 }
 
 /** Drops cache entries for players who have left. */
@@ -188,6 +235,7 @@ function advance(from: number) {
   current.round = next
   current.startedAt = now
   current.endsAt = now + ROUND_SECONDS * 1000
+  startedClimb.clear()
   console.log('[SERVER] round ' + next + ' started')
 }
 
