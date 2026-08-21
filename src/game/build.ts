@@ -223,10 +223,12 @@ export function buildWorld(layout: Layout): World {
     return { entity, def, clock: def.phase }
   })
 
-  const levers = layout.levers.map((lever) => ({
-    pad: createPressurePad(lever, entities),
-    section: lever.section
-  }))
+  const levers = layout.levers.map((lever) => {
+    const pad = createPressurePad(lever, entities)
+    labelPad(lever, 'STAND HERE
+STOPS THE BEAM', entities)
+    return { pad, section: lever.section }
+  })
 
   const shortcut = buildShortcut(layout, entities)
 
@@ -271,8 +273,36 @@ function buildShortcut(layout: Layout, entities: Entity[]): BuiltShortcut | null
 
   const padA = createPressurePad(layout.shortcut.padA, entities)
   const padB = createPressurePad(layout.shortcut.padB, entities)
+  labelPad(layout.shortcut.padA, 'BOTH PADS
+OPENS A SHORTCUT', entities)
+  labelPad(layout.shortcut.padB, 'BOTH PADS
+OPENS A SHORTCUT', entities)
 
   return { route, padA, padB, open: false }
+}
+
+/**
+ * A word floating over a pad, billboarded so it reads from anywhere.
+ *
+ * This is the only place the co-op mechanics are explained. A phone screen has
+ * no room for a rules panel, and a player who has to read one has already left
+ * - so the pad says what it wants in one word, in the world, where they are
+ * standing on it.
+ */
+function labelPad(at: { x: number; y: number; z: number }, text: string, entities: Entity[]) {
+  const sign = engine.addEntity()
+  entities.push(sign)
+
+  Transform.create(sign, { position: Vector3.create(at.x, at.y + 2.2, at.z) })
+  TextShape.create(sign, {
+    text,
+    fontSize: 2.6,
+    textColor: CP_ALBEDO,
+    outlineColor: Color4.Black(),
+    outlineWidth: 0.25,
+    textAlign: TextAlignMode.TAM_MIDDLE_CENTER
+  })
+  Billboard.create(sign, { billboardMode: BillboardMode.BM_Y })
 }
 
 function createPressurePad(at: { x: number; y: number; z: number }, entities: Entity[]): Entity {

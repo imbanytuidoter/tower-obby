@@ -87,8 +87,9 @@ const button = (text: string, onClick: () => void, color: Color4 = NEON) => {
 }
 
 /**
- * Four lines on a phone, five on a monitor. Falls and checkpoints share a row
- * on mobile - a climb needs the screen more than the statistics do.
+ * Four lines, and never a fifth. On a phone the screen is the game, and every
+ * line of chrome is a line of tower nobody can see. Personal best rides along
+ * with the round number rather than earning a row of its own.
  */
 const hud = () => {
   const s = style()
@@ -105,7 +106,10 @@ const hud = () => {
       uiBackground={{ color: PANEL }}
     >
       <Label
-        value={'ROUND ' + run.round + ' / ' + TOTAL_ROUNDS}
+        value={
+          'ROUND ' + run.round + '/' + TOTAL_ROUNDS +
+          (run.personalBest > 0 ? '   BEST ' + formatTime(run.personalBest) : '')
+        }
         fontSize={s.line}
         color={GOLD}
         textAlign="middle-left"
@@ -121,16 +125,6 @@ const hud = () => {
         value={'ALL END IN ' + countdown(run.roundEndsIn)}
         fontSize={s.line}
         color={run.roundEndsIn < 30 ? WARN : NEON}
-        textAlign="middle-left"
-      />
-      <Label
-        value={
-          'BEST ' +
-          (run.personalBest > 0 ? formatTime(run.personalBest) : '--:--.--') +
-          (run.climbs > 0 ? '   CLIMBS ' + run.climbs : '')
-        }
-        fontSize={s.line}
-        color={DIM}
         textAlign="middle-left"
       />
     </UiEntity>
