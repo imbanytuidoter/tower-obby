@@ -5,7 +5,7 @@
     "title": "Tower Obby",
     "description": "Ten procedural parkour towers with a leaderboard.",
     "favicon": "favicon_asset",
-    "navmapThumbnail": ""
+    "navmapThumbnail": "images/scene-thumbnail.png"
   },
   "owner": "",
   "contact": {
