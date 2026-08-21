@@ -28,7 +28,7 @@ import {
   GROUND_SIZE,
   START_PAD_X,
   START_PAD_Z,
-  TOTAL_ROUNDS
+  BOARD_SIZE
 } from './config'
 import { formatTime } from './format'
 import { MODELS, placeProp } from './props'
@@ -41,7 +41,7 @@ import { MODELS, placeProp } from './props'
 const BOARD_W = 5.6
 const ROW_H = 0.34
 const HEADER_H = 0.85
-const BOARD_H = HEADER_H + TOTAL_ROUNDS * ROW_H + 0.5
+const BOARD_H = HEADER_H + BOARD_SIZE * ROW_H + 0.5
 const BOARD_Y = 3.3
 
 /** Yaw in degrees that turns a board's readable face towards a target point. */
@@ -232,7 +232,7 @@ function createStartGate() {
  * is ever standing still together.
  */
 function createPracticeHops() {
-  const c = curve(1)
+  const c = curve(0)
   const step = c.jumpGap + c.padSize
 
   // Off to the side of the walk to the gate, never blocking it.
@@ -438,7 +438,7 @@ function createBoard() {
   const headingPos = front(0.17)
   Transform.create(heading, { position: Vector3.create(headingPos.x, headerY, headingPos.z), rotation })
   TextShape.create(heading, {
-    text: 'LEADERBOARD',
+    text: "TODAY'S FASTEST",
     fontSize: 2.8,
     textColor: Color4.White(),
     outlineColor: Color4.Black(),
@@ -451,7 +451,7 @@ function createBoard() {
   const textPos = front(0.17)
   const stripePos = front(0.1)
 
-  for (let i = 0; i < TOTAL_ROUNDS; i++) {
+  for (let i = 0; i < BOARD_SIZE; i++) {
     const y = firstRowY - i * ROW_H
 
     if (i % 2 === 0) {
@@ -589,7 +589,7 @@ function createDressing() {
   })
 }
 
-export type BoardRow = { name: string; seconds: number; round: number }
+export type BoardRow = { name: string; seconds: number }
 
 /**
  * Redraws the monument from the server-owned board. Rows are wins, newest
@@ -611,7 +611,7 @@ export function showBoard(entries: BoardRow[]) {
       continue
     }
 
-    label.text = 'R' + entry.round + '  ' + entry.name
+    label.text = String(i + 1) + '.  ' + entry.name
     value.text = formatTime(entry.seconds)
     value.textColor = Color4.White()
   }

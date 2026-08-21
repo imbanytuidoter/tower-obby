@@ -3,20 +3,9 @@ import { isServer } from '@dcl/sdk/network'
 import { AUTH_SERVER_PEER_ID } from '@dcl/sdk/network/message-bus-sync'
 
 /**
- * The round everyone is climbing. The tower is generated from the round
- * number alone and the generator is deterministic, so broadcasting this one
- * integer is enough for every player to build the identical course.
- */
-export const RoundState = engine.defineComponent('obby::roundState', {
-  round: Schemas.Int,
-  /** Server clock, milliseconds. Timestamps need Int64, not Number. */
-  startedAt: Schemas.Int64,
-  endsAt: Schemas.Int64
-})
-
-/**
- * Kept apart from RoundState on purpose: a component is sent whole on every
- * change, and this one ticks every couple of seconds.
+ * Proof the server is awake, and the anchor every client uses to find the
+ * shared state entity. Its own component because it ticks every couple of
+ * seconds and a component is re-sent whole on every change.
  */
 export const ServerHeartbeat = engine.defineComponent('obby::heartbeat', {
   at: Schemas.Int64
@@ -58,11 +47,25 @@ export const LeverState = engine.defineComponent('obby::levers', {
   halted: Schemas.Array(Schemas.Int)
 })
 
-/** Best times of the current session, newest winner first. */
+/** The ten fastest climbs ever recorded on this tower. Survives restarts. */
 export const Board = engine.defineComponent('obby::board', {
   names: Schemas.Array(Schemas.String),
+  seconds: Schemas.Array(Schemas.Float)
+})
+
+/**
+ * The ten fastest climbs today, cleared at midnight UTC.
+ *
+ * The all-time board is unreachable for somebody who arrived an hour ago, and
+ * a target nobody can hit is a target nobody looks at. A board that empties
+ * every night is winnable tonight - which is the actual reason to come back
+ * tomorrow.
+ */
+export const DailyBoard = engine.defineComponent('obby::daily', {
+  names: Schemas.Array(Schemas.String),
   seconds: Schemas.Array(Schemas.Float),
-  rounds: Schemas.Array(Schemas.Int)
+  /** UTC day number this board belongs to, so clients can spot a rollover. */
+  day: Schemas.Int
 })
 
 /**
@@ -75,10 +78,10 @@ export function protectServerState() {
   const serverOnly = (value: { senderAddress: string }) =>
     value.senderAddress.toLowerCase() === AUTH_SERVER_PEER_ID.toLowerCase()
 
-  RoundState.validateBeforeChange(serverOnly)
   Ranking.validateBeforeChange(serverOnly)
   ShortcutState.validateBeforeChange(serverOnly)
   LeverState.validateBeforeChange(serverOnly)
   ServerHeartbeat.validateBeforeChange(serverOnly)
   Board.validateBeforeChange(serverOnly)
+  DailyBoard.validateBeforeChange(serverOnly)
 }

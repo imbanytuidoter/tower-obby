@@ -1,5 +1,3 @@
-import { TOTAL_ROUNDS } from './config'
-
 export enum Phase {
   Ready = 'ready',
   Running = 'running',
@@ -9,7 +7,6 @@ export enum Phase {
 
 export const run = {
   phase: Phase.Ready as Phase,
-  round: 1,
   time: 0,
   falls: 0,
   checkpoint: 0,
@@ -22,9 +19,11 @@ export const run = {
   section: 1,
   totalSections: 1,
   sectionName: '',
-  /** Shared-round facts, filled from the server-owned component. */
+  /** Filled from the server-owned component. */
   serverAlive: false,
-  roundEndsIn: 0,
+  /** Fastest climb today, and the fastest anyone has ever done it. */
+  dailyBest: 0,
+  towerRecord: 0,
   /** Restored from the server's per-player storage, survives everything. */
   personalBest: 0,
   climbs: 0,
@@ -39,9 +38,8 @@ export const run = {
   announcementFor: 0
 }
 
-export function prepareRound(round: number, totalCheckpoints: number, sections: string[]) {
+export function prepareRound(totalCheckpoints: number, sections: string[]) {
   run.phase = Phase.Ready
-  run.round = round
   run.time = 0
   run.falls = 0
   run.checkpoint = 0
@@ -60,7 +58,7 @@ export function startClock() {
 
 export function completeRound(wasBest: boolean) {
   run.lastWasBest = wasBest
-  run.phase = run.round >= TOTAL_ROUNDS ? Phase.AllDone : Phase.RoundDone
+  run.phase = Phase.RoundDone
 }
 
 /** Shows a line about someone else for a few seconds, then clears itself. */

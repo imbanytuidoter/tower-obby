@@ -1,13 +1,26 @@
 /** Global tuning for the obby. Heights stay under the ~20m ceiling of one parcel. */
 
-export const TOTAL_ROUNDS = 10
+/**
+ * One tower, permanent, shared by everyone in the World.
+ *
+ * This replaced ten rotating rounds. A course that regenerates every few
+ * minutes cannot be learned, cannot be talked about, and produces times that
+ * compare to nothing - which quietly defeated the leaderboard, the live
+ * ranking and every reason two players would speak to each other. Difficulty
+ * now ramps with altitude, which is what the ramp was always for.
+ */
+export const TOWER_ZONES = 20
+
+/** Kept only so the tower is reproducible; the seed never changes. */
+export const TOWER_SEED = 20260904
 
 /**
- * Rough cost of climbing a course, in seconds.
+ * Rough cost of climbing the tower, in seconds. A model, not a playtest.
  *
- * A model, not a playtest: each hop costs the greater of covering its gap at a
- * realistic 4 m/s - nobody holds jogSpeed 8 across a two metre pad - or the
- * airtime of a jump, plus hardLandingCooldown on hops that gain real height.
+ * Each hop costs the greater of covering its gap at a realistic 4 m/s -
+ * nobody holds jogSpeed 8 across a two metre pad - or the airtime of a jump,
+ * plus hardLandingCooldown on hops that gain real height. Used to size the
+ * signage and to sanity-check that the climb is a climb and not a marathon.
  */
 export function estimateClimbSeconds(
   pads: { x: number; y: number; z: number; size: number }[]
@@ -25,22 +38,6 @@ export function estimateClimbSeconds(
     if (pad.y - previous.y > 0.3) seconds += RECOVER
   }
   return seconds
-}
-
-/**
- * How long a round lasts, from what the course actually costs to climb.
- *
- * Counting pads was a proxy for the wrong thing. Modelling the climb put round
- * ten at ~120s of clean running against a 261s clock - more than double, so
- * the round dragged whenever nobody finished. The clock is a backstop for that
- * case, and ROUND_SLACK is how much room it leaves for falls and retries.
- */
-export const ROUND_SLACK = 1.7
-
-export function roundSeconds(
-  pads: { x: number; y: number; z: number; size: number }[]
-): number {
-  return Math.round(Math.min(300, Math.max(75, estimateClimbSeconds(pads) * ROUND_SLACK)))
 }
 
 /** How often the server proves it is alive. */
@@ -233,30 +230,34 @@ export const CHECKPOINT_EVERY_SECTIONS = 3
 export const SHAFT_MIN_RADIUS = 6
 export const SHAFT_MAX_RADIUS = 17
 
-/** Difficulty curve, evaluated at t = (round - 1) / (TOTAL_ROUNDS - 1). */
-export function curve(round: number) {
-  const t = Math.min(1, Math.max(0, (round - 1) / (TOTAL_ROUNDS - 1)))
+/**
+ * Difficulty at a point on the climb. `progress` is 0 at the gate and 1 at
+ * the crown, so a zone's shape is decided by how high it is rather than by
+ * which round it belongs to.
+ */
+export function curve(progress: number) {
+  const t = Math.min(1, Math.max(0, progress))
   const lerp = (a: number, b: number) => a + (b - a) * t
 
   return {
     t,
-    /** Tower of Hell style: a round is a stack of self-contained sections. */
-    sections: Math.round(lerp(5, 10)),
+    /** How many zones a stretch of the tower is worth. Fixed: see TOWER_ZONES. */
+    sections: TOWER_ZONES,
     /** Pads per section, before the section's own shape decides the rest. */
-    sectionLength: Math.round(lerp(4, 7)),
-    padSize: lerp(2.8, 1.9),
+    sectionLength: Math.round(lerp(6, 9)),
+    padSize: lerp(3.3, 1.95),
     /**
      * The gap between pad EDGES - this is the distance actually jumped.
      * Centre-to-centre was the wrong thing to tune: with 3.2m pads a 4.2m
      * centre distance leaves a 1m gap, which reads as platforms touching.
      */
-    jumpGap: lerp(2.4, 3.6),
-    rise: lerp(0.9, 1.1),
-    spinnerSpeed: 50 + round * 8,
+    jumpGap: lerp(1.9, 3.5),
+    rise: lerp(0.9, 1.4),
+    spinnerSpeed: 45 + t * 85,
     spinnerReach: lerp(2.4, 3.8),
-    moverSpeed: 1.2 + round * 0.2,
+    moverSpeed: 1.1 + t * 2.1,
     moverReach: lerp(2, 3.4),
     /** Share of sections that get a hazard on top of their own shape. */
-    hazardChance: lerp(0.2, 0.8)
+    hazardChance: lerp(0, 0.85)
   }
 }

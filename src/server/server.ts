@@ -13,18 +13,22 @@ import {
   GATE_Z,
   RANKING_SECONDS,
   RANKING_SIZE,
-  HEARTBEAT_SECONDS,
-  roundSeconds,
-  TOTAL_ROUNDS
+  HEARTBEAT_SECONDS
 } from '../game/config'
-import { buildLayout } from '../game/layout'
+import { buildTower } from '../game/layout'
 import { room } from '../shared/messages'
-import { Board, LeverState, Ranking, RoundState, ServerHeartbeat, ShortcutState } from '../shared/schemas'
+import { Board, DailyBoard, LeverState, Ranking, ServerHeartbeat, ShortcutState } from '../shared/schemas'
 
-const STORAGE_KEY = 'obby.board.v1'
+const STORAGE_KEY = 'obby.board.v2'
+const DAILY_KEY = 'obby.daily.v1'
 const PLAYER_KEY = 'obby.stats.v1'
 
-type Entry = { name: string; seconds: number; round: number }
+type Entry = { name: string; seconds: number }
+
+/** Whole days since the epoch, UTC. The daily board resets when this changes. */
+function utcDay(at: number): number {
+  return Math.floor(at / 86400000)
+}
 
 /** Versioned from day one: storage outlives deploys, so old shapes will turn up. */
 type PlayerStats = { version: number; bestSeconds: number; climbs: number }
@@ -48,31 +52,33 @@ const startedClimb = new Map<string, number>()
 
 let state = engine.addEntity()
 let board: Entry[] = []
+let daily: Entry[] = []
+
+/**
+ * The tower, generated once. It never changes, so regenerating it inside a
+ * per-frame watcher was pure waste - buildTower() walks 132 pads.
+ */
+const tower = buildTower()
 let heartbeatTimer = 0
 let rankingTimer = 0
 
 export async function startServer() {
   state = engine.addEntity()
 
-  const opening = Date.now()
-  RoundState.create(state, {
-    round: 1,
-    startedAt: opening,
-    endsAt: opening + lengthOf(1) * 1000
-  })
   // Pulse once here so the first client to arrive does not wait a full interval
   // before it can tell the server is alive.
   ServerHeartbeat.create(state, { at: Date.now() })
-  Board.create(state, { names: [], seconds: [], rounds: [] })
-  Ranking.create(state, { names: [], heights: [] })
+  Board.create(state, { names: [], seconds: [] })
+  DailyBoard.create(state, { names: [], seconds: [], day: utcDay(Date.now()) })
+  Ranking.create(state, { names: [], heights: [], climbers: 0 })
   ShortcutState.create(state, { open: false })
   LeverState.create(state, { halted: [] })
 
   // Only the server calls syncEntity in an authoritative scene.
   syncEntity(state, [
-    RoundState.componentId,
     ServerHeartbeat.componentId,
     Board.componentId,
+    DailyBoard.componentId,
     Ranking.componentId,
     ShortcutState.componentId,
     LeverState.componentId
@@ -82,7 +88,7 @@ export async function startServer() {
 
   room.onMessage('claimFinish', (data, context) => {
     if (!context) return
-    handleClaim(data.round, data.name, context.from)
+    handleClaim(data.name, context.from)
   })
 
   room.onMessage('hello', (data, context) => {
@@ -92,11 +98,8 @@ export async function startServer() {
   })
 
   engine.addSystem(serverSystem)
-  console.log('[SERVER] obby ready, round 1')
+  console.log('[SERVER] tower ready - ' + buildTower().pads.length + ' pads')
 }
-
-/** Addresses credited with a summit in the current round. Cleared on advance. */
-const finishedThisRound = new Set<string>()
 
 /** Heartbeat and the round clock. Everything else is event driven. */
 function serverSystem(dt: number) {
@@ -121,53 +124,67 @@ function serverSystem(dt: number) {
     publishRanking()
   }
 
-  const current = RoundState.getOrNull(state)
-  if (!current) return
-  if (Date.now() < current.endsAt) return
-
-  // Say the round expired. Being teleported with no explanation reads as a bug.
-  room.send('roundTimeout', { round: current.round })
-  advance(current.round)
+  rolloverDailyBoard()
 }
 
 /**
- * A claim is only ever a claim. The server finds where the finish pad of that
- * round actually is - using the same deterministic generator the clients run -
- * reads the player's verified position, and decides for itself.
+ * Midnight UTC empties the daily board. Checked every frame because the server
+ * can stay up for days, so a rollover will land mid-session.
  */
-function handleClaim(round: number, name: string, from: string) {
-  const current = RoundState.getOrNull(state)
-  if (!current || round !== current.round) return
+function rolloverDailyBoard() {
+  const view = DailyBoard.getOrNull(state)
+  if (!view) return
 
-  // One credited summit per player per round. Without this a finisher could
-  // hit CLIMB AGAIN and fill the whole board by themselves.
+  const today = utcDay(Date.now())
+  if (view.day === today) return
+
+  daily = []
+  const mutable = DailyBoard.getMutable(state)
+  mutable.names = []
+  mutable.seconds = []
+  mutable.day = today
+  console.log('[SERVER] daily board reset for day ' + today)
+  void Storage.set(DAILY_KEY, JSON.stringify({ day: today, entries: [] }))
+}
+
+/**
+ * A claim is only ever a claim. The server knows where the crown is - it runs
+ * the same deterministic generator the clients do - reads the player's
+ * verified position, and decides for itself.
+ */
+function handleClaim(name: string, from: string) {
   const address = from.toLowerCase()
-  if (finishedThisRound.has(address)) return
+
+  // No gate crossing, no climb. This also stops a repeat claim from the same
+  // standing position: the crossing is cleared the moment a summit lands, so
+  // a second claim has nothing to time from.
+  const began = startedClimb.get(address)
+  if (began === undefined) return
 
   const position = playerPosition(from)
   if (!position) return
 
-  const finish = finishOf(current.round)
+  const finish = finishOf()
   if (!finish) return
   if (Vector3.distance(position, finish) > FINISH_RADIUS) {
-    console.log('[SERVER] rejected finish claim from ' + from + ': too far from the pad')
+    console.log('[SERVER] rejected finish claim from ' + from + ': too far from the crown')
     return
   }
 
-  // Their own climb, not the round's age.
-  const began = startedClimb.get(from.toLowerCase()) ?? current.startedAt
   const seconds = (Date.now() - began) / 1000
-  board.unshift({ name: name.slice(0, 24) || 'Guest', seconds, round: current.round })
-  board = board.slice(0, BOARD_SIZE)
+  const entry: Entry = { name: name.slice(0, 24) || 'Guest', seconds }
+
+  // Fastest first on both boards - one tower means one number to beat, which
+  // is the entire reason the rotating rounds had to go.
+  const record = board.length === 0 || seconds < board[0].seconds
+  board = [...board, entry].sort((a, b) => a.seconds - b.seconds).slice(0, BOARD_SIZE)
+  daily = [...daily, entry].sort((a, b) => a.seconds - b.seconds).slice(0, BOARD_SIZE)
   publishBoard()
 
-  finishedThisRound.add(address)
+  // They have to walk back through the gate to start another climb.
+  startedClimb.delete(address)
 
-  // The round is NOT over. It used to end the instant the first player topped
-  // out, which on a phone meant a fast desktop climber could deny everyone
-  // else a summit, round after round. The clock owns the round; a finish is
-  // something that happens inside it. This is also how Tower of Hell works.
-  room.send('roundWon', { name, seconds, place: finishedThisRound.size })
+  room.send('summit', { name, seconds, record })
   void persistBoard()
   void recordClimb(from, seconds)
 }
@@ -216,11 +233,10 @@ function publishRanking() {
  * a favour you can do for strangers, not a lock.
  */
 function watchLevers() {
-  const current = RoundState.getOrNull(state)
   const view = LeverState.getOrNull(state)
-  if (!current || !view) return
+  if (!view) return
 
-  const levers = buildLayout(current.round).levers
+  const levers = tower.levers
   if (levers.length === 0) {
     if (view.halted.length > 0) LeverState.getMutable(state).halted = []
     return
@@ -251,10 +267,7 @@ function watchLevers() {
  * kind of state a client would want to lie about.
  */
 function watchShortcutPads() {
-  const current = RoundState.getOrNull(state)
-  if (!current) return
-
-  const shortcut = buildLayout(current.round).shortcut
+  const shortcut = tower.shortcut
   const view = ShortcutState.getOrNull(state)
   if (!shortcut || !view) {
     if (view && view.open) ShortcutState.getMutable(state).open = false
@@ -329,33 +342,20 @@ function playerPosition(address: string): Vector3 | null {
   return null
 }
 
-/** A round lasts in proportion to the tower it generated. */
-function lengthOf(round: number): number {
-  return roundSeconds(buildLayout(round).pads)
-}
-
-function finishOf(round: number): Vector3 | null {
-  const pad = buildLayout(round).pads.find((candidate) => candidate.kind === 'finish')
+/** Where the crown is. One tower, so this never changes. */
+function finishOf(): Vector3 | null {
+  const pad = tower.pads.find((candidate) => candidate.kind === 'finish')
   return pad ? Vector3.create(pad.x, pad.y, pad.z) : null
 }
 
-function advance(from: number) {
-  const next = from >= TOTAL_ROUNDS ? 1 : from + 1
-  const now = Date.now()
-  const current = RoundState.getMutable(state)
-  current.round = next
-  current.startedAt = now
-  current.endsAt = now + lengthOf(next) * 1000
-  startedClimb.clear()
-  finishedThisRound.clear()
-  console.log('[SERVER] round ' + next + ' started')
-}
-
 function publishBoard() {
-  const view = Board.getMutable(state)
-  view.names = board.map((entry) => entry.name)
-  view.seconds = board.map((entry) => entry.seconds)
-  view.rounds = board.map((entry) => entry.round)
+  const all = Board.getMutable(state)
+  all.names = board.map((entry) => entry.name)
+  all.seconds = board.map((entry) => entry.seconds)
+
+  const today = DailyBoard.getMutable(state)
+  today.names = daily.map((entry) => entry.name)
+  today.seconds = daily.map((entry) => entry.seconds)
 }
 
 /**
@@ -406,11 +406,21 @@ async function recordClimb(address: string, seconds: number) {
 }
 
 type Stored = { version: number; board: Entry[] }
+type StoredDaily = { version: number; day: number; board: Entry[] }
 
 /** Written only when a round is won, never per tick: storage writes are capped. */
 async function persistBoard() {
   const ok = await Storage.set<Stored>(STORAGE_KEY, { version: 1, board })
-  if (!ok) console.log('[SERVER] board did not persist')
+  if (!ok) console.log('[SERVER] all-time board did not persist')
+
+  // Kept in its own key with the day stamped on it, so a server that boots
+  // the next morning restores an empty board rather than yesterday's times.
+  const okDaily = await Storage.set<StoredDaily>(DAILY_KEY, {
+    version: 1,
+    day: utcDay(Date.now()),
+    board: daily
+  })
+  if (!okDaily) console.log('[SERVER] daily board did not persist')
 }
 
 /**
@@ -425,9 +435,28 @@ async function restoreBoard() {
     board = stored.board
       .filter((entry) => typeof entry?.name === 'string' && typeof entry?.seconds === 'number')
       .slice(0, BOARD_SIZE)
-    publishBoard()
-    console.log('[SERVER] restored ' + board.length + ' board entries')
+    console.log('[SERVER] restored ' + board.length + ' all-time entries')
   } catch (error) {
     console.log('[SERVER] stored board unreadable, starting empty: ' + error)
   }
+
+  try {
+    const stored = await Storage.get<StoredDaily>(DAILY_KEY)
+    if (stored && stored.version === 1 && Array.isArray(stored.board)) {
+      if (stored.day === utcDay(Date.now())) {
+        daily = stored.board
+          .filter((entry) => typeof entry?.name === 'string' && typeof entry?.seconds === 'number')
+          .slice(0, BOARD_SIZE)
+        console.log('[SERVER] restored ' + daily.length + " of today's entries")
+      } else {
+        console.log('[SERVER] stored daily board is from another day, starting empty')
+      }
+    }
+  } catch (error) {
+    console.log('[SERVER] stored daily board unreadable: ' + error)
+  }
+
+  const view = DailyBoard.getOrNull(state)
+  if (view) DailyBoard.getMutable(state).day = utcDay(Date.now())
+  publishBoard()
 }

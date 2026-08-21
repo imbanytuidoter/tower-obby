@@ -14,25 +14,20 @@ export const room = registerMessages({
    * decides whether the claim is true.
    */
   claimFinish: Schemas.Map({
-    round: Schemas.Int,
     /** Cosmetic only - it labels a row on the board, it never sets a score. */
     name: Schemas.String
   }),
-  /** Server tells everyone who closed the round out. */
-  roundWon: Schemas.Map({
+  /** Somebody reached the crown. Announced to everyone, wherever they are. */
+  summit: Schemas.Map({
     name: Schemas.String,
     seconds: Schemas.Float,
-    /** 1 for the first climber to top out this round, 2 for the next... */
-    place: Schemas.Int
+    /** True when this climb is the fastest anyone has ever done it. */
+    record: Schemas.Boolean
   }),
   /** "I have arrived, send me my saved record." */
   hello: Schemas.Map({
     /** Cosmetic label for the live ranking; the server has only addresses. */
     name: Schemas.String
-  }),
-  /** The clock ran out and nobody topped out. */
-  roundTimeout: Schemas.Map({
-    round: Schemas.Int
   }),
   /** Sent back to that one player: their history, restored from storage. */
   stats: Schemas.Map({

@@ -16,6 +16,8 @@ import {
   MAX_SHORTCUT_RISE,
   MAX_STEP_RISE,
   REACH_BUDGET,
+  TOWER_SEED,
+  TOWER_ZONES,
   PAD_SEPARATION,
   SHAFT_MAX_RADIUS,
   SHAFT_MIN_RADIUS,
@@ -83,7 +85,6 @@ export type MoverDef = {
 }
 
 export type Layout = {
-  round: number
   pads: Pad[]
   spinners: SpinnerDef[]
   movers: MoverDef[]
@@ -139,9 +140,19 @@ type Build = {
   levers: LeverDef[]
 }
 
-export function buildLayout(round: number): Layout {
-  const rng = makeRng(round * 7919)
-  const c = curve(round)
+/**
+ * The tower. One of them, permanent, identical for everybody.
+ *
+ * Every zone is generated at its own point on the difficulty curve, so the
+ * climb opens wide and gentle at the gate and narrows toward the crown. The
+ * seed never changes: a client that built a different tower would drop its
+ * player through somebody else's floor.
+ */
+export function buildTower(): Layout {
+  const rng = makeRng(TOWER_SEED)
+  // Zone one's shape, used for anything that needs the course's opening feel
+  // (the practice hops in the yard) before the loop begins.
+  const c = curve(0)
 
   const out: Build = { pads: [], spinners: [], movers: [], levers: [] }
   const sectionNames: string[] = []
@@ -166,11 +177,14 @@ export function buildLayout(round: number): Layout {
   }
 
   let previous: SectionKind | null = null
-  for (let index = 1; index <= c.sections; index++) {
+  for (let index = 1; index <= TOWER_ZONES; index++) {
+    // Progress up the tower, not through a round. This is the whole point of
+    // the change: altitude decides how hard a zone is.
+    const zone = curve((index - 1) / (TOWER_ZONES - 1))
     const kind = pickKind(index, previous, rng)
     previous = kind
     sectionNames.push(kind)
-    buildSection(kind, index, cursor, c, rng, out)
+    buildSection(kind, index, cursor, zone, rng, out)
   }
 
   // The last pad of the last section is the goal.
@@ -179,10 +193,9 @@ export function buildLayout(round: number): Layout {
   last.crumble = false
   last.size = Math.max(last.size, 3.2)
 
-  const shortcut = buildShortcut(out, c)
+  const shortcut = buildShortcut(out, curve(0.35))
 
   return {
-    round,
     pads: out.pads,
     spinners: out.spinners,
     movers: out.movers,

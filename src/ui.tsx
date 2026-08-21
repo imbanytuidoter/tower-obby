@@ -1,7 +1,6 @@
 import ReactEcs, { Label, ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 import { Color4 } from '@dcl/sdk/math'
 import { isMobile } from '@dcl/sdk/platform'
-import { TOTAL_ROUNDS } from './game/config'
 import { formatTime } from './game/format'
 import { Phase, run } from './game/state'
 
@@ -107,8 +106,7 @@ const hud = () => {
     >
       <Label
         value={
-          'ROUND ' + run.round + '/' + TOTAL_ROUNDS +
-          (run.personalBest > 0 ? '   BEST ' + formatTime(run.personalBest) : '')
+          run.personalBest > 0 ? 'YOUR BEST ' + formatTime(run.personalBest) : 'FIRST CLIMB'
         }
         fontSize={s.line}
         color={GOLD}
@@ -121,10 +119,21 @@ const hud = () => {
         color={Color4.White()}
         textAlign="middle-left"
       />
+      {/*
+        The fourth and last line. It used to count down a shared round clock;
+        with one permanent tower there is no such clock, and the most useful
+        thing this line can say is whether anybody else is here.
+      */}
       <Label
-        value={'ALL END IN ' + countdown(run.roundEndsIn)}
+        value={
+          run.climbers > 1
+            ? run.climbers + ' CLIMBING NOW'
+            : run.serverAlive
+              ? 'YOU HAVE THE TOWER TO YOURSELF'
+              : 'CONNECTING...'
+        }
         fontSize={s.line}
-        color={run.roundEndsIn < 30 ? WARN : NEON}
+        color={run.climbers > 1 ? GOLD : NEON}
         textAlign="middle-left"
       />
     </UiEntity>
@@ -317,7 +326,7 @@ const clearedPanel = () => {
         }}
         uiBackground={{ color: PANEL }}
       >
-        <Label value="TOP OF THE TOWER" fontSize={s.title * 0.75} color={GOLD} />
+        <Label value="THE CROWN" fontSize={s.title * 0.75} color={GOLD} />
         <Label value={formatTime(run.time)} fontSize={s.clock} color={NEON} />
         <Label
           value={(run.lastWasBest ? 'Your best yet.   ' : '') + 'Falls: ' + run.falls}
@@ -337,7 +346,7 @@ const clearedPanel = () => {
           />
         )}
         <Label
-          value={'New tower for everyone in ' + countdown(run.roundEndsIn)}
+          value={'Climb it again for a faster time.'}
           fontSize={s.body}
           color={DIM}
         />

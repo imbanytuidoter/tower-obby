@@ -8,10 +8,10 @@ import { movePlayerTo } from '~system/RestrictedActions'
 import { room } from './shared/messages'
 import {
   Board,
+  DailyBoard,
   protectServerState,
   LeverState,
   Ranking,
-  RoundState,
   ServerHeartbeat,
   ShortcutState
 } from './shared/schemas'
@@ -34,8 +34,7 @@ import {
   HAZARD_HALF_WIDTH,
   RESPAWN_COOLDOWN,
   RESPAWN_LIFT,
-  HEARTBEAT_SECONDS,
-  TOTAL_ROUNDS
+  HEARTBEAT_SECONDS
 } from './game/config'
 import {
   activateCheckpoint,
@@ -51,7 +50,8 @@ import {
   World
 } from './game/build'
 import { applyFairness, freezeAfterFall } from './game/fairness'
-import { buildLayout } from './game/layout'
+import { formatTime } from './game/format'
+import { buildTower } from './game/layout'
 import { buildPlaza, decorSystem, GATE_LOOK, refreshBoard, showBoard } from './game/plaza'
 import { play, setupSound } from './game/sound'
 import { announce, completeRound, Phase, prepareRound, run, startClock, tickAnnouncement } from './game/state'
@@ -78,8 +78,8 @@ function startClient() {
   applyFairness()
   buildPlaza()
   setupSound()
-  setupUi({ next: () => {}, retry: retryRound, restart: retryRound })
-  loadRound(1)
+  setupUi({ next: () => {}, retry: retryClimb, restart: retryClimb })
+  buildTheTower()
 
   engine.addSystem(hazardSystem, 1, 'hazardSystem')
   engine.addSystem(runSystem, 2, 'runSystem')
@@ -92,14 +92,15 @@ function startClient() {
   // The round keeps running after somebody tops out, so this is news about a
   // rival rather than a signal that everything is over. Saying which place
   // they took is what makes a second and third summit worth chasing.
-  room.onMessage('roundWon', (data) => {
-    const place = data.place <= 1 ? 'first to the top' : ordinal(data.place) + ' to the top'
-    announce(data.name + ' - ' + place + ' in ' + data.seconds.toFixed(1) + 's')
+  // Every summit is announced to the whole World, wherever the listener is on
+  // the tower. It is the cheapest possible proof that the place is inhabited.
+  room.onMessage('summit', (data) => {
+    announce(
+      data.record
+        ? data.name + ' set a new tower record - ' + formatTime(data.seconds)
+        : data.name + ' reached the crown in ' + formatTime(data.seconds)
+    )
     play('finish')
-  })
-
-  room.onMessage('roundTimeout', () => {
-    announce('Time up - nobody reached the top')
   })
 
   room.onMessage('stats', (data) => {
@@ -109,11 +110,6 @@ function startClient() {
   })
 }
 
-const ordinal = (n: number) => {
-  const tens = n % 100
-  if (tens >= 11 && tens <= 13) return n + 'th'
-  return n + (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')
-}
 
 /**
  * Asks the server for this player's saved record, and keeps asking.
@@ -145,14 +141,18 @@ function helloSystem(dt: number) {
 /** Sections whose beam is held still by somebody on a lever pad. */
 let haltedSections: number[] = []
 
-let shownRound = 0
 let lastHeartbeatValue = 0
 let lastHeartbeatSeenAt = 0
 
+/**
+ * Reads the one entity the server owns. ServerHeartbeat is the anchor now
+ * that there is no RoundState: it is the component every shared-state client
+ * needs anyway, and it is present from the server's first frame.
+ */
 function sharedRoundSystem(dt: number) {
   tickAnnouncement(dt)
 
-  for (const [entity, state] of engine.getEntitiesWith(RoundState)) {
+  for (const [entity] of engine.getEntitiesWith(ServerHeartbeat)) {
     const beat = ServerHeartbeat.getOrNull(entity)
     if (beat && beat.at !== lastHeartbeatValue) {
       lastHeartbeatValue = beat.at
@@ -162,7 +162,6 @@ function sharedRoundSystem(dt: number) {
     }
 
     run.serverAlive = Date.now() - lastHeartbeatSeenAt < HEARTBEAT_SECONDS * 3000
-    run.roundEndsIn = Math.max(0, (state.endsAt - Date.now()) / 1000)
 
     const levers = LeverState.getOrNull(entity)
     haltedSections = levers ? levers.halted : []
@@ -180,39 +179,39 @@ function sharedRoundSystem(dt: number) {
       run.climbers = ranking.climbers
     }
 
-    const board = Board.getOrNull(entity)
-    if (board) {
-      showBoard(
-        board.names.map((name, index) => ({
-          name,
-          seconds: board.seconds[index] ?? 0,
-          round: board.rounds[index] ?? 0
-        }))
-      )
+    // Today's board is the one on the monument. The all-time list is the
+    // trophy cabinet; the daily list is the thing a newcomer can actually win.
+    const today = DailyBoard.getOrNull(entity)
+    const allTime = Board.getOrNull(entity)
+    if (today) {
+      showBoard(today.names.map((name, index) => ({ name, seconds: today.seconds[index] ?? 0 })))
+      run.dailyBest = today.seconds[0] ?? 0
     }
+    if (allTime) run.towerRecord = allTime.seconds[0] ?? 0
 
-    if (state.round !== shownRound) {
-      shownRound = state.round
-      loadRound(state.round)
-    }
     return
   }
 
   run.serverAlive = false
 }
 
-function loadRound(round: number) {
+/**
+ * Built once, at startup, and never rebuilt.
+ *
+ * The tower is permanent now, so there is no round to load and nothing to
+ * tear down. Everyone in the World is standing on the same geometry from the
+ * moment they arrive until they leave.
+ */
+function buildTheTower() {
   clearWorld(world)
-  world = buildWorld(buildLayout(round))
-  prepareRound(round, world.checkpoints.length - 1, world.sectionNames)
-  // A round begins in the lobby, facing the gate the player has to walk
-  // through. That crossing is what starts the clock.
+  world = buildWorld(buildTower())
+  prepareRound(world.checkpoints.length - 1, world.sectionNames)
   sendToLobby()
 }
 
-/** Your own attempt restarts; the shared round keeps running for everyone. */
-function retryRound() {
-  prepareRound(run.round, world ? world.checkpoints.length - 1 : 0, world ? world.sectionNames : [])
+/** Reset your own attempt. The tower does not change; only your clock does. */
+function retryClimb() {
+  prepareRound(world ? world.checkpoints.length - 1 : 0, world ? world.sectionNames : [])
   sendToLobby()
 }
 
@@ -377,7 +376,7 @@ function runSystem(dt: number) {
     // Claim it and let the server decide. It re-derives the finish pad from the
     // round number and checks our verified position before crediting anything.
     const profile = getPlayer()
-    room.send('claimFinish', { round: run.round, name: profile?.name ?? 'Guest' })
+    room.send('claimFinish', { name: profile?.name ?? 'Guest' })
 
     // The panel is optimistic, the sound is not: it plays when the server
     // confirms the finish over roundWon, so it can never celebrate a claim
@@ -438,7 +437,7 @@ function updatePrompt(player: Vector3) {
     const distance = Math.sqrt((player.x - GATE_X) ** 2 + (player.z - GATE_Z) ** 2)
     run.prompt =
       distance < PROMPT_RANGE
-        ? 'ROUND ' + run.round + ' OF ' + TOTAL_ROUNDS + '  -  cross the START line to begin'
+        ? 'CROSS THE LINE TO START YOUR CLIMB'
         : ''
     return
   }
