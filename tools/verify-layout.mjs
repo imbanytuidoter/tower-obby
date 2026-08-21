@@ -101,6 +101,25 @@ for (const round of ROUNDS) {
 note(deadZones === 0, 'finish slab fully responsive', `worst corner ${worstCorner.toFixed(2)}m, ${deadZones} dead zones`)
 note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_RADIUS}m`)
 
+// The generator clamps at MAX_PAD_HEIGHT. A couple of pads landing on the cap
+// is the cap doing its job; a crowd of them means whole zones are being
+// flattened against it and the climb stops gaining height.
+{
+  const pads = buildTower().pads
+  const pinned = pads.filter((p) => p.y >= cfg.MAX_PAD_HEIGHT - 0.01).length
+  note(pinned <= 2, 'zones not flattened on the ceiling', `${pinned} pads pinned at ${cfg.MAX_PAD_HEIGHT} m`)
+}
+
+// Every fork has to be reachable AND priced, or it is a coin toss rather than
+// a decision. Zero forks is the failure this check exists for: the random
+// zone order once produced a whole tower without one.
+{
+  const L = buildTower()
+  note(L.forks.length >= 2, 'the climb asks a question', `${L.forks.length} forks`)
+  const unpriced = L.forks.filter((f) => !(f.savesSeconds > 0)).length
+  note(unpriced === 0, 'every fork has a price', `${unpriced} unpriced`)
+}
+
 // The first ten seconds. A player arriving alone must see the gate they have
 // to walk through AND the board that tells them why - without turning round.
 // The board used to sit exactly 180 degrees behind the spawn.

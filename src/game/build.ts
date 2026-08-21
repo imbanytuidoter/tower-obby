@@ -284,6 +284,7 @@ export function buildWorld(layout: Layout): World {
   })
 
   const shortcut = buildShortcut(layout, entities)
+  buildForks(layout, entities)
 
   return {
     sectionNames: layout.sectionNames,
@@ -310,6 +311,80 @@ const SHORTCUT_CLOSED = Color4.create(0.3, 0.34, 0.42, 0.25)
  * instant - spawning a dozen entities at the moment two people cooperate would
  * land after the moment had passed.
  */
+/**
+ * Marks every fork and prices both of its arms.
+ *
+ * A fork whose cost the player cannot read is a coin toss, not a decision. The
+ * junction gets the CHOICE edge - a line, never a fill, so the pad still says
+ * whether it is safe - and each arm gets a two-line sign carrying the number
+ * of pads and what the arm is worth in seconds. Those seconds come from the
+ * same climb model the round length uses, so the sign cannot drift from the
+ * geometry.
+ */
+function buildForks(layout: Layout, entities: Entity[]) {
+  for (const fork of layout.forks) {
+    const junction = layout.pads[fork.junction]
+    const bold = layout.pads[fork.boldFirst]
+    const safe = layout.pads[fork.safeFirst]
+    if (!junction || !bold || !safe) continue
+
+    entities.push(createChoiceEdge(junction))
+    entities.push(
+      ...routeSign(bold, 'BOLD', fork.boldPads + ' pads   -' + fork.savesSeconds.toFixed(1) + 's', CRUMBLE_EMISSIVE),
+      ...routeSign(safe, 'SAFE', fork.safePads + ' pads   no drop', CP_EMISSIVE)
+    )
+  }
+}
+
+/** A ring of choice colour around a pad's lip. Line only - never a fill. */
+function createChoiceEdge(pad: Pad): Entity {
+  const edge = engine.addEntity()
+  Transform.create(edge, {
+    position: Vector3.create(pad.x, pad.y + 0.3, pad.z),
+    scale: Vector3.create(pad.size * 1.16, 0.09, pad.size * 1.16)
+  })
+  MeshRenderer.setCylinder(edge, 0.5, 0.5)
+  Material.setPbrMaterial(edge, {
+    albedoColor: CHOICE_EDGE,
+    emissiveColor: CHOICE_EDGE_3,
+    emissiveIntensity: 2
+  })
+  return edge
+}
+
+/** Two lines over an arm: what it is, and what it costs. */
+function routeSign(pad: Pad, title: string, cost: string, tone: Color3): Entity[] {
+  const made: Entity[] = []
+
+  const head = engine.addEntity()
+  Transform.create(head, { position: Vector3.create(pad.x, pad.y + 3.4, pad.z) })
+  TextShape.create(head, {
+    text: title,
+    fontSize: 2.6,
+    textColor: Color4.create(tone.r, tone.g, tone.b, 1),
+    outlineColor: Color4.Black(),
+    outlineWidth: 0.3,
+    textAlign: TextAlignMode.TAM_MIDDLE_CENTER
+  })
+  Billboard.create(head, { billboardMode: BillboardMode.BM_Y })
+  made.push(head)
+
+  const line = engine.addEntity()
+  Transform.create(line, { position: Vector3.create(pad.x, pad.y + 2.5, pad.z) })
+  TextShape.create(line, {
+    text: cost,
+    fontSize: 1.7,
+    textColor: CHOICE_EDGE,
+    outlineColor: Color4.Black(),
+    outlineWidth: 0.3,
+    textAlign: TextAlignMode.TAM_MIDDLE_CENTER
+  })
+  Billboard.create(line, { billboardMode: BillboardMode.BM_Y })
+  made.push(line)
+
+  return made
+}
+
 function buildShortcut(layout: Layout, entities: Entity[]): BuiltShortcut | null {
   if (!layout.shortcut) return null
 

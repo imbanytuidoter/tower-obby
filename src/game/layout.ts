@@ -14,6 +14,7 @@ import {
   LOBBY_Z,
   MAX_PAD_HEIGHT,
   MAX_SHORTCUT_RISE,
+  estimateClimbSeconds,
   MAX_STEP_RISE,
   REACH_BUDGET,
   TOWER_SEED,
@@ -93,6 +94,27 @@ export type Layout = {
   sectionNames: string[]
   /** The co-op bypass, or null when this round had no room for one. */
   shortcut: Shortcut | null
+  /** Every place the climb asks the player a question. */
+  forks: ForkDef[]
+}
+
+/**
+ * A fork: two ways up from one pad, rejoining at one landing.
+ *
+ * The generator records it so the builder can price it. A fork the player
+ * cannot read the cost of is not a decision, it is a coin toss - which is the
+ * whole difference the design pass draws between a choice and a jump.
+ */
+export type ForkDef = {
+  /** Pad the choice is made on. */
+  junction: number
+  /** First pad of each arm, where its sign stands. */
+  boldFirst: number
+  safeFirst: number
+  boldPads: number
+  safePads: number
+  /** Seconds the bold arm saves against the safe one, from the climb model. */
+  savesSeconds: number
 }
 
 /**
@@ -134,6 +156,7 @@ type SectionKind = (typeof SECTION_KINDS)[number]
 type Cursor = { x: number; y: number; z: number; angle: number }
 
 type Build = {
+  forks: ForkDef[]
   pads: Pad[]
   spinners: SpinnerDef[]
   movers: MoverDef[]
@@ -154,7 +177,7 @@ export function buildTower(): Layout {
   // (the practice hops in the yard) before the loop begins.
   const c = curve(0)
 
-  const out: Build = { pads: [], spinners: [], movers: [], levers: [] }
+  const out: Build = { pads: [], spinners: [], movers: [], levers: [], forks: [] }
   const sectionNames: string[] = []
 
   // Pad zero never moves: the lobby, the gate and the spawn are built around it.
@@ -176,13 +199,11 @@ export function buildTower(): Layout {
     angle: Math.atan2(START_Z - CENTER_Z, START_X - CENTER_X)
   }
 
-  let previous: SectionKind | null = null
   for (let index = 1; index <= TOWER_ZONES; index++) {
     // Progress up the tower, not through a round. This is the whole point of
     // the change: altitude decides how hard a zone is.
     const zone = curve((index - 1) / (TOWER_ZONES - 1))
-    const kind = pickKind(index, previous, rng)
-    previous = kind
+    const kind = pickKind(index)
     sectionNames.push(kind)
     buildSection(kind, index, cursor, zone, rng, out)
   }
@@ -201,7 +222,8 @@ export function buildTower(): Layout {
     movers: out.movers,
     levers: out.levers,
     sectionNames,
-    shortcut
+    shortcut,
+    forks: out.forks
   }
 }
 
@@ -290,19 +312,44 @@ function chordRoute(out: Build, from: Pad, to: Pad, hops: number, size: number):
 }
 
 /**
- * Round one opens gently; after that anything goes, minus a repeat of the
- * section just built. The previous kind is threaded through rather than kept
- * in module state: a round has to generate identically no matter what was
- * generated before it, or leaderboard times stop being comparable.
+ * The running order of the tower, authored rather than rolled.
+ *
+ * Zones used to be sampled at random with a no-immediate-repeat rule. On the
+ * seed this tower is built from that produced a climb with FOUR plunges, three
+ * crumbling runs - and not a single fork. The one section that asks the player
+ * a question never appeared, so the tower had no decision in it anywhere.
+ *
+ * A random sequence was the right call when the course regenerated every few
+ * minutes. There is one tower now and it is permanent, so it gets designed:
+ * teach at the bottom, put the first decision early enough to matter, alternate
+ * the co-op sections so a player alone is never far from a reason to want
+ * somebody else, and never repeat a kind twice running.
  */
-function pickKind(index: number, previous: SectionKind | null, rng: Rng): SectionKind {
-  if (index === 1) return 'gap jumps'
+const ZONE_ORDER: SectionKind[] = [
+  'gap jumps',        //  1  teach the jump, nothing else
+  'zigzag steps',     //  2  teach turning while jumping
+  'ring of platforms',//  3  first hazard, on a wide floor
+  'the fork',         //  4  first decision, early
+  'narrow bridge',    //  5
+  'the lever',        //  6  first co-op: hold it for strangers
+  'crumbling run',    //  7  commit, do not stop
+  'spinner floor',    //  8
+  'the plunge',       //  9  risk against certainty
+  'piston hall',      // 10
+  'the fork',         // 11
+  'ring of platforms',// 12
+  'the lever',        // 13
+  'narrow bridge',    // 14
+  'crumbling run',    // 15
+  'the plunge',       // 16
+  'zigzag steps',     // 17
+  'the fork',         // 18  last decision before the summit run
+  'spinner floor',    // 19
+  'gap jumps'         // 20  the ladder: pure nerve, no tricks
+]
 
-  for (let attempt = 0; attempt < 8; attempt++) {
-    const kind = SECTION_KINDS[rng.int(0, SECTION_KINDS.length - 1)]
-    if (kind !== previous) return kind
-  }
-  return SECTION_KINDS[0]
+function pickKind(index: number): SectionKind {
+  return ZONE_ORDER[(index - 1) % ZONE_ORDER.length]
 }
 
 function buildSection(
@@ -497,6 +544,7 @@ function zigzagSteps(index: number, cursor: Cursor, c: ReturnType<typeof curve>,
  */
 function theFork(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rng: Rng, out: Build) {
   const junction = out.pads[out.pads.length - 1]
+  const boldFirst = out.pads.length
 
   // Bold arm: fewer, longer hops.
   hop(out, cursor, index, c, { size: c.padSize * 0.85, rise: c.rise, gapScale: 1.35, from: junction })
@@ -504,6 +552,7 @@ function theFork(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rng
   const boldTip = out.pads[out.pads.length - 1]
 
   // Safe arm: starts back at the junction, more hops, shorter and wider.
+  const safeFirst = out.pads.length
   const safe: Cursor = { x: junction.x, y: junction.y, z: junction.z, angle: cursor.angle + 1.1 }
   for (let i = 0; i < 4; i++) {
     // Half the rise over twice the hops: the two arms end level, so the shared
@@ -517,6 +566,22 @@ function theFork(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rng
       from: i === 0 ? junction : undefined
     })
   }
+
+  // Price the two arms with the same model config uses for the whole climb,
+  // so the signs carry a real number rather than a guess.
+  const boldPads = out.pads.slice(boldFirst, boldFirst + 2)
+  const safePads = out.pads.slice(safeFirst, safeFirst + 4)
+  out.forks.push({
+    junction: out.pads.indexOf(junction),
+    boldFirst,
+    safeFirst,
+    boldPads: boldPads.length,
+    safePads: safePads.length,
+    savesSeconds: Math.max(
+      0,
+      estimateClimbSeconds([junction, ...safePads]) - estimateClimbSeconds([junction, ...boldPads])
+    )
+  })
 
   cursor.x = boldTip.x
   cursor.y = boldTip.y
