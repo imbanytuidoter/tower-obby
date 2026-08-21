@@ -32,6 +32,14 @@ export const Ranking = engine.defineComponent('obby::ranking', {
   heights: Schemas.Array(Schemas.Float)
 })
 
+/**
+ * Whether the co-op bypass is currently open. The server decides: a client
+ * cannot be trusted to say two people are standing on two pads.
+ */
+export const ShortcutState = engine.defineComponent('obby::shortcut', {
+  open: Schemas.Boolean
+})
+
 /** Best times of the current session, newest winner first. */
 export const Board = engine.defineComponent('obby::board', {
   names: Schemas.Array(Schemas.String),
@@ -51,6 +59,7 @@ export function protectServerState() {
 
   RoundState.validateBeforeChange(serverOnly)
   Ranking.validateBeforeChange(serverOnly)
+  ShortcutState.validateBeforeChange(serverOnly)
   ServerHeartbeat.validateBeforeChange(serverOnly)
   Board.validateBeforeChange(serverOnly)
 }

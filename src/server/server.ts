@@ -5,6 +5,7 @@ import { Storage } from '@dcl/sdk/server'
 import {
   BOARD_SIZE,
   FINISH_RADIUS,
+  PAD_RADIUS,
   GATE_DIR_X,
   GATE_DIR_Z,
   GATE_WIDTH,
@@ -18,7 +19,7 @@ import {
 } from '../game/config'
 import { buildLayout } from '../game/layout'
 import { room } from '../shared/messages'
-import { Board, Ranking, RoundState, ServerHeartbeat } from '../shared/schemas'
+import { Board, Ranking, RoundState, ServerHeartbeat, ShortcutState } from '../shared/schemas'
 
 const STORAGE_KEY = 'obby.board.v1'
 const PLAYER_KEY = 'obby.stats.v1'
@@ -64,13 +65,15 @@ export async function startServer() {
   ServerHeartbeat.create(state, { at: Date.now() })
   Board.create(state, { names: [], seconds: [], rounds: [] })
   Ranking.create(state, { names: [], heights: [] })
+  ShortcutState.create(state, { open: false })
 
   // Only the server calls syncEntity in an authoritative scene.
   syncEntity(state, [
     RoundState.componentId,
     ServerHeartbeat.componentId,
     Board.componentId,
-    Ranking.componentId
+    Ranking.componentId,
+    ShortcutState.componentId
   ])
 
   await restoreBoard()
@@ -104,6 +107,7 @@ function serverSystem(dt: number) {
   // Every frame, unlike the ranking: sampling the gate once a second would
   // hand everyone up to a second of free time off their climb.
   watchGate()
+  watchShortcutPads()
 
   rankingTimer += dt
   if (rankingTimer >= RANKING_SECONDS) {
@@ -185,6 +189,45 @@ function publishRanking() {
   const view = Ranking.getMutable(state)
   view.names = top.map((climber) => climber.name)
   view.heights = top.map((climber) => Math.round(climber.height))
+}
+
+/**
+ * The bypass opens only while two DIFFERENT people hold the two pads.
+ *
+ * The server does this itself from engine-read positions. TriggerArea is a
+ * client-side collision feature and the headless server has no renderer, so a
+ * trigger could only ever be a hint from a client - and this is exactly the
+ * kind of state a client would want to lie about.
+ */
+function watchShortcutPads() {
+  const current = RoundState.getOrNull(state)
+  if (!current) return
+
+  const shortcut = buildLayout(current.round).shortcut
+  const view = ShortcutState.getOrNull(state)
+  if (!shortcut || !view) {
+    if (view && view.open) ShortcutState.getMutable(state).open = false
+    return
+  }
+
+  let onA: string | null = null
+  let onB: string | null = null
+
+  for (const [entity, identity] of engine.getEntitiesWith(PlayerIdentityData)) {
+    const transform = Transform.getOrNull(entity)
+    if (!transform) continue
+
+    const address = identity.address.toLowerCase()
+    if (!onA && near(transform.position, shortcut.padA)) onA = address
+    else if (!onB && near(transform.position, shortcut.padB)) onB = address
+  }
+
+  const open = onA !== null && onB !== null && onA !== onB
+  if (view.open !== open) ShortcutState.getMutable(state).open = open
+}
+
+function near(position: Vector3, pad: { x: number; y: number; z: number }): boolean {
+  return Math.hypot(position.x - pad.x, position.z - pad.z) < PAD_RADIUS && Math.abs(position.y - pad.y) < 3
 }
 
 /** Watches every player for the moment they step past the start line. */

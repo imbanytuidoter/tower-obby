@@ -22,6 +22,28 @@ export const FINISH_RADIUS = 3.5
 /** Rows kept on the shared board. */
 export const BOARD_SIZE = 10
 
+/**
+ * The co-op shortcut. Two pads held at the same time by two different avatars
+ * open a shorter route past one section.
+ *
+ * The main climb always stays completable alone - a judge will arrive on their
+ * own, and gating the only path on a second player would make the scene look
+ * broken to them.
+ */
+export const PAD_RADIUS = 2.2
+/** How far apart the two pads sit: far enough that one person cannot hold both. */
+export const PAD_SEPARATION = 9
+/** Which section boundary the shortcut starts from. */
+export const SHORTCUT_FROM_SECTION = 2
+/** Fewest pads a bypass is worth building from. */
+export const SHORTCUT_HOPS = 4
+
+/**
+ * Highest rise the bypass may ask for in one hop. jumpHeight is 1m and
+ * runJumpHeight 1.5m, so this stays inside what a jump actually reaches.
+ */
+export const MAX_SHORTCUT_RISE = 1.3
+
 /** Live "who is highest" ranking: how many climbers, refreshed how often. */
 export const RANKING_SIZE = 3
 export const RANKING_SECONDS = 1

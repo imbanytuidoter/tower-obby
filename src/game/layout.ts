@@ -13,10 +13,14 @@ import {
   LOBBY_X,
   LOBBY_Z,
   MAX_PAD_HEIGHT,
+  MAX_SHORTCUT_RISE,
+  PAD_SEPARATION,
   SHAFT_MAX_RADIUS,
   SHAFT_MIN_RADIUS,
   START_PAD_X,
   START_PAD_Z,
+  SHORTCUT_FROM_SECTION,
+  SHORTCUT_HOPS,
   START_X,
   START_Z
 } from './config'
@@ -64,6 +68,23 @@ export type Layout = {
   movers: MoverDef[]
   /** Names of the sections stacked this round, bottom to top. */
   sectionNames: string[]
+  /** The co-op bypass, or null when this round had no room for one. */
+  shortcut: Shortcut | null
+}
+
+/**
+ * Two pressure pads and the route they open. Both pads must be stood on at the
+ * same time by two different people, so one player cannot hold both - they are
+ * placed PAD_SEPARATION apart for exactly that reason.
+ */
+export type Shortcut = {
+  padA: { x: number; y: number; z: number }
+  padB: { x: number; y: number; z: number }
+  /** Pads that only exist while the shortcut is open. */
+  route: Pad[]
+  /** Index into pads of the landing it starts from and the one it reaches. */
+  fromIndex: number
+  toIndex: number
 }
 
 /**
@@ -130,7 +151,91 @@ export function buildLayout(round: number): Layout {
   last.crumble = false
   last.size = Math.max(last.size, 3.2)
 
-  return { round, pads: out.pads, spinners: out.spinners, movers: out.movers, sectionNames }
+  const shortcut = buildShortcut(out, c)
+
+  return {
+    round,
+    pads: out.pads,
+    spinners: out.spinners,
+    movers: out.movers,
+    sectionNames,
+    shortcut
+  }
+}
+
+/**
+ * Builds the co-op bypass: a short chain of pads from one landing straight to
+ * a later one, skipping what is between them.
+ *
+ * Returns null rather than forcing it if the route would sit on top of the
+ * climb it is meant to bypass - a shortcut that overlaps the main path is
+ * worse than no shortcut.
+ */
+function buildShortcut(out: Build, c: ReturnType<typeof curve>): Shortcut | null {
+  const landings: number[] = []
+  for (let i = 0; i < out.pads.length; i++) {
+    if (out.pads[i].kind === 'checkpoint' || out.pads[i].kind === 'start') landings.push(i)
+  }
+  if (landings.length < 2) return null
+
+  const fromIndex = landings[Math.min(SHORTCUT_FROM_SECTION - 1, landings.length - 2)]
+  const from = out.pads[fromIndex]
+  const step = c.jumpGap + c.padSize
+
+  /**
+   * Search for a target rather than assuming one.
+   *
+   * Two constraints pull against each other: the bypass has to climb whatever
+   * height it skips, at no more than MAX_SHORTCUT_RISE per hop, and its pads
+   * have to sit at least a jump apart or they overlap. Fixing the target to the
+   * next landing made both unsatisfiable at once - the climb needed ten hops
+   * and the chord only had room for four. So walk the candidates and take the
+   * first pair where the geometry actually works.
+   */
+  for (let toIndex = fromIndex + SHORTCUT_HOPS + 2; toIndex < out.pads.length - 1; toIndex++) {
+    const to = out.pads[toIndex]
+    const span = Math.hypot(to.x - from.x, to.z - from.z)
+    const climb = to.y - from.y
+    if (climb <= 0) continue
+
+    // Enough hops to keep every rise jumpable...
+    const hops = Math.max(SHORTCUT_HOPS, Math.ceil(climb / MAX_SHORTCUT_RISE))
+    // ...but only if that many still fit along the chord without overlapping.
+    if (span / (hops + 1) < step * 0.8) continue
+
+    const route = chordRoute(out, from, to, hops, c.padSize)
+    if (!route) continue
+
+    const across = Math.atan2(from.z - CENTER_Z, from.x - CENTER_X) + Math.PI / 2
+    const half = PAD_SEPARATION / 2
+
+    return {
+      padA: { x: from.x + Math.cos(across) * half, y: from.y + 0.3, z: from.z + Math.sin(across) * half },
+      padB: { x: from.x - Math.cos(across) * half, y: from.y + 0.3, z: from.z - Math.sin(across) * half },
+      route,
+      fromIndex,
+      toIndex
+    }
+  }
+
+  return null
+}
+
+/** Evenly spaced pads from one landing to another, or null if any is blocked. */
+function chordRoute(out: Build, from: Pad, to: Pad, hops: number, size: number): Pad[] | null {
+  const route: Pad[] = []
+
+  for (let i = 1; i <= hops; i++) {
+    const t = i / (hops + 1)
+    const x = from.x + (to.x - from.x) * t
+    const z = from.z + (to.z - from.z) * t
+    const y = from.y + (to.y - from.y) * t
+
+    if (!isClear(out, x, y, z, size)) return null
+    route.push({ kind: 'normal', x, y, z, size, crumble: false, section: from.section })
+  }
+
+  return route
 }
 
 /**

@@ -6,7 +6,14 @@ import { movePlayerTo } from '~system/RestrictedActions'
 // Static, never lazy: registerMessages and defineComponent must both run
 // during module load, before the engine seals.
 import { room } from './shared/messages'
-import { Board, protectServerState, Ranking, RoundState, ServerHeartbeat } from './shared/schemas'
+import {
+  Board,
+  protectServerState,
+  Ranking,
+  RoundState,
+  ServerHeartbeat,
+  ShortcutState
+} from './shared/schemas'
 import {
   CHECKPOINT_RADIUS,
   GATE_DIR_X,
@@ -37,6 +44,7 @@ import {
   paintPad,
   PAD_TOP,
   sectionAccent,
+  setShortcutOpen,
   World
 } from './game/build'
 import { applyFairness, freezeAfterFall } from './game/fairness'
@@ -139,6 +147,9 @@ function sharedRoundSystem(dt: number) {
 
     run.serverAlive = Date.now() - lastHeartbeatSeenAt < HEARTBEAT_SECONDS * 3000
     run.roundEndsIn = Math.max(0, (state.endsAt - Date.now()) / 1000)
+
+    const bypass = ShortcutState.getOrNull(entity)
+    if (bypass && world?.shortcut) setShortcutOpen(world.shortcut, bypass.open)
 
     const ranking = Ranking.getOrNull(entity)
     if (ranking) {

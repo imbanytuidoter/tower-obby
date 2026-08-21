@@ -11,7 +11,8 @@ import {
   Transform
 } from '@dcl/sdk/ecs'
 import { Color3, Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
-import { CENTER_X, CENTER_Z, HAZARD_THICKNESS } from './config'
+import { ColliderLayer, TriggerArea, triggerAreaEventsSystem } from '@dcl/sdk/ecs'
+import { CENTER_X, CENTER_Z, HAZARD_THICKNESS, PAD_RADIUS } from './config'
 import { Layout, MoverDef, Pad, SpinnerDef } from './layout'
 
 export type BuiltPad = {
@@ -37,6 +38,15 @@ export type Checkpoint = {
   padIndex: number
 }
 
+export type BuiltShortcut = {
+  /** Route pads, solid only while the bypass is open. */
+  route: Entity[]
+  /** The two pressure pads and their lights. */
+  padA: Entity
+  padB: Entity
+  open: boolean
+}
+
 export type World = {
   /** Section names bottom to top, so the HUD can name the current one. */
   sectionNames: string[]
@@ -45,6 +55,7 @@ export type World = {
   movers: BuiltMover[]
   checkpoints: Checkpoint[]
   finish: Vector3
+  shortcut: BuiltShortcut | null
   entities: Entity[]
 }
 
@@ -210,7 +221,107 @@ export function buildWorld(layout: Layout): World {
     return { entity, def, clock: def.phase }
   })
 
-  return { sectionNames: layout.sectionNames, pads, spinners, movers, checkpoints, finish, entities }
+  const shortcut = buildShortcut(layout, entities)
+
+  return {
+    sectionNames: layout.sectionNames,
+    pads,
+    spinners,
+    movers,
+    checkpoints,
+    finish,
+    shortcut,
+    entities
+  }
+}
+
+/** Cyan means safe, so a route you can rely on only turns cyan once it is real. */
+const SHORTCUT_CLOSED = Color4.create(0.3, 0.34, 0.42, 0.25)
+
+/**
+ * The co-op bypass: two pressure pads and the route they open.
+ *
+ * The route exists from the start but is ghosted and has no collider until the
+ * server says both pads are held. Building it up front keeps the reveal
+ * instant - spawning a dozen entities at the moment two people cooperate would
+ * land after the moment had passed.
+ */
+function buildShortcut(layout: Layout, entities: Entity[]): BuiltShortcut | null {
+  if (!layout.shortcut) return null
+
+  const route = layout.shortcut.route.map((pad) => {
+    const entity = engine.addEntity()
+    entities.push(entity)
+    Transform.create(entity, {
+      position: Vector3.create(pad.x, pad.y, pad.z),
+      scale: Vector3.create(pad.size, 0.5, pad.size)
+    })
+    MeshRenderer.setBox(entity)
+    Material.setPbrMaterial(entity, { albedoColor: SHORTCUT_CLOSED })
+    return entity
+  })
+
+  const padA = createPressurePad(layout.shortcut.padA, entities)
+  const padB = createPressurePad(layout.shortcut.padB, entities)
+
+  return { route, padA, padB, open: false }
+}
+
+function createPressurePad(at: { x: number; y: number; z: number }, entities: Entity[]): Entity {
+  const pad = engine.addEntity()
+  entities.push(pad)
+
+  Transform.create(pad, {
+    position: Vector3.create(at.x, at.y, at.z),
+    scale: Vector3.create(PAD_RADIUS * 2, 0.2, PAD_RADIUS * 2)
+  })
+  MeshRenderer.setCylinder(pad)
+  MeshCollider.setCylinder(pad)
+  paintPressurePad(pad, false)
+
+  // CL_PLAYER, not CL_MAIN_PLAYER: the point is seeing that somebody ELSE is
+  // standing on the other pad. This is local colour only - the server decides
+  // whether the route actually opens.
+  const zone = engine.addEntity()
+  entities.push(zone)
+  Transform.create(zone, {
+    position: Vector3.create(at.x, at.y + 1, at.z),
+    scale: Vector3.create(PAD_RADIUS, PAD_RADIUS, PAD_RADIUS)
+  })
+  TriggerArea.setSphere(zone, ColliderLayer.CL_PLAYER)
+
+  triggerAreaEventsSystem.onTriggerEnter(zone, () => paintPressurePad(pad, true))
+  triggerAreaEventsSystem.onTriggerExit(zone, () => paintPressurePad(pad, false))
+
+  return pad
+}
+
+function paintPressurePad(pad: Entity, pressed: boolean) {
+  Material.setPbrMaterial(pad, {
+    albedoColor: pressed ? CP_DONE_ALBEDO : CP_ALBEDO,
+    emissiveColor: pressed ? CP_DONE_EMISSIVE : CP_EMISSIVE,
+    emissiveIntensity: pressed ? 5 : 2
+  })
+}
+
+/** Turns the bypass solid, or ghosts it again. */
+export function setShortcutOpen(shortcut: BuiltShortcut, open: boolean) {
+  if (shortcut.open === open) return
+  shortcut.open = open
+
+  for (const entity of shortcut.route) {
+    if (open) {
+      MeshCollider.setBox(entity)
+      Material.setPbrMaterial(entity, {
+        albedoColor: CP_ALBEDO,
+        emissiveColor: CP_EMISSIVE,
+        emissiveIntensity: 2.5
+      })
+    } else {
+      MeshCollider.deleteFrom(entity)
+      Material.setPbrMaterial(entity, { albedoColor: SHORTCUT_CLOSED })
+    }
+  }
 }
 
 export function clearWorld(world: World | null) {
@@ -223,6 +334,7 @@ export function clearWorld(world: World | null) {
   world.spinners = []
   world.movers = []
   world.checkpoints = []
+  world.shortcut = null
 }
 
 /**
