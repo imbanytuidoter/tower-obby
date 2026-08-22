@@ -15,6 +15,12 @@ import { getPlayer } from '@dcl/sdk/players'
 import { movePlayerTo } from '~system/RestrictedActions'
 // Static, never lazy: registerMessages and defineComponent must both run
 // during module load, before the engine seals.
+// Static, and before anything that reaches into it. esbuild wraps modules in
+// lazy __esm initializers because the server branch is imported dynamically,
+// and build.ts calling placeProp() ran before props.ts had initialised -
+// "placeProp is not defined" at runtime, with a clean type-check. Third time
+// this exact trap has bitten; naming it here so the next reader sees it.
+import './game/props'
 import { room } from './shared/messages'
 import {
   Board,

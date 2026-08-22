@@ -555,37 +555,28 @@ function createPerimeter() {
     const angle = (i / count) * Math.PI * 2
     const x = CENTER_X + Math.cos(angle) * radius
     const z = CENTER_Z + Math.sin(angle) * radius
-    const height = 5 + (i % 3) * 2.5
 
-    const monolith = engine.addEntity()
-    Transform.create(monolith, {
-      position: Vector3.create(x, height / 2, z),
-      rotation: Quaternion.fromEulerDegrees(0, (angle * 180) / Math.PI, 0),
-      scale: Vector3.create(1.1, height, 1.1)
-    })
-    MeshRenderer.setBox(monolith)
-    MeshCollider.setBox(monolith)
-    Material.setPbrMaterial(monolith, {
-      // Black slabs standing in open water read as missing geometry. These
-      // are a boundary, not a feature - they should recede, not punch holes.
-      albedoColor: Color4.create(0.44, 0.46, 0.54, 1),
-      metallic: 0.05,
-      roughness: 0.9
+    // Obelisks from the catalog rather than stretched boxes. Native size is
+    // 2 x 4 x 2 m and it has no _collider meshes, so collision goes on the
+    // visible mesh; the ring alternates height to break the rhythm.
+    const scale = 0.9 + (i % 3) * 0.45
+    placeProp(MODELS.obelisk, {
+      position: Vector3.create(x, 0, z),
+      yaw: (angle * 180) / Math.PI + 90,
+      scale: Vector3.create(scale, scale, scale),
+      solid: true
     })
 
-    // A lit cap, clear of the monolith's top face so the two never z-fight.
-    const cap = engine.addEntity()
-    Transform.create(cap, {
-      position: Vector3.create(x, height + 0.16, z),
-      rotation: Quaternion.fromEulerDegrees(0, (angle * 180) / Math.PI, 0),
-      scale: Vector3.create(1.3, 0.14, 1.3)
-    })
-    MeshRenderer.setBox(cap)
-    Material.setPbrMaterial(cap, {
-      albedoColor: CYAN4,
-      emissiveColor: CYAN3,
-      emissiveIntensity: 2.5
-    })
+    // A shard leaning at its foot, so the boundary reads as weathered rather
+    // than as sixteen identical markers.
+    if (i % 2 === 0) {
+      const lean = angle + 0.9
+      placeProp(MODELS.shard, {
+        position: Vector3.create(x + Math.cos(lean) * 1.9, 0, z + Math.sin(lean) * 1.9),
+        yaw: (lean * 180) / Math.PI,
+        scale: 1.6
+      })
+    }
   }
 }
 

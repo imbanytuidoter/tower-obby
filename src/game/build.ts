@@ -11,6 +11,7 @@ import {
   Transform
 } from '@dcl/sdk/ecs'
 import { Color3, Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
+import { CLIPS, MODELS, placeProp } from './props'
 import { ColliderLayer, TriggerArea, triggerAreaEventsSystem } from '@dcl/sdk/ecs'
 import {
   CENTER_X,
@@ -293,6 +294,17 @@ export function buildWorld(layout: Layout): World {
     }
 
     if (pad.kind === 'checkpoint') {
+      // A teal crystal on every ring. Cyan already means safe here, and this
+      // is the same statement in an object: 15 triangles, animated, and it
+      // marks the one pad on the climb that gives your progress back.
+      entities.push(
+        placeProp(MODELS.crystalSafe, {
+          position: Vector3.create(pad.x, pad.y + PAD_TOP + 0.1, pad.z),
+          scale: 0.75,
+          clip: CLIPS.crystalSafe
+        })
+      )
+
       const marker = createCheckpointMarker(pad, checkpoints.length)
       entities.push(marker.ring, marker.column, marker.label)
 
@@ -435,6 +447,19 @@ function buildCoin(layout: Layout, entities: Entity[]): BuiltCoin | null {
       roughness: 0.7
     })
     entities.push(createGroundShadow(pad))
+  }
+
+  // The coin itself stays a primitive - it has to read as gold and nothing
+  // else - but the pads leading to it get an orange crystal apiece, which is
+  // the unstable colour saying the same thing a second way.
+  for (const pad of def.route) {
+    entities.push(
+      placeProp(MODELS.crystalUnstable, {
+        position: Vector3.create(pad.x, pad.y + 0.35, pad.z),
+        scale: 0.55,
+        clip: CLIPS.crystalUnstable
+      })
+    )
   }
 
   const entity = engine.addEntity()
