@@ -117,9 +117,27 @@ npm run build
 The layout module imports no SDK, so it compiles standalone and every geometric
 claim above is reproducible in Node.
 
-## What has not been verified
+## What has been verified, and what has not
 
-Stated plainly, because the rest of this document is measured. The five
-mechanics — coin, token, tandem plate, finish deltas, ghost — compile, build,
-pass the harness and produce no client errors, but have not been played
-end to end. The tandem plate cannot be verified by one person at all.
+Played end to end in a running client, gate to crown:
+
+```
+clock starts at the gate                          0:43.02 recorded
+fork choice recorded from where the feet landed   "Zone 3 - took the bold arm -3.7s"
+ante: client claims, server validates, token granted
+     "PRESS 1 TO SPEND THE COIN AND SKIP AHEAD"
+live height ranking                               "1. imbanytui 85m"
+lifetime summit count, per wallet                 "Summit number 7."
+ghost accepted by the server        [SERVER] ghost replaced by imbanytui (44.1s)
+```
+
+Still unverified, and honestly so:
+
+- **The tandem plate.** It needs two people standing on one slab and cannot be
+  tested by one. Its arrival is a placement rather than a physics ride
+  specifically so that it does not depend on undocumented behaviour.
+- **Spending the skip token.** The grant is verified; the button press that
+  spends it cannot be sent programmatically, so the teleport it performs has
+  not been exercised.
+- **Anything on a physical phone.** The mobile layout branches on `isMobile()`
+  and the budgets are inside mobile limits, but no handset has run this.
