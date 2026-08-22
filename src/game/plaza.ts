@@ -92,6 +92,18 @@ const DIM = Color4.create(0.62, 0.7, 0.8, 1)
 const GOLD4 = Color4.create(1, 0.82, 0.25, 1)
 
 /** Where to point the camera so a player sees the gate they must walk through. */
+/** The tower record line on the gate, rewritten when the server sends one. */
+let recordSign: Entity | null = null
+
+/** Called from the client when the all-time board arrives. */
+export function showTowerRecord(name: string, seconds: number) {
+  if (!recordSign) return
+  const shape = TextShape.getMutableOrNull(recordSign)
+  if (!shape) return
+  shape.text =
+    seconds > 0 ? 'TOWER RECORD  ' + formatTime(seconds) + '  -  ' + name : 'NO RECORD YET  -  SET IT'
+}
+
 export const GATE_LOOK = Vector3.create(GATE_X, LOBBY_Y + 2.6, GATE_Z)
 
 type Row = { label: Entity; value: Entity }
@@ -230,6 +242,30 @@ function createStartGate() {
     textColor: Color4.create(0.45, 1, 0.65, 1),
     outlineColor: Color4.Black(),
     outlineWidth: 0.25,
+    textAlign: TextAlignMode.TAM_MIDDLE_CENTER
+  })
+
+  /**
+   * The number to beat, on the gate you beat it through.
+   *
+   * The all-time board has been computed, persisted to Storage and synced to
+   * every client since the tower went permanent, and it was displayed
+   * nowhere - the same dead-data mistake the lifetime summit count made. The
+   * daily board in the yard is the one a newcomer can win tonight; this is the
+   * one that says what the tower is capable of, and the moment it means
+   * something is the moment you step through.
+   */
+  recordSign = engine.addEntity()
+  Transform.create(recordSign, {
+    position: Vector3.create(GATE_X + GATE_DIR_X * -0.2, signY - 2.05, GATE_Z + GATE_DIR_Z * -0.2),
+    rotation
+  })
+  TextShape.create(recordSign, {
+    text: 'NO RECORD YET  -  SET IT',
+    fontSize: 2,
+    textColor: GOLD4,
+    outlineColor: Color4.Black(),
+    outlineWidth: 0.3,
     textAlign: TextAlignMode.TAM_MIDDLE_CENTER
   })
 

@@ -65,7 +65,14 @@ import {
 import { applyFairness, freezeAfterFall } from './game/fairness'
 import { formatTime } from './game/format'
 import { buildTower } from './game/layout'
-import { buildPlaza, decorSystem, GATE_LOOK, refreshBoard, showBoard } from './game/plaza'
+import {
+  buildPlaza,
+  decorSystem,
+  GATE_LOOK,
+  refreshBoard,
+  showBoard,
+  showTowerRecord
+} from './game/plaza'
 import { play, setupSound } from './game/sound'
 import { announce, completeRound, Phase, prepareRound, run, startClock, tickAnnouncement } from './game/state'
 import { setupUi } from './ui'
@@ -249,7 +256,10 @@ function sharedRoundSystem(dt: number) {
       showBoard(today.names.map((name, index) => ({ name, seconds: today.seconds[index] ?? 0 })))
       run.dailyBest = today.seconds[0] ?? 0
     }
-    if (allTime) run.towerRecord = allTime.seconds[0] ?? 0
+    if (allTime) {
+      run.towerRecord = allTime.seconds[0] ?? 0
+      showTowerRecord(allTime.names[0] ?? '', allTime.seconds[0] ?? 0)
+    }
 
     return
   }
