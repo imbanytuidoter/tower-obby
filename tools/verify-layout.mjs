@@ -23,7 +23,7 @@ execSync(
 )
 // CommonJS output so Node resolves the extensionless relative imports tsc emits.
 const req = createRequire(join(out, 'x.cjs'))
-const { buildTower, backdropRing, BACKDROP_PANELS } = req(join(out, 'layout.js'))
+const { buildTower, backdropRing, BACKDROP_PANELS, treeLine } = req(join(out, 'layout.js'))
 const cfg = req(join(out, 'config.js'))
 const palette = req(join(out, 'palette.js'))
 
@@ -340,6 +340,34 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   note(worst.margin > 0.12, 'pads read lighter than the backdrop',
     'tightest ' + worst.band + ': pad ' + worst.pad.toFixed(2) +
     ' vs wall ' + worst.backdrop.toFixed(2) + ' (+' + worst.margin.toFixed(2) + ')')
+}
+
+// The forest edge must stand outside everything it could ruin.
+//
+// Set to radius 27 once, which put trees through the leaderboard and the
+// spawn camera inside a canopy - the lobby is a 24 m square whose corners
+// reach much further out than its centre radius suggests.
+{
+  const trees = treeLine()
+  const half = cfg.LOBBY_SIZE / 2
+
+  let deepest = 0
+  for (const t of trees) {
+    const dx = Math.max(0, Math.abs(t.x - cfg.LOBBY_X) - half)
+    const dz = Math.max(0, Math.abs(t.z - cfg.LOBBY_Z) - half)
+    // How far the canopy pushes into the deck, 0 when it clears it entirely.
+    deepest = Math.max(deepest, cfg.TREE_CANOPY_RADIUS - Math.hypot(dx, dz))
+  }
+  note(deepest <= 0, 'trees stand clear of the lobby',
+    trees.length + ' trees, deepest intrusion ' + Math.max(0, deepest).toFixed(2) + ' m')
+
+  let nearest = Infinity
+  for (const t of trees) {
+    nearest = Math.min(nearest,
+      Math.hypot(t.x - cfg.CENTER_X, t.z - cfg.CENTER_Z) - cfg.TREE_CANOPY_RADIUS)
+  }
+  note(nearest > cfg.SHAFT_MAX_RADIUS + 2, 'trees stand clear of the climb',
+    'nearest canopy ' + nearest.toFixed(1) + ' m, pads reach ' + cfg.SHAFT_MAX_RADIUS + ' m')
 }
 
 // Determinism: every client builds the tower locally, so the same round must

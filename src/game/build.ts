@@ -26,7 +26,7 @@ import {
   HAZARD_THICKNESS,
   PAD_RADIUS
 } from './config'
-import { backdropRing, Layout, MoverDef, Pad, SpinnerDef } from './layout'
+import { backdropRing, Layout, MoverDef, Pad, SpinnerDef, treeLine } from './layout'
 import { accentRgb, BACKDROP_EMISSIVE, bodyRgb, zoneRamp } from './palette'
 
 export type BuiltPad = {
@@ -421,6 +421,7 @@ export function buildWorld(layout: Layout): World {
 
   const shortcut = buildShortcut(layout, entities)
   createBands(entities)
+  createTreeLine(entities)
   const forks = buildForks(layout, entities)
   const plate = buildPlate(layout, entities)
   const coin = buildCoin(layout, entities)
@@ -903,6 +904,32 @@ function createBands(entities: Entity[]) {
       // backdrop is distance, not an object; it has no business casting.
       castShadows: false
     })
+  }
+}
+
+/**
+ * A tree line standing between the climb and the backdrop wall.
+ *
+ * The wall alone was the problem: flat colour across more than half the frame
+ * reads as cardboard, not as distance. Silhouette is what makes it a forest,
+ * and silhouette is the one thing a painted box cannot supply.
+ *
+ * Placed at TREE_RING_RADIUS - outside every pad by construction, inside the
+ * wall - so it can never enter a jump. Deterministic: angle and scale come
+ * from the index, never from Math.random, or two clients grow different
+ * forests.
+ */
+function createTreeLine(entities: Entity[]) {
+  for (const tree of treeLine()) {
+    entities.push(
+      placeProp(MODELS.tree, {
+        position: Vector3.create(tree.x, 0, tree.z),
+        yaw: tree.yaw,
+        scale: tree.scale,
+        solid: true,
+        hasColliderMeshes: true
+      })
+    )
   }
 }
 

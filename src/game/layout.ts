@@ -21,6 +21,10 @@ import {
   REACH_BUDGET,
   TOWER_SEED,
   TOWER_ZONES,
+  TREE_CANOPY_RADIUS,
+  TREE_COUNT,
+  TREE_RING_RADIUS,
+  TREE_SCALE,
   PAD_SEPARATION,
   SHAFT_MAX_RADIUS,
   SHAFT_MIN_RADIUS,
@@ -1176,10 +1180,17 @@ export type BandPanel = {
 }
 
 /** How many panels make up one band ring. */
-export const BACKDROP_PANELS = 14
+export const BACKDROP_PANELS = 8
 
-/** Panels overlap their neighbours by this much so the ring has no seams. */
-const PANEL_OVERLAP = 1.2
+/**
+ * How much longer than its exact slot each panel is cut.
+ *
+ * The exact length is the side of the circumscribed polygon, 2R tan(pi/N).
+ * Deriving it means the ring stays closed when N changes; the old fixed 1.2 m
+ * overlap was tuned for N = 14 and would have opened gaps at N = 8 without
+ * saying so.
+ */
+const PANEL_OVERLAP_FACTOR = 1.06
 
 /**
  * The backdrop ring, as pure numbers.
@@ -1191,7 +1202,8 @@ const PANEL_OVERLAP = 1.2
  */
 export function backdropRing(): BandPanel[] {
   const panels: BandPanel[] = []
-  const length = (BACKDROP_RADIUS * 2 * Math.PI) / BACKDROP_PANELS + PANEL_OVERLAP
+  const length =
+    2 * BACKDROP_RADIUS * Math.tan(Math.PI / BACKDROP_PANELS) * PANEL_OVERLAP_FACTOR
 
   for (const band of BANDS) {
     const height = band.high - band.low
@@ -1210,4 +1222,46 @@ export function backdropRing(): BandPanel[] {
     }
   }
   return panels
+}
+
+
+export type TreeDef = { x: number; z: number; yaw: number; scale: number }
+
+/**
+ * The forest edge, as pure numbers.
+ *
+ * Two things it must never do, both of which it did before this was written
+ * down: stand inside the lobby (the ring was set to radius 27 and the lobby
+ * deck is a 24 m square centred at radius 22, so trees grew through the
+ * leaderboard and the camera sat inside a canopy), and reach far enough in to
+ * touch a pad.
+ *
+ * Deterministic by construction - angle, wobble and scale are functions of
+ * the index, never of Math.random - because every client grows its own copy
+ * of this forest and they have to match.
+ */
+export function treeLine(): TreeDef[] {
+  const trees: TreeDef[] = []
+  const halfLobby = LOBBY_SIZE / 2 + TREE_CANOPY_RADIUS
+
+  for (let i = 0; i < TREE_COUNT; i++) {
+    const angle = (i / TREE_COUNT) * Math.PI * 2
+    const radius = TREE_RING_RADIUS + Math.sin(i * 2.399) * 2.2
+    const x = CENTER_X + Math.cos(angle) * radius
+    const z = CENTER_Z + Math.sin(angle) * radius
+
+    // The lobby deck is an axis-aligned square, so this is a box test, not a
+    // radius test. A radius test would leave trees standing on the corners.
+    const insideLobby =
+      Math.abs(x - LOBBY_X) < halfLobby && Math.abs(z - LOBBY_Z) < halfLobby
+    if (insideLobby) continue
+
+    trees.push({
+      x,
+      z,
+      yaw: (i * 47) % 360,
+      scale: TREE_SCALE * (1 + Math.sin(i * 1.107) * 0.22)
+    })
+  }
+  return trees
 }

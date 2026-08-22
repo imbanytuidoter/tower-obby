@@ -20,7 +20,22 @@ export const MODELS = {
   rockTall: 'assets/Models/rock-tall.glb',
   crystalSafe: 'assets/Models/crystal-teal.glb',
   crystalUnstable: 'assets/Models/crystal-orange.glb',
-  shard: 'assets/Models/stone-shard.glb'
+  shard: 'assets/Models/stone-shard.glb',
+  /**
+   * The forest edge. Audited before placing: 2 meshes / 2 materials / 1
+   * texture, no animation, ships its own `TreeFir_02_collider`, so it goes in
+   * with hasColliderMeshes: true and nothing on the visible mesh. 412 tri.
+   *
+   * Chosen over wm-tree01 for two measured reasons: it is faceted rather than
+   * painted, which matches the flat-shaded pads, and it costs 2 material slots
+   * per instance instead of 3 - eighteen of the other one put the scene at 516
+   * against a 500 hard cap on mobile, which is a scene that does not load.
+   *
+   * Native bounding box is 270 x 253 x 555 units, so it wants a small scale.
+   */
+  tree: 'assets/Models/tree-fir-02.glb',
+  /** 1 mesh / 1 material / 1 texture, clip "fernidle", no collider meshes. */
+  fern: 'assets/Models/fern.glb'
 } as const
 
 /** Clip names read out of the GLBs, not guessed. */

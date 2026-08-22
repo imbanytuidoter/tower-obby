@@ -87,8 +87,8 @@ export const DECOR_MAX_SATURATION = 0.2
  * Heights measured from the generated tower rather than assumed.
  */
 export const BANDS = [
-  { name: 'UNDERSTORY', from: 1, to: 5, low: 0, high: 17, backdrop: '#6B7A5CFF' },
-  { name: 'MID BOUGHS', from: 6, to: 10, low: 17, high: 28.8, backdrop: '#3F5340FF' },
+  { name: 'UNDERSTORY', from: 1, to: 5, low: 0, high: 17, backdrop: '#3A4432FF' },
+  { name: 'MID BOUGHS', from: 6, to: 10, low: 17, high: 28.8, backdrop: '#2E3B2CFF' },
   { name: 'UPPER CANOPY', from: 11, to: 15, low: 28.8, high: 44.6, backdrop: '#2F4038FF' },
   { name: 'CROWN', from: 16, to: 20, low: 44.6, high: 78, backdrop: '#243040FF' }
 ] as const
@@ -99,6 +99,21 @@ export const BANDS = [
  * whole play area sat inside a drum - the backdrop has to be behind the
  * climb, not around the player. 34 keeps it inside the 40 m plate edge.
  */
+/** The forest edge: outside every pad, inside the backdrop wall. */
+export const TREE_RING_RADIUS = 30
+export const TREE_COUNT = 24
+/**
+ * tree-fir-02 stands 5.55 m at scale 1, so this is roughly a 14 m tree.
+ *
+ * The catalog lists it as "270.6 x 253.7 x 555.0m" and that is the raw mesh
+ * bounding box with the GLB's own node scale of 0.01 ignored. Trusting it
+ * produced 14-centimetre trees that rendered but could not be seen. Model
+ * dimensions get measured out of the file, never read off the catalog.
+ */
+export const TREE_SCALE = 3.0
+/** Half the canopy width at TREE_SCALE: tree-fir-02 is 2.7 m wide at scale 1. */
+export const TREE_CANOPY_RADIUS = 4.1
+
 export const BACKDROP_RADIUS = 34
 
 /** Bark, canopy, mist, grass. None of these may exceed DECOR_MAX_SATURATION. */
