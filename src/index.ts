@@ -406,7 +406,7 @@ function runSystem(dt: number) {
 
   updatePrompt(player)
   noteForkChoice(player)
-  reachForCoin(player)
+  reachForCoin(dt, player)
   spendToken()
   rideThePlate(player)
 
@@ -591,10 +591,13 @@ function rideThePlate(player: Vector3) {
  * because standing next to it would otherwise send one claim per frame.
  */
 let coinTimer = 0
-function reachForCoin(player: Vector3) {
+function reachForCoin(dt: number, player: Vector3) {
   if (!world?.coin || world.coin.taken || run.token > 0) return
 
-  coinTimer -= 1 / 30
+  // Real elapsed time, not an assumed 30 fps. The client renders at whatever
+  // rate the device manages - a phone under load runs slower and would have
+  // throttled this to a crawl, a fast machine would have sped it up.
+  coinTimer -= dt
   if (coinTimer > 0) return
 
   if (horizontalDistance(player, world.coin.at) < 2 && Math.abs(player.y - world.coin.at.y) < 2.5) {

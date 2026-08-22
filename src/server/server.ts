@@ -382,11 +382,39 @@ function near(position: Vector3, pad: { x: number; y: number; z: number }): bool
 function watchGate() {
   for (const [entity, identity] of engine.getEntitiesWith(PlayerIdentityData)) {
     const address = identity.address.toLowerCase()
-    if (startedClimb.has(address)) continue
-
     const transform = Transform.getOrNull(entity)
-    if (transform) noteGateCrossing(address, transform.position)
+    if (!transform) continue
+
+    if (startedClimb.has(address)) {
+      abandonIfBackAtTheStart(address, transform.position)
+      continue
+    }
+
+    noteGateCrossing(address, transform.position)
   }
+}
+
+/**
+ * Walking back behind the gate abandons the climb, and the next crossing
+ * starts a fresh one.
+ *
+ * Without this a retry was timed from the FIRST gate crossing: the client
+ * reset its own clock and sent the player to the lobby, the server kept the
+ * original stamp, and the board recorded a time that included the attempt
+ * they gave up on. The HUD and the leaderboard disagreed, and the leaderboard
+ * was the one that was wrong.
+ *
+ * Decided from the player's engine-verified position rather than from a
+ * message, so a client cannot abandon a climb it is losing and quietly keep
+ * the better start time.
+ */
+function abandonIfBackAtTheStart(address: string, position: Vector3) {
+  const dx = position.x - GATE_X
+  const dz = position.z - GATE_Z
+  if (dx * GATE_DIR_X + dz * GATE_DIR_Z > -1) return
+
+  startedClimb.delete(address)
+  tookCoin.delete(address)
 }
 
 /** Records the first moment a player is past the gate plane, inside its width. */
