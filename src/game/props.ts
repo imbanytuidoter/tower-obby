@@ -16,6 +16,8 @@ export const MODELS = {
    * _collider meshes, so collision is set on the visible mesh or left off.
    */
   obelisk: 'assets/Models/obelisk.glb',
+  cliff: 'assets/Models/cliff-a.glb',
+  rockTall: 'assets/Models/rock-tall.glb',
   crystalSafe: 'assets/Models/crystal-teal.glb',
   crystalUnstable: 'assets/Models/crystal-orange.glb',
   shard: 'assets/Models/stone-shard.glb'
@@ -35,6 +37,16 @@ export type PropOptions = {
   solid?: boolean
   /** Clip to loop, for the models that ship with one. */
   clip?: string
+  /**
+   * True when the GLB ships its own `_collider` meshes.
+   *
+   * The two patterns are not interchangeable and must never be mixed: a model
+   * WITH collider meshes wants them on the invisible mask and nothing on the
+   * visible one, and a model without wants the reverse. The rocks have them
+   * and the obelisks do not, which is only knowable by opening the files -
+   * so both were opened.
+   */
+  hasColliderMeshes?: boolean
 }
 
 export function placeProp(src: string, options: PropOptions): Entity {
@@ -49,10 +61,13 @@ export function placeProp(src: string, options: PropOptions): Entity {
         : options.scale ?? Vector3.One()
   })
 
+  const solid = options.solid ?? false
   GltfContainer.create(entity, {
     src,
-    visibleMeshesCollisionMask: options.solid ? ColliderLayer.CL_PHYSICS : ColliderLayer.CL_NONE,
-    invisibleMeshesCollisionMask: ColliderLayer.CL_NONE
+    visibleMeshesCollisionMask:
+      options.hasColliderMeshes || !solid ? ColliderLayer.CL_NONE : ColliderLayer.CL_PHYSICS,
+    invisibleMeshesCollisionMask:
+      options.hasColliderMeshes && solid ? ColliderLayer.CL_PHYSICS : ColliderLayer.CL_NONE
   })
 
   // A GLB with animations loops its first clip forever whether or not anyone

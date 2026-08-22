@@ -10,7 +10,7 @@
  * Exits non-zero if a single invariant breaks, so it can gate a commit.
  */
 import { execSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
@@ -209,6 +209,24 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     'the token buys something',
     L.coin ? `skips to checkpoint ${L.coin.skipsToCheckpoint} of ${cps}` : '-'
   )
+}
+
+// The scene.json spawn box, which is what actually places an arriving player -
+// the code's movePlayerTo only runs afterwards. The box used to straddle the
+// gate: a player could land on the start line and have their run begin before
+// they had seen anything.
+{
+  const scene = JSON.parse(readFileSync('scene.json', 'utf8'))
+  const box = scene.spawnPoints?.[0]?.position
+  const behind = (x, z) => {
+    const dx = x - cfg.GATE_X, dz = z - cfg.GATE_Z
+    return dx * cfg.GATE_DIR_X + dz * cfg.GATE_DIR_Z < -1
+  }
+  const corners = box
+    ? [[box.x[0], box.z[0]], [box.x[0], box.z[1]], [box.x[1], box.z[0]], [box.x[1], box.z[1]]]
+    : []
+  const bad = corners.filter(([x, z]) => !behind(x, z)).length
+  note(box && bad === 0, 'nobody spawns past the start line', box ? `${bad} of 4 corners past the gate` : 'no spawnPoints')
 }
 
 // Lobby furniture. Everything in the yard is hand-placed from constants, which
