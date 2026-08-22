@@ -71,6 +71,7 @@ import {
   GATE_LOOK,
   refreshBoard,
   showBoard,
+  showClimbers,
   showTowerRecord
 } from './game/plaza'
 import { play, setupSound } from './game/sound'
@@ -246,6 +247,7 @@ function sharedRoundSystem(dt: number) {
         height: ranking.heights[index] ?? 0
       }))
       run.climbers = ranking.climbers
+      showClimbers(ranking.heights.map((h) => h))
     }
 
     // Today's board is the one on the monument. The all-time list is the

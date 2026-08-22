@@ -31,6 +31,8 @@ import {
   START_PAD_Z,
   BOARD_SIZE,
   BOARD_FORWARD,
+  MAX_PAD_HEIGHT,
+  RANKING_SIZE,
   REACH_ABILITY,
   SKYBOX_TIME,
   BOARD_LATERAL,
@@ -92,6 +94,71 @@ const DIM = Color4.create(0.62, 0.7, 0.8, 1)
 const GOLD4 = Color4.create(1, 0.82, 0.25, 1)
 
 /** Where to point the camera so a player sees the gate they must walk through. */
+/**
+ * The progress rail: the tower's height, shrunk to something you can stand in
+ * front of, with a light on it for every climber currently up there.
+ *
+ * The live ranking already existed as three lines of HUD text, which is a
+ * private thing each player reads alone. This is the same information as an
+ * object in the yard: two people waiting can look at it together, point at it,
+ * and watch a light climb. The design brief's complaint about the lobby is
+ * that people cross it and leave - this gives them a reason to stop, and the
+ * thing they stop to watch is each other.
+ */
+const RAIL_HEIGHT = 7.5
+let railMarkers: Entity[] = []
+
+function createProgressRail() {
+  // Hard against the board, so the two read as one panel: what the tower has
+  // done, and who is on it right now.
+  const x = BOARD_X + SIDE_X * (BOARD_W / 2 + 0.75)
+  const z = BOARD_Z + SIDE_Z * (BOARD_W / 2 + 0.75)
+
+  const rail = engine.addEntity()
+  Transform.create(rail, {
+    position: Vector3.create(x, RAIL_HEIGHT / 2 + 0.4, z),
+    scale: Vector3.create(0.4, RAIL_HEIGHT, 0.4)
+  })
+  MeshRenderer.setBox(rail)
+  Material.setPbrMaterial(rail, {
+    albedoColor: Color4.create(0.3, 0.34, 0.42, 1),
+    roughness: 0.9
+  })
+
+  label(x, RAIL_HEIGHT + 1.4, z, 'ON THE TOWER NOW', CYAN4, 1.8)
+
+  // One marker per ranked climber. Parked below the floor until the server
+  // says somebody is up there.
+  railMarkers = []
+  for (let i = 0; i < RANKING_SIZE; i++) {
+    const marker = engine.addEntity()
+    Transform.create(marker, {
+      position: Vector3.create(x, -20, z),
+      scale: Vector3.create(1.35, 0.3, 1.35)
+    })
+    MeshRenderer.setBox(marker)
+    Material.setPbrMaterial(marker, {
+      albedoColor: i === 0 ? GOLD4 : CYAN4,
+      emissiveColor: i === 0 ? Color3.create(1, 0.75, 0.2) : CYAN3,
+      emissiveIntensity: 2.5
+    })
+    railMarkers.push(marker)
+  }
+}
+
+/** Places a light per climber at their share of the tower's height. */
+export function showClimbers(heights: number[]) {
+  for (let i = 0; i < railMarkers.length; i++) {
+    const transform = Transform.getMutableOrNull(railMarkers[i])
+    if (!transform) continue
+    const height = heights[i]
+    transform.position.y =
+      height === undefined
+        ? -20
+        : 0.4 + Math.min(1, Math.max(0, height / MAX_PAD_HEIGHT)) * RAIL_HEIGHT
+  }
+}
+
 /** The tower record line on the gate, rewritten when the server sends one. */
 let recordSign: Entity | null = null
 
@@ -126,6 +193,7 @@ export function buildPlaza(opening: Opening) {
   SkyboxTime.createOrReplace(engine.RootEntity, { fixedTime: SKYBOX_TIME })
 
   createGround()
+  createProgressRail()
   createPerimeter()
   createLobby()
   createStartGate()
