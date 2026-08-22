@@ -66,6 +66,68 @@ export const COIN_RADIUS = 3
 export const PLATE_RISE_RATE = 0.22
 export const PLATE_FALL_RATE = 0.5
 
+/**
+ * THE TOWER IS A TREE.
+ *
+ * Art only. Nothing in this block may move a pad, change a collider or touch
+ * a jump budget - if a value affects reach it belongs with REACH_BUDGET.
+ *
+ * The rule the whole style rests on: every readable surface is one of the
+ * four gameplay colours, and every unreadable surface is desaturated
+ * green-grey. A forest is made of green and brown, and so is a bad parkour
+ * map; what keeps the two apart is that saturation is reserved for meaning.
+ */
+export const DECOR_MAX_SATURATION = 0.2
+
+/**
+ * Four bands, five zones each, and the background DARKENS with altitude so a
+ * pad is always lighter than whatever is behind it. That is the reason the
+ * crown is the darkest band and not the brightest.
+ *
+ * Heights measured from the generated tower rather than assumed.
+ */
+export const BANDS = [
+  { name: 'UNDERSTORY', from: 1, to: 5, low: 0, high: 17, backdrop: '#6B7A5CFF' },
+  { name: 'MID BOUGHS', from: 6, to: 10, low: 17, high: 28.8, backdrop: '#3F5340FF' },
+  { name: 'UPPER CANOPY', from: 11, to: 15, low: 28.8, high: 44.6, backdrop: '#2F4038FF' },
+  { name: 'CROWN', from: 16, to: 20, low: 44.6, high: 78, backdrop: '#243040FF' }
+] as const
+
+/** Where the backdrop stands: outside every pad, inside the ground plate. */
+/**
+ * 34, not 27. At 27 the ring stood between the yard and the horizon and the
+ * whole play area sat inside a drum - the backdrop has to be behind the
+ * climb, not around the player. 34 keeps it inside the 40 m plate edge.
+ */
+export const BACKDROP_RADIUS = 34
+
+/** Bark, canopy, mist, grass. None of these may exceed DECOR_MAX_SATURATION. */
+export const FOREST = {
+  // #4A3628 is what the brief specified, and it measures 0.30 saturation
+  // against the brief's own 0.20 ceiling - the largest surface in the scene
+  // would have been the one thing breaking the rule the style rests on.
+  // Pulled 37% toward grey: still unmistakably bark, now 0.19.
+  // Lightness matters as much as saturation here. #4A3628 from the brief is
+  // 0.30 saturation, over the brief's own 0.20 ceiling; pulling it to grey
+  // fixed that and left it at 0.22 lightness, which renders as a black
+  // column under this sun. #7A6553 is 0.19 saturation and 0.40 lightness -
+  // quiet enough to obey the rule, light enough to be bark rather than a
+  // silhouette, and still darker than every pad in front of it.
+  bark: '#7A6553FF',
+  canopyNear: '#3D5240FF',
+  canopyFar: '#5B6F5EFF',
+  mist: '#96A89BFF',
+  grass: '#7B8C6AFF'
+} as const
+
+/** How much a pad lights itself, per meaning, so it survives canopy shade. */
+export const PAD_EMISSIVE = {
+  safe: 0.35,
+  hurts: 0.2,
+  unstable: 0.25,
+  goal: 0.55
+} as const
+
 /** How often the server proves it is alive. */
 export const HEARTBEAT_SECONDS = 2
 

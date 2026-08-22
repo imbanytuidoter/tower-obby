@@ -132,7 +132,10 @@ const hud = () => {
       />
       <Label value={formatTime(run.time)} fontSize={s.clock} color={NEON} textAlign="middle-left" />
       <Label
-        value={'SECTION ' + run.section + '/' + run.totalSections + '   FALLS ' + run.falls}
+        value={
+          'SECTION ' + run.section + '/' + run.totalSections +
+          '  ·  ' + run.band + '   FALLS ' + run.falls
+        }
         fontSize={s.line}
         color={Color4.White()}
         textAlign="middle-left"

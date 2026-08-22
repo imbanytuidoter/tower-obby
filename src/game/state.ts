@@ -19,6 +19,8 @@ export const run = {
   section: 1,
   totalSections: 1,
   sectionName: '',
+  /** Which of the four bands the climber is in. Replaces a tutorial panel. */
+  band: 'UNDERSTORY',
   /** Filled from the server-owned component. */
   serverAlive: false,
   /** Fastest climb today, and the fastest anyone has ever done it. */

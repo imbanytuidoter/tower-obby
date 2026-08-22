@@ -14,8 +14,13 @@ import { Color3, Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 import { CLIPS, MODELS, placeProp } from './props'
 import { ColliderLayer, TriggerArea, triggerAreaEventsSystem } from '@dcl/sdk/ecs'
 import {
+  BACKDROP_RADIUS,
+  BANDS,
   CENTER_X,
   CENTER_Z,
+  DECOR_MAX_SATURATION,
+  FOREST,
+  PAD_EMISSIVE,
   TOWER_ZONES,
   FINISH_RADIUS,
   FINISH_TOUCH_MARGIN,
@@ -125,6 +130,39 @@ export type World = {
  * vocabulary rests on.
  */
 /** The one fill that means "you can stand here". Shared with the plaza. */
+/**
+ * The forest may not shout. A boot-time guard, not a note in a review.
+ *
+ * Decoration exists to be ignored; the four meanings exist to be read. The
+ * moment a leaf is as saturated as a hazard, the player has to think about
+ * which is which, and that is the whole failure mode this style has.
+ */
+/** Which band a zone belongs to. The band name is the only tutorial left. */
+export function bandFor(section: number): string {
+  const band = BANDS.find((b) => section >= b.from && section <= b.to)
+  return band ? band.name : BANDS[BANDS.length - 1].name
+}
+
+export function assertDecorIsQuiet() {
+  const saturation = (hex: string) => {
+    const c = Color4.fromHexString(hex)
+    const mx = Math.max(c.r, c.g, c.b)
+    const mn = Math.min(c.r, c.g, c.b)
+    if (mx === mn) return 0
+    const l = (mx + mn) / 2
+    return (mx - mn) / (l > 0.5 ? 2 - mx - mn : mx + mn)
+  }
+
+  for (const [name, hex] of Object.entries(FOREST)) {
+    const s = saturation(hex)
+    if (s > DECOR_MAX_SATURATION) {
+      throw new Error(
+        'build: decor ' + name + ' at ' + s.toFixed(2) + ' competes with a meaning'
+      )
+    }
+  }
+}
+
 export const SAFE_FILL = Color4.fromHexString('#4EE3F2FF')
 
 export const CHOICE_EDGE = Color4.fromHexString('#CFC6FFFF')
@@ -369,6 +407,7 @@ export function buildWorld(layout: Layout): World {
   })
 
   const shortcut = buildShortcut(layout, entities)
+  createBands(entities)
   const forks = buildForks(layout, entities)
   const plate = buildPlate(layout, entities)
   const coin = buildCoin(layout, entities)
@@ -812,6 +851,52 @@ function createStrut(pad: Pad, index: number): Entity {
  * It stays clear of the pads by construction: SHAFT_MIN_RADIUS is 6 m and the
  * core's widest half-width is 2.5 m.
  */
+/**
+ * The forest behind the climb.
+ *
+ * There is no fog component in SDK7 - only SkyboxTime - so the bands are
+ * built rather than rendered: a ring of inward-facing panels per band,
+ * standing outside every pad and inside the ground plate. Each ring is one
+ * flat colour, and they darken with altitude so a pad is always lighter than
+ * what is behind it. That is the value separation the whole style depends on,
+ * and it is why the crown is the darkest band rather than the brightest.
+ */
+function createBands(entities: Entity[]) {
+  const PANELS = 14
+
+  for (const band of BANDS) {
+    const height = band.high - band.low
+    const colour = Color4.fromHexString(band.backdrop)
+
+    for (let i = 0; i < PANELS; i++) {
+      const angle = (i / PANELS) * Math.PI * 2
+      const x = CENTER_X + Math.cos(angle) * BACKDROP_RADIUS
+      const z = CENTER_Z + Math.sin(angle) * BACKDROP_RADIUS
+
+      const panel = engine.addEntity()
+      entities.push(panel)
+      Transform.create(panel, {
+        position: Vector3.create(x, band.low + height / 2, z),
+        // Faces the tower. A panel showing its back to the climb is a hole.
+        rotation: Quaternion.fromEulerDegrees(0, (-angle * 180) / Math.PI + 90, 0),
+        scale: Vector3.create(0.4, height, (BACKDROP_RADIUS * 2 * Math.PI) / PANELS + 1.2)
+      })
+      MeshRenderer.setBox(panel)
+      // Self-lit at low intensity. A vertical panel facing inward catches no
+      // sky, so an unlit one renders black and the band reads as a hole
+      // rather than as distance. The emissive is the band colour itself, so
+      // it holds its exact value instead of whatever the sun leaves it.
+      Material.setPbrMaterial(panel, {
+        albedoColor: colour,
+        emissiveColor: Color3.create(colour.r, colour.g, colour.b),
+        emissiveIntensity: 0.85,
+        roughness: 1,
+        metallic: 0
+      })
+    }
+  }
+}
+
 function createSpine(height: number, accent: Color3): Entity[] {
   const made: Entity[] = []
   const BASE = 5
@@ -827,7 +912,8 @@ function createSpine(height: number, accent: Color3): Entity[] {
   // black hole in a bright sky - which is exactly what 0.16 did.
   Material.setPbrMaterial(core, {
     texture: Material.Texture.Common({ src: CORE_TEXTURE }),
-    albedoColor: Color4.create(0.63, 0.6, 0.55, 1),
+    // Bark. The trunk was always the thing this scene was going to become.
+    albedoColor: Color4.fromHexString(FOREST.bark),
     metallic: 0.1,
     roughness: 0.8
   })

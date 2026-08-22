@@ -58,6 +58,8 @@ import {
 } from './game/config'
 import {
   activateCheckpoint,
+  assertDecorIsQuiet,
+  bandFor,
   buildWorld,
   clearWorld,
   paintCrumbled,
@@ -106,6 +108,7 @@ export function main() {
 }
 
 function startClient() {
+  assertDecorIsQuiet()
   applyFairness()
 
   // Built once and shared: the plaza needs the opening jump to size the
@@ -453,6 +456,7 @@ function runSystem(dt: number) {
       const done = world.pads[checkpoint.padIndex].pad.section
       run.section = Math.min(done + 1, run.totalSections)
       run.sectionName = world.sectionNames[run.section - 1] ?? run.sectionName
+      run.band = bandFor(run.section)
       break
     }
   }
