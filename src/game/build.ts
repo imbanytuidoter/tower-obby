@@ -253,6 +253,37 @@ export function sectionAccent(section: number): Color3 {
   return hsl(SAFE_HUE + SAFE_HUE_SWING - t * (SAFE_HUE_SWING * 2), 0.9, 0.74)
 }
 
+/**
+ * A shaft of light standing over every goal.
+ *
+ * The brief's reasoning is the good part: in a canopy the one place light
+ * gets through is where you are trying to reach, so a goal becomes visible as
+ * a beam before the pad itself is. On a phone that is worth more than the pad
+ * being bigger - you can see it from below, through foliage, from three zones
+ * down.
+ *
+ * Non-collidable by construction: it is a renderer with no MeshCollider, and
+ * decoration that can be stood on is the classic bug this style invites.
+ */
+function createGodray(pad: Pad, entities: Entity[]) {
+  const shaft = engine.addEntity()
+  entities.push(shaft)
+  Transform.create(shaft, {
+    position: Vector3.create(pad.x, pad.y + 9, pad.z),
+    scale: Vector3.create(pad.size * 0.62, 18, pad.size * 0.62)
+  })
+  MeshRenderer.setCylinder(shaft, 0.5, 0.14)
+  Material.setPbrMaterial(shaft, {
+    // Faint. A shaft that competes with the pad it is pointing at defeats the
+    // purpose, and from the clearing twenty of them at full strength wash the
+    // whole climb.
+    albedoColor: Color4.create(1, 0.9, 0.55, 0.07),
+    emissiveColor: Color3.create(1, 0.86, 0.45),
+    emissiveIntensity: PAD_EMISSIVE.goal * 0.5,
+    roughness: 1
+  })
+}
+
 /** Landmarks are round, plain pads are square: readable at a glance. */
 const isLandmark = (pad: Pad) => pad.kind === 'checkpoint' || pad.kind === 'finish'
 
@@ -332,6 +363,8 @@ export function buildWorld(layout: Layout): World {
     }
 
     if (pad.kind === 'checkpoint') {
+      createGodray(pad, entities)
+
       // A teal crystal on every ring. Cyan already means safe here, and this
       // is the same statement in an object: 15 triangles, animated, and it
       // marks the one pad on the climb that gives your progress back.
@@ -357,6 +390,7 @@ export function buildWorld(layout: Layout): World {
     }
 
     if (pad.kind === 'finish') {
+      createGodray(pad, entities)
       finish = top
       // Half-diagonal: the furthest point a player can legitimately stand on
       // the slab. Clamped so the client stays inside the server's tolerance.
@@ -482,7 +516,7 @@ function buildCoin(layout: Layout, entities: Entity[]): BuiltCoin | null {
     Material.setPbrMaterial(slab, {
       albedoColor: CRUMBLE_ALBEDO,
       emissiveColor: CRUMBLE_EMISSIVE,
-      emissiveIntensity: 1.2,
+      emissiveIntensity: PAD_EMISSIVE.unstable * 5,
       roughness: 0.7
     })
     entities.push(createGroundShadow(pad))
@@ -1020,7 +1054,7 @@ function paintHazard(entity: Entity) {
   Material.setPbrMaterial(entity, {
     albedoColor: HAZARD_ALBEDO,
     emissiveColor: HAZARD_EMISSIVE,
-    emissiveIntensity: 1.4,
+    emissiveIntensity: PAD_EMISSIVE.hurts * 5,
     roughness: 0.6
   })
 }
@@ -1081,7 +1115,7 @@ export function paintPad(entity: Entity, pad: Pad) {
         // every slab to contrast against; without it the emissive simply
         // washed the fill to white and the safe-colour reading went with it.
         emissiveColor: sectionAccent(pad.section),
-        emissiveIntensity: 0.32,
+        emissiveIntensity: PAD_EMISSIVE.safe,
         metallic: 0,
         roughness: 0.75
       })

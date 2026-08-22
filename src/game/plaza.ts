@@ -31,6 +31,7 @@ import {
   START_PAD_Z,
   BOARD_SIZE,
   BOARD_FORWARD,
+  FOREST,
   MAX_PAD_HEIGHT,
   RANKING_SIZE,
   REACH_ABILITY,
@@ -223,9 +224,9 @@ function createLobby() {
   MeshRenderer.setBox(deck)
   MeshCollider.setBox(deck)
   Material.setPbrMaterial(deck, {
-    // Was 0.12 - a black plate under a lit tower, which is what made the yard
-    // look like a hole rather than a floor people stand on.
-    albedoColor: Color4.create(0.34, 0.36, 0.42, 1),
+    // Mown short at the start line: the deck is a lighter, tidier patch of
+    // the same clearing rather than a slab dropped onto it.
+    albedoColor: Color4.create(0.55, 0.6, 0.46, 1),
     metallic: 0.1,
     roughness: 0.5
   })
@@ -535,7 +536,9 @@ function createGround() {
   // pale slabs something to sit against.
   Material.setPbrMaterial(ground, {
     texture: Material.Texture.Common({ src: 'images/textures/ground.png' }),
-    albedoColor: Color4.create(0.5, 0.49, 0.46, 1),
+    // The clearing floor. Grass from the forest ramp, inside the 20%
+    // saturation rule like every other decorative surface.
+    albedoColor: Color4.fromHexString(FOREST.grass),
     metallic: 0.05,
     roughness: 0.95
   })

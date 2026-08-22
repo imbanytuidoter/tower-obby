@@ -72,7 +72,6 @@ const uiRoot = () => (
     {!run.serverAlive && wakingBanner()}
     {run.announcement !== '' && announcementBanner()}
     {run.prompt !== '' && promptBanner()}
-    {run.phase === Phase.Ready && readyPanel()}
     {(run.phase === Phase.RoundDone || run.phase === Phase.AllDone) && clearedPanel()}
   </UiEntity>
 )
@@ -120,7 +119,6 @@ const hud = () => {
         flexDirection: 'column',
         padding: compact ? 14 : 18
       }}
-      uiBackground={{ color: PANEL }}
     >
       <Label
         value={
@@ -177,7 +175,6 @@ const rankingPanel = () => {
         flexDirection: 'column',
         padding: compact ? 14 : 16
       }}
-      uiBackground={{ color: PANEL }}
     >
       <Label
         value={run.climbers > 1 ? 'HIGHEST NOW   ' + run.climbers + ' CLIMBING' : 'HIGHEST NOW'}
@@ -217,7 +214,6 @@ const wakingBanner = () => {
     >
       <UiEntity
         uiTransform={{ height: 80, minWidth: 520, alignItems: 'center', justifyContent: 'center', padding: 22 }}
-        uiBackground={{ color: PANEL }}
       >
         <Label value="Waking the server up..." fontSize={s.banner} color={GOLD} />
       </UiEntity>
@@ -264,7 +260,10 @@ const promptBanner = () => {
         positionType: 'absolute',
         width: '100%',
         height: 90,
-        position: { bottom: compact ? 210 : 170 },
+        // Low enough to clear the gate's own signage. A HUD line and a 3D
+        // label are drawn by different systems and neither knows about the
+        // other, so the only thing keeping them apart is where they are put.
+        position: { bottom: compact ? 150 : 96 },
         alignItems: 'center',
         justifyContent: 'center'
       }}
@@ -277,7 +276,6 @@ const promptBanner = () => {
           justifyContent: 'center',
           padding: { left: 32, right: 32 }
         }}
-        uiBackground={{ color: PANEL }}
       >
         <Label value={run.prompt} fontSize={s.banner} color={GOLD} />
       </UiEntity>
@@ -290,43 +288,6 @@ const promptBanner = () => {
  * START, the board shows the times, and a wall of text on a small screen is
  * the fastest way to lose someone in the first ten seconds.
  */
-const readyPanel = () => {
-  const s = style()
-
-  return (
-    <UiEntity
-      uiTransform={{
-        positionType: 'absolute',
-        // Centre on a phone: this is a dialog to read, and the documented
-        // place for those is the middle of the screen. It used to sit bottom
-        // left, under the joystick.
-        position: compact ? { top: '28%', left: '50%' } : { top: 150, right: 40 },
-        margin: compact ? { left: -280 } : {},
-        width: compact ? 560 : 520,
-        flexDirection: 'column',
-        padding: compact ? 18 : 24
-      }}
-      uiBackground={{ color: PANEL }}
-    >
-      <Label value="CLIMB THE TOWER" fontSize={s.title * 0.6} color={NEON} textAlign="middle-left" />
-      <Label
-        value={
-          compact
-            ? '\nWalk through the START gate.\nCyan rings save your progress.\nRed hurts. Orange crumbles.'
-            : '\nWalk through the START gate to begin.\n\n' +
-              'Cyan rings save your progress.\n' +
-              'Red beams and bars knock you back.\n' +
-              'Orange pads crumble under you.\n' +
-              'Double jump and glide are yours - the gaps assume it.'
-        }
-        fontSize={s.body}
-        color={Color4.White()}
-        textAlign="middle-left"
-      />
-    </UiEntity>
-  )
-}
-
 /** Shown after a finish, until the server rolls everyone into the next round. */
 const clearedPanel = () => {
   const s = style()
