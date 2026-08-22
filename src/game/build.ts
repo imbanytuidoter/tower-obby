@@ -129,6 +129,23 @@ export const SAFE_FILL = Color4.fromHexString('#4EE3F2FF')
 export const CHOICE_EDGE = Color4.fromHexString('#CFC6FFFF')
 export const CHOICE_EDGE_3 = Color3.create(0.81, 0.78, 1)
 
+/**
+ * Surfaces, generated rather than downloaded.
+ *
+ * Textures measured at 1 of the 47 the scene is allowed, which is the honest
+ * reason the tower read as a greybox: every face in the game was one flat
+ * colour. These three are drawn procedurally into images/textures - a poured
+ * slab for the ground, vertical panelling for the core, a brushed finish for
+ * the platforms - so nothing is licensed from anywhere and they cost three
+ * texture slots between them however many meshes use them.
+ *
+ * albedoColor multiplies the texture, so the colour vocabulary survives: a
+ * safe pad is still cyan, it now has a surface as well.
+ */
+const GROUND_TEXTURE = 'images/textures/ground.png'
+const CORE_TEXTURE = 'images/textures/core.png'
+const SLAB_TEXTURE = 'images/textures/slab.png'
+
 const HAZARD_ALBEDO = Color4.fromHexString('#FF3B4DFF')
 const HAZARD_EMISSIVE = Color3.create(1, 0.12, 0.16)
 const CRUMBLE_ALBEDO = Color4.fromHexString('#FF9D2EFF')
@@ -784,6 +801,7 @@ function createSpine(height: number, accent: Color3): Entity[] {
   // Dark enough to sit behind the platforms, light enough not to punch a
   // black hole in a bright sky - which is exactly what 0.16 did.
   Material.setPbrMaterial(core, {
+    texture: Material.Texture.Common({ src: CORE_TEXTURE }),
     albedoColor: Color4.create(0.63, 0.6, 0.55, 1),
     metallic: 0.1,
     roughness: 0.8
@@ -938,6 +956,7 @@ export function paintPad(entity: Entity, pad: Pad) {
       // leaving the zone colour legible from the ground.
       const haze = quantise(pad.y, HAZE_STEPS) * 0.1
       Material.setPbrMaterial(entity, {
+        texture: Material.Texture.Common({ src: SLAB_TEXTURE }),
         albedoColor: Color4.create(
           base.r + (0.82 - base.r) * haze,
           base.g + (0.8 - base.g) * haze,

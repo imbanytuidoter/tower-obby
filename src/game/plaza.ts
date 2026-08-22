@@ -526,6 +526,7 @@ function createGround() {
   // the whole scene look unlit. A mid slate reads as a floor, and gives the
   // pale slabs something to sit against.
   Material.setPbrMaterial(ground, {
+    texture: Material.Texture.Common({ src: 'images/textures/ground.png' }),
     albedoColor: Color4.create(0.5, 0.49, 0.46, 1),
     metallic: 0.05,
     roughness: 0.95
