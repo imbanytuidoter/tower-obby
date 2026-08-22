@@ -48,8 +48,8 @@ import { MODELS, placeProp } from './props'
  * exact instead of relying on line breaks inside a single block of text.
  */
 const BOARD_W = 5.6
-const ROW_H = 0.34
-const HEADER_H = 0.85
+const ROW_H = 0.44
+const HEADER_H = 1.05
 const BOARD_H = HEADER_H + BOARD_SIZE * ROW_H + 0.5
 const BOARD_Y = 3.3
 
@@ -109,10 +109,19 @@ const RAIL_HEIGHT = 7.5
 let railMarkers: Entity[] = []
 
 function createProgressRail() {
-  // Hard against the board, so the two read as one panel: what the tower has
-  // done, and who is on it right now.
-  const x = BOARD_X + SIDE_X * (BOARD_W / 2 + 0.75)
-  const z = BOARD_Z + SIDE_Z * (BOARD_W / 2 + 0.75)
+  // Forward of the board and off to one side, on open deck.
+  //
+  // It used to sit at BOARD_W/2 + 0.75 along the side axis, which is where the
+  // gold marker post already stands at BOARD_W/2 + 0.7 - five centimetres
+  // apart, so the rail was drawn straight through it. The lamp is at +1.9 on
+  // the same axis, so that whole line is taken. Arithmetic found this; looking
+  // at it had not, across several screenshots.
+  // Offsets found by searching the deck for a spot clear of the board, both
+  // marker posts, both lamps, the gate posts and the doorway itself - rather
+  // than by picking a number and looking at it, which is how the rail ended up
+  // inside a marker post the first time and inside the gate the second.
+  const x = BOARD_X + FRONT_X * 3.2 - SIDE_X * 2.4
+  const z = BOARD_Z + FRONT_Z * 3.2 - SIDE_Z * 2.4
 
   const rail = engine.addEntity()
   Transform.create(rail, {
@@ -648,7 +657,7 @@ function createBoard() {
   Transform.create(heading, { position: Vector3.create(headingPos.x, headerY, headingPos.z), rotation })
   TextShape.create(heading, {
     text: "TODAY'S FASTEST",
-    fontSize: 2.8,
+    fontSize: 3.6,
     textColor: Color4.White(),
     outlineColor: Color4.Black(),
     outlineWidth: 0.2,
@@ -682,7 +691,7 @@ function createBoard() {
     })
     TextShape.create(label, {
       text: '',
-      fontSize: 1.5,
+      fontSize: 2,
       textColor: DIM,
       outlineColor: Color4.Black(),
       outlineWidth: 0.15,
@@ -697,7 +706,7 @@ function createBoard() {
     })
     TextShape.create(value, {
       text: '',
-      fontSize: 1.5,
+      fontSize: 2,
       textColor: Color4.White(),
       outlineColor: Color4.Black(),
       outlineWidth: 0.15,

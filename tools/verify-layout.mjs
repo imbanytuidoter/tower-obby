@@ -211,6 +211,38 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   )
 }
 
+// Lobby furniture. Everything in the yard is hand-placed from constants, which
+// is exactly where things end up inside each other: the progress rail was put
+// at BOARD_W/2 + 0.75 along the side axis, five centimetres from a marker post
+// already standing at +0.7, and several screenshots did not reveal it.
+{
+  const sx = -cfg.GATE_DIR_Z, sz = cfg.GATE_DIR_X
+  const BX = cfg.LOBBY_X + cfg.GATE_DIR_X * cfg.BOARD_FORWARD + sx * cfg.BOARD_LATERAL
+  const BZ = cfg.LOBBY_Z + cfg.GATE_DIR_Z * cfg.BOARD_FORWARD + sz * cfg.BOARD_LATERAL
+  const yaw = Math.atan2(-(cfg.LOBBY_SPAWN_X - BX), -(cfg.LOBBY_SPAWN_Z - BZ))
+  const FX = -Math.sin(yaw), FZ = -Math.cos(yaw)
+  const SX = Math.cos(yaw), SZ = -Math.sin(yaw)
+  const W = 5.6
+
+  const items = [{ n: 'board', x: BX, z: BZ, r: W / 2 }]
+  for (const d of [-1, 1]) {
+    items.push({ n: `marker${d}`, x: BX + SX * d * (W / 2 + 0.7), z: BZ + SZ * d * (W / 2 + 0.7), r: 0.3 })
+    items.push({ n: `lamp${d}`, x: BX + SX * d * (W / 2 + 1.9), z: BZ + SZ * d * (W / 2 + 1.9), r: 0.7 })
+    items.push({ n: `post${d}`, x: cfg.GATE_X + sx * d * cfg.GATE_WIDTH / 2, z: cfg.GATE_Z + sz * d * cfg.GATE_WIDTH / 2, r: 0.9 })
+  }
+  items.push({ n: 'rail', x: BX + FX * 3.2 - SX * 2.4, z: BZ + FZ * 3.2 - SZ * 2.4, r: 0.5 })
+
+  const clashes = []
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const a = items[i], b = items[j]
+      const gap = Math.hypot(a.x - b.x, a.z - b.z) - a.r - b.r
+      if (gap < 0) clashes.push(`${a.n}/${b.n} ${gap.toFixed(2)}m`)
+    }
+  }
+  note(clashes.length === 0, 'lobby furniture stands clear', clashes.length ? clashes.slice(0, 3).join(', ') : `${items.length} objects`)
+}
+
 // The first ten seconds. A player arriving alone must see the gate they have
 // to walk through AND the board that tells them why - without turning round.
 // The board used to sit exactly 180 degrees behind the spawn.

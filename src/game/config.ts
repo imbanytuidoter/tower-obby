@@ -161,7 +161,7 @@ export const START_PAD_Z = CENTER_Z + Math.sin(startAngle) * START_RADIUS
  */
 export const LOBBY_X = START_PAD_X + Math.cos(startAngle) * 10
 export const LOBBY_Z = START_PAD_Z + Math.sin(startAngle) * 10
-export const LOBBY_SIZE = 16
+export const LOBBY_SIZE = 24
 export const LOBBY_Y = 0.4
 
 /** The start gate straddles the line between the lobby and the first pad. */
@@ -190,9 +190,9 @@ export const LOBBY_SPAWN_X = LOBBY_X - GATE_DIR_X * LOBBY_SPAWN_BACK
 export const LOBBY_SPAWN_Z = LOBBY_Z - GATE_DIR_Z * LOBBY_SPAWN_BACK
 
 /** Board placement, relative to the lobby centre, in gate-space. */
-export const BOARD_FORWARD = 5
-export const BOARD_LATERAL = 6
-export const GATE_WIDTH = 9
+export const BOARD_FORWARD = 6.6
+export const BOARD_LATERAL = 9.6
+export const GATE_WIDTH = 6
 
 /** How close the player must be for an approach prompt to appear. */
 export const PROMPT_RANGE = 11
