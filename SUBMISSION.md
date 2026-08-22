@@ -52,9 +52,14 @@ eye to every next target and every other slab is tested as a box along it:
 119 of 119 clear. On a six-inch screen a target you cannot see is a target you
 cannot plan for.
 
-**No dynamic lights and no particles**, because neither renders on mobile — the
-leaderboard is lit with emissive geometry so the phone and the desktop see the
-same place.
+**Built against the documented mobile gaps, not around them.** No dynamic
+lights and no particles, because neither renders on mobile — the leaderboard is
+lit with emissive geometry so the phone and the desktop see the same place. The
+UI is rendered with `screenInset: 'interactable'` on phones only, so it sits in
+the rectangle the client leaves free of its own joystick, chat and profile
+column. And every surface a climber lands on uses a box collider, because
+collider-shape consistency between the mobile and desktop clients is an open
+item in Decentraland's own tracker and a box is the shape both agree on.
 
 Measured in a running client: **689 entities of 5,000. 44,468 triangles of
 250,000. One texture of 47. 30 fps with zero hiccup frames.**

@@ -607,17 +607,25 @@ function reachForCoin(dt: number, player: Vector3) {
 }
 
 /**
- * Button 1 spends the token: it lifts the player to the checkpoint the coin
- * paid for, skipping what is between.
+ * E spends the token: it lifts the player to the checkpoint the coin paid
+ * for, skipping what is between.
  *
  * There is no legend and no tutorial for this. The button does nothing until
  * a token is held and the prompt appears the moment one is - the control
- * teaches itself by going live, which is the only way to teach a button set
- * on a phone without spending a HUD line on it.
+ * teaches itself by going live, which is the only way to teach a button on a
+ * phone without spending one of four HUD lines on it.
  */
 function spendToken() {
   if (run.token <= 0 || !world) return
-  if (!inputSystem.isTriggered(InputAction.IA_ACTION_3, PointerEventType.PET_DOWN)) return
+  // E, not 1.
+  //
+  // The design pass put this on button 1, but Decentraland's own mobile
+  // guidance says not to: IA_ACTION_3 to IA_ACTION_6 sit behind a secondary
+  // menu on the phone HUD and are "not easily reachable during gameplay".
+  // IA_PRIMARY is the E button, always on screen, and this is the only thing
+  // in the game bound to it - so the control still teaches itself by lighting
+  // up when a token is held and doing nothing otherwise.
+  if (!inputSystem.isTriggered(InputAction.IA_PRIMARY, PointerEventType.PET_DOWN)) return
 
   const index = Math.min(run.tokenSkipsTo, world.checkpoints.length - 1)
   const target = world.checkpoints[index]
@@ -697,7 +705,7 @@ function updatePrompt(player: Vector3) {
       const index = Math.min(run.tokenSkipsTo, world.checkpoints.length - 1)
       run.prompt =
         index > run.checkpoint
-          ? 'PRESS 1 TO SPEND THE COIN AND SKIP AHEAD'
+          ? 'PRESS E TO SPEND THE COIN AND SKIP AHEAD'
           : 'YOU CLIMBED PAST WHAT THE COIN BUYS'
       return
     }

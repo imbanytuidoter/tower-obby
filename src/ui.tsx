@@ -21,9 +21,20 @@ export function setupUi(next: Handlers) {
 
   // The mobile client's own canvas is 1600x720; matching it keeps these pixel
   // values meaning the same thing on both platforms.
+  //
+  // screenInset 'interactable' asks the client for the area it has left free
+  // of its OWN controls, and on a phone that means the whole left-hand column
+  // - chat, profile, joystick, emotes - is excluded. The HUD used to sit at
+  // top-left, which is exactly that column: on a handset it would have been
+  // drawn underneath the client's furniture, competing for the same taps.
+  //
+  // Only on mobile. The docs are explicit that this is not a no-op on desktop
+  // - the desktop client reserves roughly the left 25% - so applying it there
+  // would move a layout that is already correct.
   ReactEcsRenderer.setUiRenderer(uiRoot, {
     virtualWidth: compact ? 1600 : 1920,
-    virtualHeight: compact ? 720 : 1080
+    virtualHeight: compact ? 720 : 1080,
+    screenInset: compact ? 'interactable' : 'device'
   })
 }
 
@@ -97,7 +108,14 @@ const hud = () => {
     <UiEntity
       uiTransform={{
         positionType: 'absolute',
-        position: { top: s.edge, left: s.edge },
+        // Top-centre on a phone. "Top-center - non-actionable messages, status
+        // and notifications" is the documented home for exactly this, and it
+        // keeps the clock away from both the left-hand controls and the
+        // top-right corner that reads as the client's own HUD.
+        position: compact
+          ? { top: s.edge, left: '50%' }
+          : { top: s.edge, left: s.edge },
+        margin: compact ? { left: -(s.hudWidth / 2) } : {},
         width: s.hudWidth,
         flexDirection: 'column',
         padding: compact ? 14 : 18
@@ -276,7 +294,11 @@ const readyPanel = () => {
     <UiEntity
       uiTransform={{
         positionType: 'absolute',
-        position: compact ? { bottom: s.edge, left: s.edge } : { top: 150, right: 40 },
+        // Centre on a phone: this is a dialog to read, and the documented
+        // place for those is the middle of the screen. It used to sit bottom
+        // left, under the joystick.
+        position: compact ? { top: '28%', left: '50%' } : { top: 150, right: 40 },
+        margin: compact ? { left: -280 } : {},
         width: compact ? 560 : 520,
         flexDirection: 'column',
         padding: compact ? 18 : 24

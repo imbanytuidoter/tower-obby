@@ -239,8 +239,19 @@ export function buildWorld(layout: Layout): World {
       scale: Vector3.create(pad.size, 0.75, pad.size)
     })
     if (isLandmark(pad)) {
+      // Round to look at, square to stand on.
+      //
+      // Decentraland's own docs list "Colliders Shape Consistency Review vs
+      // Unity" as an open gap between the desktop and mobile clients, and
+      // these are the checkpoints and the crown - the pads it matters most to
+      // land on. A box is the shape with no ambiguity between the two.
+      //
+      // The trade is a corner of each landmark that is solid without looking
+      // it. That is the right way round: on a parkour tower, falling through
+      // something that looks solid is a far worse failure than an invisible
+      // ledge, and both clients agree about a box.
       MeshRenderer.setCylinder(entity)
-      MeshCollider.setCylinder(entity)
+      MeshCollider.setBox(entity)
     } else {
       MeshRenderer.setBox(entity)
       MeshCollider.setBox(entity)
@@ -438,7 +449,9 @@ function buildPlate(layout: Layout, entities: Entity[]): BuiltPlate | null {
     scale: Vector3.create(def.size, 0.6, def.size)
   })
   MeshRenderer.setCylinder(entity, 0.5, 0.5)
-  MeshCollider.setCylinder(entity)
+  // Box, for the same reason the landmarks are: this one carries two people
+  // twelve metres and neither of them should fall through it on a phone.
+  MeshCollider.setBox(entity)
   Material.setPbrMaterial(entity, {
     albedoColor: SAFE_FILL,
     emissiveColor: CHOICE_EDGE_3,
@@ -612,7 +625,7 @@ function createPressurePad(at: { x: number; y: number; z: number }, entities: En
     scale: Vector3.create(PAD_RADIUS * 2, 0.2, PAD_RADIUS * 2)
   })
   MeshRenderer.setCylinder(pad)
-  MeshCollider.setCylinder(pad)
+  MeshCollider.setBox(pad)
   paintPressurePad(pad, false)
 
   // CL_PLAYER, not CL_MAIN_PLAYER: the point is seeing that somebody ELSE is
