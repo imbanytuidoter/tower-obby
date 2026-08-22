@@ -1,4 +1,6 @@
 import {
+  BACKDROP_RADIUS,
+  BANDS,
   CENTER_X,
   CENTER_Z,
   CHECKPOINT_EVERY_SECTIONS,
@@ -1159,4 +1161,53 @@ function push(
     section,
     fromIndex
   })
+}
+
+export type BandPanel = {
+  x: number
+  z: number
+  y: number
+  /** Yaw in degrees. Local +Z must lie on the tangent, never on the radius. */
+  yaw: number
+  height: number
+  length: number
+  thickness: number
+  backdrop: string
+}
+
+/** How many panels make up one band ring. */
+export const BACKDROP_PANELS = 14
+
+/** Panels overlap their neighbours by this much so the ring has no seams. */
+const PANEL_OVERLAP = 1.2
+
+/**
+ * The backdrop ring, as pure numbers.
+ *
+ * This lives here rather than in build.ts for one reason: it was wrong for two
+ * commits and nothing could tell. A yaw of -angle + 90 turned every panel from
+ * a piece of wall into a spoke pointing out of the tower, and the only witness
+ * was a screenshot. Numbers can be asserted; a screenshot cannot.
+ */
+export function backdropRing(): BandPanel[] {
+  const panels: BandPanel[] = []
+  const length = (BACKDROP_RADIUS * 2 * Math.PI) / BACKDROP_PANELS + PANEL_OVERLAP
+
+  for (const band of BANDS) {
+    const height = band.high - band.low
+    for (let i = 0; i < BACKDROP_PANELS; i++) {
+      const angle = (i / BACKDROP_PANELS) * Math.PI * 2
+      panels.push({
+        x: CENTER_X + Math.cos(angle) * BACKDROP_RADIUS,
+        z: CENTER_Z + Math.sin(angle) * BACKDROP_RADIUS,
+        y: band.low + height / 2,
+        yaw: (-angle * 180) / Math.PI,
+        height,
+        length,
+        thickness: 0.4,
+        backdrop: band.backdrop
+      })
+    }
+  }
+  return panels
 }

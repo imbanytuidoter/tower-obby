@@ -14,7 +14,6 @@ import { Color3, Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 import { CLIPS, MODELS, placeProp } from './props'
 import { ColliderLayer, TriggerArea, triggerAreaEventsSystem } from '@dcl/sdk/ecs'
 import {
-  BACKDROP_RADIUS,
   BANDS,
   CENTER_X,
   CENTER_Z,
@@ -27,7 +26,7 @@ import {
   HAZARD_THICKNESS,
   PAD_RADIUS
 } from './config'
-import { Layout, MoverDef, Pad, SpinnerDef } from './layout'
+import { backdropRing, Layout, MoverDef, Pad, SpinnerDef } from './layout'
 
 export type BuiltPad = {
   entity: Entity
@@ -896,38 +895,30 @@ function createStrut(pad: Pad, index: number): Entity {
  * and it is why the crown is the darkest band rather than the brightest.
  */
 function createBands(entities: Entity[]) {
-  const PANELS = 14
+  // Geometry comes from layout.ts so it can be asserted in Node. Everything
+  // below is material work only - no angles are computed here any more.
+  for (const panel of backdropRing()) {
+    const colour = Color4.fromHexString(panel.backdrop)
 
-  for (const band of BANDS) {
-    const height = band.high - band.low
-    const colour = Color4.fromHexString(band.backdrop)
-
-    for (let i = 0; i < PANELS; i++) {
-      const angle = (i / PANELS) * Math.PI * 2
-      const x = CENTER_X + Math.cos(angle) * BACKDROP_RADIUS
-      const z = CENTER_Z + Math.sin(angle) * BACKDROP_RADIUS
-
-      const panel = engine.addEntity()
-      entities.push(panel)
-      Transform.create(panel, {
-        position: Vector3.create(x, band.low + height / 2, z),
-        // Faces the tower. A panel showing its back to the climb is a hole.
-        rotation: Quaternion.fromEulerDegrees(0, (-angle * 180) / Math.PI + 90, 0),
-        scale: Vector3.create(0.4, height, (BACKDROP_RADIUS * 2 * Math.PI) / PANELS + 1.2)
-      })
-      MeshRenderer.setBox(panel)
-      // Self-lit at low intensity. A vertical panel facing inward catches no
-      // sky, so an unlit one renders black and the band reads as a hole
-      // rather than as distance. The emissive is the band colour itself, so
-      // it holds its exact value instead of whatever the sun leaves it.
-      Material.setPbrMaterial(panel, {
-        albedoColor: colour,
-        emissiveColor: Color3.create(colour.r, colour.g, colour.b),
-        emissiveIntensity: 0.85,
-        roughness: 1,
-        metallic: 0
-      })
-    }
+    const entity = engine.addEntity()
+    entities.push(entity)
+    Transform.create(entity, {
+      position: Vector3.create(panel.x, panel.y, panel.z),
+      rotation: Quaternion.fromEulerDegrees(0, panel.yaw, 0),
+      scale: Vector3.create(panel.thickness, panel.height, panel.length)
+    })
+    MeshRenderer.setBox(entity)
+    // Self-lit at low intensity. A vertical panel facing inward catches no
+    // sky, so an unlit one renders black and the band reads as a hole
+    // rather than as distance. The emissive is the band colour itself, so
+    // it holds its exact value instead of whatever the sun leaves it.
+    Material.setPbrMaterial(entity, {
+      albedoColor: colour,
+      emissiveColor: Color3.create(colour.r, colour.g, colour.b),
+      emissiveIntensity: 0.85,
+      roughness: 1,
+      metallic: 0
+    })
   }
 }
 

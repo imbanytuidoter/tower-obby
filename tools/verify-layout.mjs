@@ -23,7 +23,7 @@ execSync(
 )
 // CommonJS output so Node resolves the extensionless relative imports tsc emits.
 const req = createRequire(join(out, 'x.cjs'))
-const { buildTower } = req(join(out, 'layout.js'))
+const { buildTower, backdropRing, BACKDROP_PANELS } = req(join(out, 'layout.js'))
 const cfg = req(join(out, 'config.js'))
 
 // --- the brief's budget, not the engine's ceiling ---------------------------
@@ -276,6 +276,57 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   note(angle <= 55, 'board visible on arrival', `${angle.toFixed(0)} deg off the gaze, ${dist.toFixed(1)} m away`)
   // And it must not stand in the doorway it is advertising.
   note(cfg.BOARD_LATERAL > cfg.GATE_WIDTH / 2 + 1, 'board clear of the gate opening', `${cfg.BOARD_LATERAL} m aside of a ${cfg.GATE_WIDTH} m gate`)
+}
+
+// The backdrop is a wall, not a set of spikes.
+//
+// This check exists because the ring shipped rotated 90 degrees for two
+// commits: every panel's long axis pointed along the radius instead of along
+// the tangent, so fourteen 16 m boxes per band stabbed straight out of the
+// tower and filled the screen. Nothing caught it - the pads were all still
+// legal, the material count was fine, and the only witness was a screenshot.
+// Two numbers settle it: the long axis must be perpendicular to the radius,
+// and consecutive panels must actually touch.
+{
+  const panels = backdropRing()
+  let worstDot = 0
+  let worstGap = 0
+
+  for (const p of panels) {
+    const rx = p.x - cfg.CENTER_X
+    const rz = p.z - cfg.CENTER_Z
+    const rlen = Math.hypot(rx, rz)
+    const phi = (p.yaw * Math.PI) / 180
+    // Local +Z after a yaw of phi points at (sin phi, cos phi) in world x/z.
+    const dot = Math.abs((Math.sin(phi) * rx + Math.cos(phi) * rz) / rlen)
+    worstDot = Math.max(worstDot, dot)
+  }
+  note(worstDot < 0.02, 'backdrop panels lie along the ring',
+    'worst |axis . radius| ' + worstDot.toFixed(4) + ' (1.0 = a spoke)')
+
+  // Each panel must cover more than its own share of the circle, or the ring
+  // is a picket fence and the climb shows sky between the slats. Measured as
+  // an angle from the centre, not as a distance between ends: the panels are
+  // straight chords laid on tangents, so their corners never touch even when
+  // they overlap properly - end-to-end distance would fail a correct ring.
+  const halfSector = Math.PI / BACKDROP_PANELS
+  const halfCovered = Math.atan((panels[0].length / 2) / cfg.BACKDROP_RADIUS)
+  const margin = ((halfCovered - halfSector) * 180) / Math.PI
+  note(margin > 0, 'backdrop closes into a ring',
+    'each panel covers ' + ((halfCovered * 360) / Math.PI).toFixed(1) +
+    ' deg of a ' + ((halfSector * 360) / Math.PI).toFixed(1) + ' deg slot')
+
+  // And it must stand outside the climb, not through it.
+  let nearest = Infinity
+  for (const p of panels) {
+    for (const s of [-1, 1]) {
+      const ex = p.x + Math.sin((p.yaw * Math.PI) / 180) * s * (p.length / 2)
+      const ez = p.z + Math.cos((p.yaw * Math.PI) / 180) * s * (p.length / 2)
+      nearest = Math.min(nearest, Math.hypot(ex - cfg.CENTER_X, ez - cfg.CENTER_Z))
+    }
+  }
+  note(nearest > cfg.SHAFT_MAX_RADIUS + 4, 'backdrop stands clear of the climb',
+    'nearest panel corner ' + nearest.toFixed(1) + ' m, pads reach ' + cfg.SHAFT_MAX_RADIUS + ' m')
 }
 
 // Determinism: every client builds the tower locally, so the same round must

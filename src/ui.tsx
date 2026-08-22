@@ -15,6 +15,9 @@ let handlers: Handlers = { next: () => {}, retry: () => {}, restart: () => {} }
  */
 let compact = false
 
+/** Height of the client's own place-name card, top-left, in virtual units. */
+const PLACE_CARD_CLEARANCE = 120
+
 export function setupUi(next: Handlers) {
   handlers = next
   compact = isMobile()
@@ -111,9 +114,13 @@ const hud = () => {
         // and notifications" is the documented home for exactly this, and it
         // keeps the clock away from both the left-hand controls and the
         // top-right corner that reads as the client's own HUD.
+        // On desktop the client parks its own place-name card in the top-left
+        // corner, and our first line rendered straight under it. The client
+        // overlay is not part of our canvas and screenInset does not reserve
+        // it, so the only thing that separates the two is this offset.
         position: compact
           ? { top: s.edge, left: '50%' }
-          : { top: s.edge, left: s.edge },
+          : { top: PLACE_CARD_CLEARANCE, left: s.edge },
         margin: compact ? { left: -(s.hudWidth / 2) } : {},
         width: s.hudWidth,
         flexDirection: 'column',
