@@ -188,7 +188,7 @@ function sectionBody(section: number): Color4 {
   const t = zoneRamp(section)
   // Azure at the base through green-cyan at the crown. Still unmistakably
   // "safe" at both ends.
-  const c = hsl(SAFE_HUE + SAFE_HUE_SWING - t * (SAFE_HUE_SWING * 2), 0.72, 0.6 - t * 0.06)
+  const c = hsl(SAFE_HUE + SAFE_HUE_SWING - t * (SAFE_HUE_SWING * 2), 0.8, 0.5 - t * 0.05)
   return Color4.create(c.r, c.g, c.b, 1)
 }
 
@@ -236,7 +236,7 @@ export function buildWorld(layout: Layout): World {
 
     Transform.create(entity, {
       position: Vector3.create(pad.x, pad.y, pad.z),
-      scale: Vector3.create(pad.size, 0.75, pad.size)
+      scale: Vector3.create(pad.size, 1, pad.size)
     })
     if (isLandmark(pad)) {
       // Round to look at, square to stand on.
@@ -258,9 +258,17 @@ export function buildWorld(layout: Layout): World {
     }
     paintPad(entity, pad)
 
-    const glow = createGlow(pad)
-    entities.push(glow)
-    entities.push(createStrut(pad, padIndex))
+    // One mesh per pad, plus its ground shadow. The glow slab and the plinth
+    // used to be separate entities under every slab - 240 more meshes, and
+    // the mobile client counts ONE MATERIAL PER MESH against a hard limit of
+    // 500 that blocks the scene from loading. At 120 pads that decoration
+    // alone was most of the budget.
+    //
+    // Neither is missed. The glow predates the pad carrying its own emissive
+    // edge, which it now does. The plinth gave the slab mass, and a thicker
+    // slab gives the same read: the top face is lit by the sky and the sides
+    // are not, so a single box is still two-tone in practice.
+    const glow = entity
     entities.push(createGroundShadow(pad))
 
     const top = Vector3.create(pad.x, pad.y + PAD_TOP, pad.z)
@@ -954,8 +962,11 @@ export function paintPad(entity: Entity, pad: Pad) {
         // The top face points at a bright sky, which bleaches it - and the
         // top face is the one a climber actually looks at. A little self-lit
         // colour holds the "safe" reading from directly above.
+        // Down from 1.05. That level was set when a dark plinth sat under
+        // every slab to contrast against; without it the emissive simply
+        // washed the fill to white and the safe-colour reading went with it.
         emissiveColor: sectionAccent(pad.section),
-        emissiveIntensity: 1.05,
+        emissiveIntensity: 0.32,
         metallic: 0,
         roughness: 0.75
       })

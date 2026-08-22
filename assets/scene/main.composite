@@ -452,18 +452,123 @@
       "data": {
         "0": {
           "json": {
-            "name": "New Scene",
-            "description": "Empty Scene Template",
-            "thumbnail": "",
-            "categories": [],
-            "author": "SDK",
+            "name": "Tower Obby",
+            "description": "Ten procedural parkour towers with a leaderboard.",
+            "thumbnail": "images/scene-thumbnail.png",
+            "categories": [
+              "game"
+            ],
+            "author": "Serhii Vasylevskyi",
             "email": "",
-            "tags": [],
+            "tags": [
+              "parkour",
+              "obby",
+              "multiplayer",
+              "mobile",
+              "competitive",
+              "friendzone"
+            ],
             "layout": {
               "parcels": [
                 {
                   "x": 0,
                   "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 1
+                },
+                {
+                  "x": 0,
+                  "y": 2
+                },
+                {
+                  "x": 0,
+                  "y": 3
+                },
+                {
+                  "x": 0,
+                  "y": 4
+                },
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 1,
+                  "y": 1
+                },
+                {
+                  "x": 1,
+                  "y": 2
+                },
+                {
+                  "x": 1,
+                  "y": 3
+                },
+                {
+                  "x": 1,
+                  "y": 4
+                },
+                {
+                  "x": 2,
+                  "y": 0
+                },
+                {
+                  "x": 2,
+                  "y": 1
+                },
+                {
+                  "x": 2,
+                  "y": 2
+                },
+                {
+                  "x": 2,
+                  "y": 3
+                },
+                {
+                  "x": 2,
+                  "y": 4
+                },
+                {
+                  "x": 3,
+                  "y": 0
+                },
+                {
+                  "x": 3,
+                  "y": 1
+                },
+                {
+                  "x": 3,
+                  "y": 2
+                },
+                {
+                  "x": 3,
+                  "y": 3
+                },
+                {
+                  "x": 3,
+                  "y": 4
+                },
+                {
+                  "x": 4,
+                  "y": 0
+                },
+                {
+                  "x": 4,
+                  "y": 1
+                },
+                {
+                  "x": 4,
+                  "y": 2
+                },
+                {
+                  "x": 4,
+                  "y": 3
+                },
+                {
+                  "x": 4,
+                  "y": 4
                 }
               ],
               "base": {
@@ -475,42 +580,44 @@
             "disablePortableExperiences": false,
             "spawnPoints": [
               {
-                "name": "SpawnArea1",
+                "name": "Lobby",
                 "default": true,
                 "position": {
                   "x": {
                     "$case": "range",
                     "value": [
-                      0,
-                      3
+                      26,
+                      29
                     ]
                   },
                   "y": {
                     "$case": "range",
                     "value": [
-                      0,
-                      0
+                      1,
+                      1
                     ]
                   },
                   "z": {
                     "$case": "range",
                     "value": [
-                      0,
-                      3
+                      26,
+                      29
                     ]
                   }
                 },
                 "cameraTarget": {
-                  "x": 8,
-                  "y": 1,
-                  "z": 8
+                  "x": 29.1,
+                  "y": 2,
+                  "z": 29.1
                 }
               }
             ],
-            "skyboxConfig": {},
+            "skyboxConfig": {
+              "fixedTime": 64800
+            },
             "creator": "",
             "disableNearbyVoiceChat": false,
-            "hideLandscapeTerrain": false
+            "hideLandscapeTerrain": true
           }
         }
       }

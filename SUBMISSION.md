@@ -61,8 +61,25 @@ column. And every surface a climber lands on uses a box collider, because
 collider-shape consistency between the mobile and desktop clients is an open
 item in Decentraland's own tracker and a box is the shape both agree on.
 
-Measured in a running client: **689 entities of 5,000. 44,468 triangles of
-250,000. One texture of 47. 30 fps with zero hiccup frames.**
+**Measured against the mobile client's own limits**, which are not the parcel
+limits and are the ones that decide whether the scene loads at all:
+
+| metric | ours | soft | hard |
+|---|---|---|---|
+| triangles | 38,956 | 1,000,000 | 1,200,000 |
+| entities | 449 | 4,800 | 6,000 |
+| meshes | 380 | 2,400 | 3,000 |
+| **materials** | **380** | **400** | **500** |
+| textures | 1 | 400 | 500 |
+| colliders | 153 | 1,200 | 1,500 |
+| content size | 1.17 MB | 120 MB | 150 MB |
+
+Materials is the one that mattered. The mobile client counts one material per
+mesh, and reaching the hard limit blocks a scene from loading — this scene was
+at 620 and would very likely not have opened on a phone at all. The per-pad
+glow slab and plinth were 240 meshes of decoration between them; the glow
+predated the pad carrying its own emissive edge and the plinth's job is done by
+a thicker slab, since the top face is lit by the sky and the sides are not.
 
 ---
 
