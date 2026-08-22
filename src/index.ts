@@ -56,7 +56,6 @@ import {
   clearWorld,
   paintCrumbled,
   paintCrumbling,
-  paintGlow,
   paintPad,
   PAD_TOP,
   sectionAccent,
@@ -375,7 +374,7 @@ function updateCrumblingPads(dt: number, player: Vector3 | null) {
       if (standing) {
         built.state = 'falling'
         built.timer = CRUMBLE_DELAY
-        paintCrumbling(built.entity, built.glow)
+        paintCrumbling(built.entity)
       }
       continue
     }
@@ -385,13 +384,16 @@ function updateCrumblingPads(dt: number, player: Vector3 | null) {
 
     if (built.state === 'falling') {
       MeshCollider.deleteFrom(built.entity)
-      paintCrumbled(built.entity, built.glow)
+      paintCrumbled(built.entity)
       built.state = 'gone'
       built.timer = CRUMBLE_RESPAWN
     } else {
       MeshCollider.setBox(built.entity)
+      // Just the pad. paintGlow used to run after this and overwrote it -
+      // with the glow entity gone, "glow" aliased the pad itself, so a
+      // respawned crumbling slab came back painted safe-cyan instead of
+      // orange. That is the one pad where the colour has to be right.
       paintPad(built.entity, built.pad)
-      paintGlow(built.glow, sectionAccent(built.pad.section))
       built.state = 'solid'
     }
   }

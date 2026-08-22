@@ -26,7 +26,6 @@ import { Layout, MoverDef, Pad, SpinnerDef } from './layout'
 export type BuiltPad = {
   entity: Entity
   /** Thin emissive slab under the pad. Reads as an edge light. */
-  glow: Entity
   pad: Pad
   /** Crumbling floors count down once stepped on, then come back. */
   state: 'solid' | 'falling' | 'gone'
@@ -268,7 +267,6 @@ export function buildWorld(layout: Layout): World {
     // edge, which it now does. The plinth gave the slab mass, and a thicker
     // slab gives the same read: the top face is lit by the sky and the sides
     // are not, so a single box is still two-tone in practice.
-    const glow = entity
     entities.push(createGroundShadow(pad))
 
     const top = Vector3.create(pad.x, pad.y + PAD_TOP, pad.z)
@@ -305,7 +303,7 @@ export function buildWorld(layout: Layout): World {
       entities.push(...createGoal(pad, previous.x, previous.z))
     }
 
-    pads.push({ entity, glow, pad, state: 'solid', timer: 0 })
+    pads.push({ entity, pad, state: 'solid', timer: 0 })
   }
 
   entities.push(...createSpine(tallest, sectionAccent(0)))
@@ -752,19 +750,6 @@ function createStrut(pad: Pad, index: number): Entity {
   return plinth
 }
 
-/** A thin bright slab tucked under a pad, so every platform has a lit edge. */
-function createGlow(pad: Pad): Entity {
-  const glow = engine.addEntity()
-  Transform.create(glow, {
-    position: Vector3.create(pad.x, pad.y - 0.36, pad.z),
-    scale: Vector3.create(pad.size * 0.9, 0.12, pad.size * 0.9)
-  })
-  if (isLandmark(pad)) MeshRenderer.setCylinder(glow)
-  else MeshRenderer.setBox(glow)
-
-  paintGlow(glow, sectionAccent(pad.section))
-  return glow
-}
 
 /**
  * A dark mast through the middle of the tower. It gives the scattered pads a
@@ -978,34 +963,23 @@ export function paintPad(entity: Entity, pad: Pad) {
  * Flashes a crumbling pad the moment it is triggered. Without this the only
  * feedback is the floor already being gone, which reads as the game cheating.
  */
-export function paintCrumbling(entity: Entity, glow: Entity) {
+export function paintCrumbling(entity: Entity) {
   const warning = {
     albedoColor: Color4.create(1, 0.55, 0.15, 1),
     emissiveColor: Color3.create(1, 0.5, 0.05),
     emissiveIntensity: 6
   }
   Material.setPbrMaterial(entity, warning)
-  Material.setPbrMaterial(glow, warning)
 }
 
 /** Dimmed look while a crumbling pad is gone. */
-export function paintCrumbled(entity: Entity, glow: Entity) {
+export function paintCrumbled(entity: Entity) {
   const faded = {
     albedoColor: Color4.create(0.28, 0.18, 0.12, 0.3),
     emissiveColor: Color3.Black(),
     emissiveIntensity: 0
   }
   Material.setPbrMaterial(entity, faded)
-  Material.setPbrMaterial(glow, faded)
-}
-
-/** Paints a pad's edge light. Also used to restore a crumbled pad. */
-export function paintGlow(glow: Entity, accent: Color3) {
-  Material.setPbrMaterial(glow, {
-    albedoColor: Color4.create(accent.r, accent.g, accent.b, 1),
-    emissiveColor: accent,
-    emissiveIntensity: 3
-  })
 }
 
 /**
