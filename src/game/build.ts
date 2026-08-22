@@ -1005,6 +1005,14 @@ export function paintCrumbled(entity: Entity) {
  * The finish gate: posts, a lintel and a line across the pad, squared up to
  * the direction the player arrives from so they run through it, not past it.
  */
+/**
+ * THE CROWN - the same architecture as the start gate, in gold.
+ *
+ * A climb should end somewhere that looks like an ending. This was two glowing
+ * poles and a bar; it is a monument now, built from the same shapes as the
+ * threshold seventy metres below, so arriving here rhymes with setting off.
+ * Gold means goal everywhere else in the game and it means it hardest here.
+ */
 function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
   const made: Entity[] = []
 
@@ -1018,87 +1026,90 @@ function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
   const acrossZ = dirX
   const yaw = (Math.atan2(dirX, dirZ) * 180) / Math.PI
   const rotation = Quaternion.fromEulerDegrees(0, yaw, 0)
-  const width = Math.max(pad.size, 2.6)
+  const width = Math.max(pad.size, 3.2)
   const deck = pad.y + PAD_TOP
+  const half = width / 2
 
-  for (const direction of [-1, 1]) {
-    const post = engine.addEntity()
-    Transform.create(post, {
-      position: Vector3.create(
-        pad.x + acrossX * direction * (width / 2),
-        deck + 3.1,
-        pad.z + acrossZ * direction * (width / 2)
-      ),
-      scale: Vector3.create(0.45, 6.2, 0.45)
-    })
-    MeshRenderer.setCylinder(post)
-    Material.setPbrMaterial(post, {
-      albedoColor: FINISH_ALBEDO,
-      emissiveColor: FINISH_EMISSIVE,
-      emissiveIntensity: 3
-    })
-    made.push(post)
+  const STONE = Color4.create(0.6, 0.55, 0.45, 1)
+  const STONE_DARK = Color4.create(0.4, 0.36, 0.3, 1)
+
+  const at = (side: number, up: number, out = 0) =>
+    Vector3.create(
+      pad.x + acrossX * side + dirX * out,
+      deck + up,
+      pad.z + acrossZ * side + dirZ * out
+    )
+
+  const block = (position: Vector3, scale: Vector3, colour: Color4) => {
+    const e = engine.addEntity()
+    Transform.create(e, { position, rotation, scale })
+    MeshRenderer.setBox(e)
+    Material.setPbrMaterial(e, { albedoColor: colour, roughness: 0.85 })
+    made.push(e)
   }
 
-  const lintel = engine.addEntity()
-  Transform.create(lintel, {
-    position: Vector3.create(pad.x, deck + 4.6, pad.z),
-    rotation,
-    scale: Vector3.create(width + 1.6, 0.7, 0.5)
-  })
-  MeshRenderer.setBox(lintel)
-  Material.setPbrMaterial(lintel, {
-    albedoColor: FINISH_ALBEDO,
-    emissiveColor: FINISH_EMISSIVE,
-    emissiveIntensity: 4
-  })
-  made.push(lintel)
+  const gold = (position: Vector3, scale: Vector3, intensity = 3) => {
+    const e = engine.addEntity()
+    Transform.create(e, { position, rotation, scale })
+    MeshRenderer.setBox(e)
+    Material.setPbrMaterial(e, {
+      albedoColor: FINISH_ALBEDO,
+      emissiveColor: FINISH_EMISSIVE,
+      emissiveIntensity: intensity
+    })
+    made.push(e)
+  }
 
-  const line = engine.addEntity()
-  Transform.create(line, {
-    position: Vector3.create(pad.x, deck + 0.07, pad.z),
-    rotation,
-    scale: Vector3.create(width, 0.1, 0.7)
+  for (const direction of [-1, 1]) {
+    const side = direction * half
+    block(at(side, 0.3), Vector3.create(1.5, 0.6, 1.5), STONE_DARK)
+
+    const shaft = engine.addEntity()
+    Transform.create(shaft, {
+      position: at(side, 2.7),
+      rotation,
+      scale: Vector3.create(1, 4.2, 1)
+    })
+    MeshRenderer.setCylinder(shaft, 0.5, 0.32)
+    Material.setPbrMaterial(shaft, { albedoColor: STONE, roughness: 0.85 })
+    made.push(shaft)
+
+    block(at(side, 4.95), Vector3.create(1.2, 0.4, 1.2), STONE_DARK)
+    gold(at(side - direction * 0.55, 2.7), Vector3.create(0.12, 3.6, 0.45))
+  }
+
+  block(at(0, 5.5), Vector3.create(width + 2.4, 0.85, 1.1), STONE)
+  block(at(0, 5), Vector3.create(width + 1.7, 0.2, 0.9), STONE_DARK)
+  gold(at(0, 4.86, 0.45), Vector3.create(width + 1.2, 0.1, 0.12), 4)
+
+  // The ring above: the one shape here that exists purely to be seen from the
+  // yard, seventy metres down.
+  const ring = engine.addEntity()
+  Transform.create(ring, {
+    position: at(0, 6.9),
+    scale: Vector3.create(width + 1.2, 0.28, width + 1.2)
   })
-  MeshRenderer.setBox(line)
-  Material.setPbrMaterial(line, {
+  MeshRenderer.setCylinder(ring, 0.5, 0.5)
+  Material.setPbrMaterial(ring, {
     albedoColor: FINISH_ALBEDO,
     emissiveColor: FINISH_EMISSIVE,
     emissiveIntensity: 5
   })
-  made.push(line)
+  made.push(ring)
 
-  // Same as the start gate: a fixed sign squared up to the gate, not a
-  // billboard that swings around and looks detached from the structure.
-  const signY = deck + 5.5
-  const panel = engine.addEntity()
-  Transform.create(panel, {
-    position: Vector3.create(pad.x, signY, pad.z),
-    rotation,
-    scale: Vector3.create(6, 1.4, 0.18)
-  })
-  MeshRenderer.setBox(panel)
-  Material.setPbrMaterial(panel, {
-    albedoColor: Color4.create(0.14, 0.1, 0.02, 1),
-    metallic: 0,
-    roughness: 0.95
-  })
-  made.push(panel)
-
-  const sign = engine.addEntity()
-  Transform.create(sign, {
-    position: Vector3.create(pad.x - dirX * 0.2, signY, pad.z - dirZ * 0.2),
-    rotation
-  })
-  TextShape.create(sign, {
-    text: 'FINISH',
-    fontSize: 4.2,
-    textColor: FINISH_ALBEDO,
+  const label = engine.addEntity()
+  made.push(label)
+  Transform.create(label, { position: at(0, 4.4, -0.62), rotation })
+  TextShape.create(label, {
+    text: 'THE CROWN',
+    fontSize: 2.6,
+    textColor: Color4.create(1, 0.86, 0.35, 1),
     outlineColor: Color4.Black(),
-    outlineWidth: 0.25,
+    outlineWidth: 0.3,
     textAlign: TextAlignMode.TAM_MIDDLE_CENTER
   })
-  made.push(sign)
+
+  gold(at(0, 0.06), Vector3.create(width, 0.08, 0.5), 4)
 
   return made
 }

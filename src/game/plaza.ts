@@ -253,90 +253,111 @@ function createLobby() {
   }
 }
 
-/** The start gate: two posts, a lintel and a lit line across the ground. */
+/**
+ * The threshold.
+ *
+ * This was two bare cylinders and a green bar, and it looked like it: nothing
+ * about it said "a thing somebody built". It is stone now - the same warm
+ * stone as the tower's core, so the gate and the thing it leads to read as one
+ * material - with tapered pylons standing on splayed footings, a deep lintel,
+ * and the safe colour used as light rather than as paint.
+ *
+ * Cyan means safe in this game, and crossing this line is the safest moment in
+ * it, so the light belongs here: recessed strips down the inner face of each
+ * pylon frame the opening, and a strip across the ground marks the line the
+ * clock starts on.
+ */
 function createStartGate() {
   const yaw = (Math.atan2(GATE_DIR_X, GATE_DIR_Z) * 180) / Math.PI
   const rotation = Quaternion.fromEulerDegrees(0, yaw, 0)
   const acrossX = -GATE_DIR_Z
   const acrossZ = GATE_DIR_X
+  const half = GATE_WIDTH / 2
 
-  for (const direction of [-1, 1]) {
-    const post = engine.addEntity()
-    Transform.create(post, {
-      position: Vector3.create(
-        GATE_X + acrossX * direction * (GATE_WIDTH / 2),
-        LOBBY_Y + 3.1,
-        GATE_Z + acrossZ * direction * (GATE_WIDTH / 2)
-      ),
-      scale: Vector3.create(0.5, 6.2, 0.5)
-    })
-    MeshRenderer.setCylinder(post)
-    MeshCollider.setCylinder(post)
-    Material.setPbrMaterial(post, {
-      albedoColor: Color4.create(0.28, 0.3, 0.36, 1),
-      metallic: 0.85,
-      roughness: 0.3
-    })
+  const STONE = Color4.create(0.63, 0.6, 0.55, 1)
+  const STONE_DARK = Color4.create(0.42, 0.4, 0.38, 1)
+
+  const at = (side: number, up: number, out = 0) =>
+    Vector3.create(
+      GATE_X + acrossX * side + GATE_DIR_X * out,
+      LOBBY_Y + up,
+      GATE_Z + acrossZ * side + GATE_DIR_Z * out
+    )
+
+  const block = (position: Vector3, scale: Vector3, colour: Color4, rot = rotation) => {
+    const e = engine.addEntity()
+    Transform.create(e, { position, rotation: rot, scale })
+    MeshRenderer.setBox(e)
+    Material.setPbrMaterial(e, { albedoColor: colour, roughness: 0.85 })
+    return e
   }
 
-  const lintel = engine.addEntity()
-  Transform.create(lintel, {
-    position: Vector3.create(GATE_X, LOBBY_Y + 4.6, GATE_Z),
-    rotation,
-    scale: Vector3.create(GATE_WIDTH + 1.2, 0.7, 0.5)
-  })
-  MeshRenderer.setBox(lintel)
-  Material.setPbrMaterial(lintel, {
-    albedoColor: Color4.create(0.3, 0.95, 0.6, 1),
-    emissiveColor: Color3.create(0.2, 0.9, 0.5),
-    emissiveIntensity: 3
-  })
+  const light = (position: Vector3, scale: Vector3) => {
+    const e = engine.addEntity()
+    Transform.create(e, { position, rotation, scale })
+    MeshRenderer.setBox(e)
+    Material.setPbrMaterial(e, {
+      albedoColor: SAFE_FILL,
+      emissiveColor: CYAN3,
+      emissiveIntensity: 3.2
+    })
+    return e
+  }
 
-  // A fixed sign on the lintel. A billboard turns with the camera, so the
-  // words drifted away from the gate and read as crooked floating text.
-  const signY = LOBBY_Y + 5.5
-  const panel = engine.addEntity()
-  Transform.create(panel, {
-    position: Vector3.create(GATE_X, signY, GATE_Z),
-    rotation,
-    scale: Vector3.create(6, 1.4, 0.18)
-  })
-  MeshRenderer.setBox(panel)
-  Material.setPbrMaterial(panel, {
-    albedoColor: Color4.create(0.05, 0.12, 0.08, 1),
-    metallic: 0,
-    roughness: 0.95
-  })
+  for (const direction of [-1, 1]) {
+    const side = direction * half
+
+    // Splayed footing, so the pylon looks like it carries weight.
+    block(at(side, 0.35), Vector3.create(1.9, 0.7, 1.9), STONE_DARK)
+    block(at(side, 0.95), Vector3.create(1.5, 0.6, 1.5), STONE)
+
+    // Tapered pylon: two stacked blocks read as a taper without a cone.
+    const shaft = engine.addEntity()
+    Transform.create(shaft, {
+      position: at(side, 3.1),
+      rotation,
+      scale: Vector3.create(1.15, 4.1, 1.15)
+    })
+    MeshRenderer.setCylinder(shaft, 0.5, 0.34)
+    MeshCollider.setBox(shaft)
+    Material.setPbrMaterial(shaft, { albedoColor: STONE, roughness: 0.85 })
+
+    // Capital under the lintel.
+    block(at(side, 5.35), Vector3.create(1.35, 0.45, 1.35), STONE_DARK)
+
+    // The light that frames the opening, on the inner face only.
+    light(at(side - direction * 0.62, 3.1), Vector3.create(0.12, 3.6, 0.5))
+  }
+
+  // Lintel: deep, with a darker soffit under it so it casts its own line.
+  block(at(0, 5.95), Vector3.create(GATE_WIDTH + 2.6, 0.9, 1.2), STONE)
+  block(at(0, 5.42), Vector3.create(GATE_WIDTH + 1.9, 0.22, 0.95), STONE_DARK)
+  light(at(0, 5.28, 0.5), Vector3.create(GATE_WIDTH + 1.4, 0.1, 0.12))
+
+  // The name, cut into a recessed panel rather than floated on a black slab.
+  // TextShape sits higher than its anchor suggests - measured against the
+  // lintel rather than assumed, the label needed dropping by about 0.7 to
+  // land on the panel cut for it instead of floating above the stone.
+  const signY = LOBBY_Y + 5.35
+  block(at(0, 5.95, -0.62), Vector3.create(GATE_WIDTH + 0.4, 0.62, 0.1), STONE_DARK)
 
   const label = engine.addEntity()
-  Transform.create(label, {
-    position: Vector3.create(GATE_X + GATE_DIR_X * -0.2, signY, GATE_Z + GATE_DIR_Z * -0.2),
-    rotation
-  })
+  Transform.create(label, { position: at(0, signY, -0.72), rotation })
   TextShape.create(label, {
     text: 'START',
-    fontSize: 4.2,
-    textColor: Color4.create(0.45, 1, 0.65, 1),
+    fontSize: 4,
+    textColor: CYAN4,
     outlineColor: Color4.Black(),
-    outlineWidth: 0.25,
+    outlineWidth: 0.3,
     textAlign: TextAlignMode.TAM_MIDDLE_CENTER
   })
 
   /**
-   * The number to beat, on the gate you beat it through.
-   *
-   * The all-time board has been computed, persisted to Storage and synced to
-   * every client since the tower went permanent, and it was displayed
-   * nowhere - the same dead-data mistake the lifetime summit count made. The
-   * daily board in the yard is the one a newcomer can win tonight; this is the
-   * one that says what the tower is capable of, and the moment it means
-   * something is the moment you step through.
+   * The number to beat, on the gate you beat it through. The all-time board
+   * was computed, persisted and synced for days and displayed nowhere.
    */
   recordSign = engine.addEntity()
-  Transform.create(recordSign, {
-    position: Vector3.create(GATE_X + GATE_DIR_X * -0.2, signY - 2.05, GATE_Z + GATE_DIR_Z * -0.2),
-    rotation
-  })
+  Transform.create(recordSign, { position: at(0, LOBBY_Y + 4.05, -0.72), rotation })
   TextShape.create(recordSign, {
     text: 'NO RECORD YET  -  SET IT',
     fontSize: 2,
@@ -346,32 +367,10 @@ function createStartGate() {
     textAlign: TextAlignMode.TAM_MIDDLE_CENTER
   })
 
-  const crown = engine.addEntity()
-  Transform.create(crown, {
-    position: Vector3.create(GATE_X, LOBBY_Y + 6.35, GATE_Z),
-    rotation,
-    scale: Vector3.create(GATE_WIDTH + 1.6, 0.22, 0.6)
-  })
-  MeshRenderer.setBox(crown)
-  Material.setPbrMaterial(crown, {
-    albedoColor: Color4.create(0.4, 1, 0.65, 1),
-    emissiveColor: Color3.create(0.3, 1, 0.6),
-    emissiveIntensity: 4
-  })
-
-  const line = engine.addEntity()
-  Transform.create(line, {
-    position: Vector3.create(GATE_X, LOBBY_Y + 0.04, GATE_Z),
-    rotation,
-    scale: Vector3.create(GATE_WIDTH, 0.1, 0.7)
-  })
-  MeshRenderer.setBox(line)
-  Material.setPbrMaterial(line, {
-    albedoColor: Color4.create(0.35, 1, 0.6, 1),
-    emissiveColor: Color3.create(0.25, 1, 0.55),
-    emissiveIntensity: 4
-  })
+  // The line the clock starts on.
+  light(at(0, 0.06), Vector3.create(GATE_WIDTH, 0.08, 0.55))
 }
+
 
 /**
  * Three pads beside the gate at exactly round one's spacing.
