@@ -165,7 +165,7 @@ export async function startServer() {
   })
 
   engine.addSystem(serverSystem)
-  console.log('[SERVER] tower ready - ' + buildTower().pads.length + ' pads')
+  console.log('[SERVER] tower ready - ' + tower.pads.length + ' pads')
 }
 
 /** Heartbeat and the round clock. Everything else is event driven. */
