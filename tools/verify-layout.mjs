@@ -101,6 +101,27 @@ for (const round of ROUNDS) {
 note(deadZones === 0, 'finish slab fully responsive', `worst corner ${worstCorner.toFixed(2)}m, ${deadZones} dead zones`)
 note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_RADIUS}m`)
 
+// Headroom. A slab close above another is a landing an avatar cannot stand on,
+// and nothing was looking for it: one ended up 1.10 m above its neighbour and
+// only turned up because it happened to break a sight line as well.
+{
+  const { pads } = buildTower()
+  const AVATAR = 1.9
+  let worst = Infinity
+  let bad = 0
+  for (const pad of pads) {
+    for (const other of pads) {
+      if (other === pad || other.y <= pad.y) continue
+      const half = (pad.size + other.size) / 2
+      if (Math.hypot(other.x - pad.x, other.z - pad.z) >= half) continue
+      const headroom = other.y - pad.y
+      worst = Math.min(worst, headroom)
+      if (headroom < AVATAR) bad++
+    }
+  }
+  note(bad === 0, 'every landing has headroom', bad ? `${bad} pads with under ${AVATAR} m above` : `tightest ${worst === Infinity ? 'none overhead' : worst.toFixed(2) + ' m'}`)
+}
+
 // Sight lines. "From any pad the next target must be visible" - the design
 // brief asks for this measured rather than eyeballed, because on a 6-inch
 // screen a target you cannot see is a target you cannot plan for.

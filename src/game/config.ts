@@ -255,7 +255,15 @@ export const VERTICAL_CLEARANCE = 2.4
  */
 export const DOUBLE_JUMP_HEIGHT = 2
 export const REACH_ABILITY = 5.5
-export const DIFFICULTY_BUDGET = 0.7
+/**
+ * 0.55, down from 0.7, on the strength of somebody actually playing it on a
+ * phone and saying the parkour was too hard. That beats the model: 70% was my
+ * reading of the design brief, and the brief was written by somebody who had
+ * not played it on a handset either. A thumb on a virtual stick has no
+ * precision to spare, and the climb is meant to be hard because of nerve and
+ * timing, not because the gap is near the edge of what the avatar can do.
+ */
+export const DIFFICULTY_BUDGET = 0.55
 
 export const REACH_BUDGET = REACH_ABILITY * DIFFICULTY_BUDGET
 /** 70% of doubleJumpHeight. Was 1.6, which is 80% and broke the brief. */
@@ -284,14 +292,14 @@ export function curve(progress: number) {
     sections: TOWER_ZONES,
     /** Pads per section, before the section's own shape decides the rest. */
     sectionLength: Math.round(lerp(6, 9)),
-    padSize: lerp(3.3, 1.95),
+    padSize: lerp(3.8, 2.6),
     /**
      * The gap between pad EDGES - this is the distance actually jumped.
      * Centre-to-centre was the wrong thing to tune: with 3.2m pads a 4.2m
      * centre distance leaves a 1m gap, which reads as platforms touching.
      */
-    jumpGap: lerp(1.9, 3.5),
-    rise: lerp(0.9, 1.4),
+    jumpGap: lerp(1.6, 2.7),
+    rise: lerp(0.8, 1.05),
     spinnerSpeed: 45 + t * 85,
     spinnerReach: lerp(2.4, 3.8),
     moverSpeed: 1.1 + t * 2.1,

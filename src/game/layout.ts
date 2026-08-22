@@ -259,6 +259,8 @@ export function buildTower(): Layout {
   last.crumble = false
   last.size = Math.max(last.size, 3.2)
 
+  relaxSightLines(out)
+
   const shortcut = buildShortcut(out, curve(0.35))
 
   return {
@@ -343,6 +345,86 @@ function buildCoin(out: Build): CoinDef | null {
 }
 
 /**
+ * Nudges any pad that stands in the line between a jump and its target.
+ *
+ * "From any pad the next target must be visible" is a design-brief rule, and
+ * widening the slabs for mobile broke it in one place: a pad grew into the
+ * sightline of a jump two hops away. Rather than accept it or narrow the pads
+ * again, the offender steps sideways until the ray is clear.
+ *
+ * Every candidate position is re-checked against clearance and the shaft, so
+ * a nudge can never trade a blocked view for an overlap. If nothing works the
+ * pad stays where it is and the harness reports it - a silent failure here
+ * would be a jump the player cannot plan, which is worse than a loud one.
+ */
+function relaxSightLines(out: Build) {
+  const EYE = 1.6
+  const STEP = 0.25
+  const SLAB = 1
+
+  const blocks = (from: Pad, to: Pad, other: Pad): boolean => {
+    const ax = from.x, ay = from.y + EYE, az = from.z
+    const span = Math.hypot(to.x - ax, to.y + 0.4 - ay, to.z - az)
+    const steps = Math.max(2, Math.ceil(span / STEP))
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps
+      const px = ax + (to.x - ax) * t
+      const py = ay + (to.y + 0.4 - ay) * t
+      const pz = az + (to.z - az) * t
+      const half = other.size / 2
+      if (
+        Math.abs(px - other.x) < half &&
+        Math.abs(pz - other.z) < half &&
+        py > other.y - SLAB / 2 &&
+        py < other.y + SLAB / 2
+      ) return true
+    }
+    return false
+  }
+
+  for (let pass = 0; pass < 8; pass++) {
+    let moved = false
+
+    for (const pad of out.pads) {
+      if (pad.fromIndex < 0) continue
+      const from = out.pads[pad.fromIndex]
+      if (!from) continue
+
+      for (const other of out.pads) {
+        if (other === pad || other === from) continue
+        if (other.kind !== 'normal') continue
+        if (!blocks(from, pad, other)) continue
+
+        // Step it away from the shaft's centre, which is the direction with
+        // the most free air.
+        const away = Math.atan2(other.z - CENTER_Z, other.x - CENTER_X)
+        for (const distance of [0.6, 1.2, 1.8, 2.4]) {
+          const nx = other.x + Math.cos(away) * distance
+          const nz = other.z + Math.sin(away) * distance
+          if (!inShaft(nx, nz, other.y)) continue
+          if (!isClear(out, nx, other.y, nz, other.size, other)) continue
+
+          const previous = out.pads[other.fromIndex]
+          if (previous) {
+            const gap =
+              Math.hypot(nx - previous.x, nz - previous.z) - (other.size + previous.size) / 2
+            if (gap > REACH_BUDGET) continue
+          }
+
+          other.x = nx
+          other.z = nz
+          moved = true
+          break
+        }
+        break
+      }
+    }
+
+    if (!moved) return
+  }
+}
+
+/**
  * Places the tandem plate beside a landing about two thirds up.
  *
  * It sits off the main route, so a solo climber is never blocked by it - the
@@ -355,28 +437,44 @@ function buildPlate(out: Build): PlateDef | null {
     .filter((entry) => entry.pad.kind === 'checkpoint')
   if (landings.length < 2) return null
 
-  const start = landings[Math.max(0, Math.floor(landings.length * 0.6))]
-  const target = landings[Math.min(landings.length - 1, landings.indexOf(start) + 1)]
-  if (!start || !target || target.pad.y <= start.pad.y) return null
-
-  // Off to the side of the landing, on the outward radius so it never sits on
-  // the route the climb already uses.
-  const out_ = Math.atan2(start.pad.z - CENTER_Z, start.pad.x - CENTER_X)
+  // Search, like the ante does. Fixing this to one landing and one angle meant
+  // that widening the pads for mobile - which the climb needed - silently
+  // deleted the plate: no clearance at the one spot it was allowed to try.
+  // The harness caught it, which is the only reason it is not gone now.
   const size = 3.6
-  const x = start.pad.x + Math.cos(out_) * (size + 1.4)
-  const z = start.pad.z + Math.sin(out_) * (size + 1.4)
-  if (!inShaft(x, z, start.pad.y) || !isClear(out, x, start.pad.y, z, size)) return null
+  for (let offset = 0; offset < landings.length - 1; offset++) {
+    const startIndex = Math.min(
+      landings.length - 2,
+      Math.max(0, Math.floor(landings.length * 0.6) + offset - 1)
+    )
+    const start = landings[startIndex]
+    const target = landings[startIndex + 1]
+    if (!start || !target || target.pad.y <= start.pad.y) continue
 
-  return {
-    x,
-    y: start.pad.y + 0.4,
-    z,
-    size,
-    rise: Math.max(2.5, target.pad.y - start.pad.y),
-    toX: target.pad.x,
-    toY: target.pad.y,
-    toZ: target.pad.z
+    const outward = Math.atan2(start.pad.z - CENTER_Z, start.pad.x - CENTER_X)
+    for (let turn = -3; turn <= 3; turn++) {
+      for (const reach of [size + 1.4, size + 2.8, size + 4.2]) {
+        const away = outward + turn * 0.4
+        const x = start.pad.x + Math.cos(away) * reach
+        const z = start.pad.z + Math.sin(away) * reach
+        if (!inDetourAir(x, z)) continue
+        if (!isClear(out, x, start.pad.y, z, size, start.pad)) continue
+
+        return {
+          x,
+          y: start.pad.y + 0.4,
+          z,
+          size,
+          rise: Math.max(2.5, target.pad.y - start.pad.y),
+          toX: target.pad.x,
+          toY: target.pad.y,
+          toZ: target.pad.z
+        }
+      }
+    }
   }
+
+  return null
 }
 
 /**
@@ -603,7 +701,7 @@ function spinnerFloor(index: number, cursor: Cursor, c: ReturnType<typeof curve>
 /** A run of small planks with a bar sweeping across the end of it. */
 function narrowBridge(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rng: Rng, out: Build) {
   const planks = 3 + Math.round(c.t * 2)
-  const width = Math.max(1.1, c.padSize * 0.55)
+  const width = Math.max(1.8, c.padSize * 0.66)
 
   for (let i = 0; i < planks; i++) {
     hop(out, cursor, index, c, { size: width, rise: c.rise * 0.6, gapScale: 0.85 })
@@ -949,7 +1047,53 @@ function hop(
     y = Math.min(ceiling, y + MAX_SHORTCUT_RISE * 0.5)
   }
 
-  // Last resort: straight up, still a legal jump.
+  // Widen the search before giving up: the same jump, more headings, and the
+  // air just outside the shaft. The shaft band is only 11 m deep and the pads
+  // got wider for mobile, so "nowhere on this level" happens far more often
+  // than it used to.
+  for (const distance of [gap + previous.size / 2 + size / 2, (gap + previous.size / 2 + size / 2) * 0.8]) {
+    for (let step = 0; step < 32; step++) {
+      const heading = cursor.angle + Math.PI / 2 + (step * Math.PI) / 16
+      const x = fromX + Math.cos(heading) * distance
+      const z = fromZ + Math.sin(heading) * distance
+      if (!inDetourAir(x, z)) continue
+      if (!isClear(out, x, y, z, size, previous)) continue
+
+      cursor.x = x
+      cursor.z = z
+      cursor.y = y
+      cursor.angle = Math.atan2(z - CENTER_Z, x - CENTER_X)
+      push(out, cursor, section, size, opts.crumble ?? false, out.pads.indexOf(previous))
+      return
+    }
+  }
+
+  // Last resort. This used to place the pad with no clearance check at all,
+  // which is how a slab ended up 1.10 m directly above another one - a landing
+  // an avatar cannot stand on, found by the sight-line test rather than by
+  // anything looking for it. It still has to go somewhere, but it goes to the
+  // least-bad spot rather than straight up into whatever is there.
+  let bestX = fromX
+  let bestZ = fromZ
+  let bestClearance = -Infinity
+  for (let step = 0; step < 32; step++) {
+    const heading = cursor.angle + Math.PI / 2 + (step * Math.PI) / 16
+    const x = fromX + Math.cos(heading) * distance
+    const z = fromZ + Math.sin(heading) * distance
+    let nearest = Infinity
+    for (const pad of out.pads) {
+      if (pad === previous) continue
+      if (Math.abs(pad.y - y) > VERTICAL_CLEARANCE) continue
+      nearest = Math.min(nearest, Math.hypot(pad.x - x, pad.z - z) - (pad.size + size) / 2)
+    }
+    if (nearest > bestClearance) {
+      bestClearance = nearest
+      bestX = x
+      bestZ = z
+    }
+  }
+  cursor.x = bestX
+  cursor.z = bestZ
   cursor.y = y
   push(out, cursor, section, size, opts.crumble ?? false, out.pads.indexOf(previous))
 }
