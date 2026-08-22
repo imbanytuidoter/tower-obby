@@ -221,6 +221,7 @@ function sharedRoundSystem(dt: number) {
       const transform = Transform.getMutable(world.plate.entity)
       transform.position.y = world.plate.baseY + tandem.lift * world.plate.rise
       run.plateRiders = tandem.riders
+      run.plateLift = tandem.lift
     }
 
     const ghost = Ghost.getOrNull(entity)
@@ -407,6 +408,7 @@ function runSystem(dt: number) {
   noteForkChoice(player)
   reachForCoin(player)
   spendToken()
+  rideThePlate(player)
 
   if (run.phase === Phase.Ready) {
     if (run.respawnCooldown <= 0 && crossedStartLine(player)) {
@@ -552,6 +554,36 @@ function ghostSystem(dt: number) {
 }
 
 /**
+ * Delivers whoever is aboard when the plate finishes its lift.
+ *
+ * The plate rising is the shared signal - two people made it move, and
+ * everyone can see that. The arrival is a placement rather than a ride,
+ * deliberately: the docs do not state whether a player standing on a moving
+ * MeshCollider is carried with it, the physics forces that would do the job
+ * are local-only and unsynced, and this is the one mechanic in the game that
+ * cannot be tested without a second person. Guessing at undocumented physics
+ * in something unverifiable is how a mechanic ships broken.
+ */
+function rideThePlate(player: Vector3) {
+  const plate = world?.plate
+  if (!plate || run.plateLift < 0.98 || run.respawnCooldown > 0) return
+
+  const deck = plate.baseY + plate.rise
+  const aboard =
+    Math.abs(player.x - plate.x) < plate.size / 2 + 0.4 &&
+    Math.abs(player.z - plate.z) < plate.size / 2 + 0.4 &&
+    Math.abs(player.y - deck) < 2.4
+  if (!aboard) return
+
+  run.respawnCooldown = RESPAWN_COOLDOWN
+  play('checkpoint')
+  void movePlayerTo({
+    newRelativePosition: plate.landing,
+    cameraTarget: Vector3.create(plate.landing.x, plate.landing.y, plate.landing.z + 1)
+  })
+}
+
+/**
  * Claims the ante when the player gets to it.
  *
  * The client only ever says "I am here" - the server knows where the coin
@@ -584,11 +616,18 @@ function spendToken() {
   if (run.token <= 0 || !world) return
   if (!inputSystem.isTriggered(InputAction.IA_ACTION_3, PointerEventType.PET_DOWN)) return
 
-  const target = world.checkpoints[Math.min(run.tokenSkipsTo, world.checkpoints.length - 1)]
+  const index = Math.min(run.tokenSkipsTo, world.checkpoints.length - 1)
+  const target = world.checkpoints[index]
   if (!target) return
 
+  // Only ever forwards. Spending it after climbing past the checkpoint it
+  // buys used to consume the token AND teleport the player back down to the
+  // ring they were standing above, losing everything since - a reward that
+  // punished you for earning it early. Held instead, and the prompt says so.
+  if (index <= run.checkpoint) return
+
   run.token = 0
-  run.checkpoint = Math.max(run.checkpoint, world.checkpoints.indexOf(target))
+  run.checkpoint = index
   activateCheckpoint(target)
   play('checkpoint')
   sendToCheckpoint()
@@ -652,7 +691,11 @@ function updatePrompt(player: Vector3) {
     }
 
     if (run.token > 0) {
-      run.prompt = 'PRESS 1 TO SPEND THE COIN AND SKIP AHEAD'
+      const index = Math.min(run.tokenSkipsTo, world.checkpoints.length - 1)
+      run.prompt =
+        index > run.checkpoint
+          ? 'PRESS 1 TO SPEND THE COIN AND SKIP AHEAD'
+          : 'YOU CLIMBED PAST WHAT THE COIN BUYS'
       return
     }
 

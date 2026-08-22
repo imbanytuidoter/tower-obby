@@ -35,6 +35,8 @@ export const run = {
   shortcutHeld: 0,
   /** How many people are standing on the tandem plate right now. */
   plateRiders: 0,
+  /** How far the plate has lifted, 0 to 1, from the server. */
+  plateLift: 0,
   /**
    * The skip token, granted by the server when it verifies you reached the
    * coin. Held, not spent, until the player decides where it is worth using.

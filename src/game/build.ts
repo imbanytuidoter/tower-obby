@@ -72,6 +72,12 @@ export type BuiltPlate = {
   /** Resting position and travel, so the client can place it from `lift`. */
   baseY: number
   rise: number
+  /** Footprint, for deciding whether the local player is aboard. */
+  x: number
+  z: number
+  size: number
+  /** Where a full lift delivers whoever is standing on it. */
+  landing: Vector3
 }
 
 export type BuiltShortcut = {
@@ -462,7 +468,15 @@ function buildPlate(layout: Layout, entities: Entity[]): BuiltPlate | null {
     CHOICE_EDGE_3
   ))
 
-  return { entity, baseY: def.y, rise: def.rise }
+  return {
+    entity,
+    baseY: def.y,
+    rise: def.rise,
+    x: def.x,
+    z: def.z,
+    size: def.size,
+    landing: Vector3.create(def.toX, def.toY + 1.2, def.toZ)
+  }
 }
 
 function buildForks(layout: Layout, entities: Entity[]): BuiltFork[] {
