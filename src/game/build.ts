@@ -27,6 +27,7 @@ import {
   PAD_RADIUS
 } from './config'
 import { backdropRing, Layout, MoverDef, Pad, SpinnerDef } from './layout'
+import { accentRgb, BACKDROP_EMISSIVE, bodyRgb, zoneRamp } from './palette'
 
 export type BuiltPad = {
   entity: Entity
@@ -216,40 +217,16 @@ const START_EMISSIVE = Color3.create(0.18, 0.85, 0.42)
  * overwrite what the pad means. Nothing here can be mistaken for red, orange
  * or gold.
  */
-const SAFE_HUE = 185
-const SAFE_HUE_SWING = 26
-const ZONE_STEPS = 10
-
-/** 0 at the gate, 1 at the crown, quantised to bound the material count. */
-function zoneRamp(section: number): number {
-  const t = Math.min(1, Math.max(0, (section - 1) / (TOWER_ZONES - 1)))
-  return Math.round(t * (ZONE_STEPS - 1)) / (ZONE_STEPS - 1)
-}
-
-/** Minimal HSL, only ever called at build time. */
-function hsl(h: number, sat: number, light: number): Color3 {
-  const c = (1 - Math.abs(2 * light - 1)) * sat
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
-  const m = light - c / 2
-  const seg = Math.floor(h / 60) % 6
-  const rgb =
-    seg === 0 ? [c, x, 0] : seg === 1 ? [x, c, 0] : seg === 2 ? [0, c, x]
-    : seg === 3 ? [0, x, c] : seg === 4 ? [x, 0, c] : [c, 0, x]
-  return Color3.create(rgb[0] + m, rgb[1] + m, rgb[2] + m)
-}
-
+/** Colour lives in palette.ts so the value rule can be asserted in Node. */
 function sectionBody(section: number): Color4 {
-  const t = zoneRamp(section)
-  // Azure at the base through green-cyan at the crown. Still unmistakably
-  // "safe" at both ends.
-  const c = hsl(SAFE_HUE + SAFE_HUE_SWING - t * (SAFE_HUE_SWING * 2), 0.8, 0.5 - t * 0.05)
-  return Color4.create(c.r, c.g, c.b, 1)
+  const [r, g, b] = bodyRgb(section)
+  return Color4.create(r, g, b, 1)
 }
 
 /** The edge light. Brighter than the face so the lip of a slab reads first. */
 export function sectionAccent(section: number): Color3 {
-  const t = zoneRamp(section)
-  return hsl(SAFE_HUE + SAFE_HUE_SWING - t * (SAFE_HUE_SWING * 2), 0.9, 0.74)
+  const [r, g, b] = accentRgb(section)
+  return Color3.create(r, g, b)
 }
 
 /**
@@ -279,7 +256,10 @@ function createGodray(pad: Pad, entities: Entity[]) {
     albedoColor: Color4.create(1, 0.9, 0.55, 0.07),
     emissiveColor: Color3.create(1, 0.86, 0.45),
     emissiveIntensity: PAD_EMISSIVE.goal * 0.5,
-    roughness: 1
+    roughness: 1,
+    // A shaft of light that casts a shadow is a contradiction, and eighteen
+    // metres of it lands right on the pad it is meant to advertise.
+    castShadows: false
   })
 }
 
@@ -915,9 +895,13 @@ function createBands(entities: Entity[]) {
     Material.setPbrMaterial(entity, {
       albedoColor: colour,
       emissiveColor: Color3.create(colour.r, colour.g, colour.b),
-      emissiveIntensity: 0.85,
+      emissiveIntensity: BACKDROP_EMISSIVE,
       roughness: 1,
-      metallic: 0
+      metallic: 0,
+      // A 33 m wall ringing the whole scene threw the clearing into full
+      // shade - the grass floor rendered black and the lobby with it. The
+      // backdrop is distance, not an object; it has no business casting.
+      castShadows: false
     })
   }
 }

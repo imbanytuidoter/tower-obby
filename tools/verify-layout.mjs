@@ -17,7 +17,7 @@ import { createRequire } from 'node:module'
 
 const out = mkdtempSync(join(tmpdir(), 'layout-'))
 execSync(
-  `npx tsc src/game/layout.ts src/game/config.ts src/game/rng.ts ` +
+  `npx tsc src/game/layout.ts src/game/config.ts src/game/rng.ts src/game/palette.ts ` +
     `--outDir "${out}" --module commonjs --target es2022`,
   { stdio: 'inherit' }
 )
@@ -25,6 +25,7 @@ execSync(
 const req = createRequire(join(out, 'x.cjs'))
 const { buildTower, backdropRing, BACKDROP_PANELS } = req(join(out, 'layout.js'))
 const cfg = req(join(out, 'config.js'))
+const palette = req(join(out, 'palette.js'))
 
 // --- the brief's budget, not the engine's ceiling ---------------------------
 // "Every required jump must need at most 70% of what jumpHeight 1 /
@@ -327,6 +328,18 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   }
   note(nearest > cfg.SHAFT_MAX_RADIUS + 4, 'backdrop stands clear of the climb',
     'nearest panel corner ' + nearest.toFixed(1) + ' m, pads reach ' + cfg.SHAFT_MAX_RADIUS + ' m')
+}
+
+// The brief's load-bearing rule: "a pad is always lighter than what is behind
+// it". It was false for the understory - backdrop 0.846 against pads 0.635 -
+// because the panels self-lit at 0.85 and overtook the climb. The margin is a
+// judgement call; below ~0.12 the pad stops popping off the wall on a phone.
+{
+  const rows = palette.valueSeparation()
+  const worst = rows.reduce((a, b) => (a.margin < b.margin ? a : b))
+  note(worst.margin > 0.12, 'pads read lighter than the backdrop',
+    'tightest ' + worst.band + ': pad ' + worst.pad.toFixed(2) +
+    ' vs wall ' + worst.backdrop.toFixed(2) + ' (+' + worst.margin.toFixed(2) + ')')
 }
 
 // Determinism: every client builds the tower locally, so the same round must
