@@ -25,6 +25,7 @@ import { room } from './shared/messages'
 import {
   Board,
   DailyBoard,
+  PairBoard,
   Ghost,
   protectServerState,
   LeverState,
@@ -264,7 +265,14 @@ function sharedRoundSystem(dt: number) {
     const today = DailyBoard.getOrNull(entity)
     const allTime = Board.getOrNull(entity)
     if (today) {
-      showBoard(today.names.map((name, index) => ({ name, seconds: today.seconds[index] ?? 0 })))
+      const pairView = PairBoard.getOrNull(entity)
+      showBoard(
+        today.names.map((name, index) => ({ name, seconds: today.seconds[index] ?? 0 })),
+        (pairView?.names ?? []).map((name, index) => ({
+          name,
+          seconds: pairView?.seconds[index] ?? 0
+        }))
+      )
       run.dailyBest = today.seconds[0] ?? 0
     }
     if (allTime) {

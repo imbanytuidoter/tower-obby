@@ -20,6 +20,7 @@ import {
   DECOR_MAX_SATURATION,
   FOREST,
   PAD_EMISSIVE,
+  CHECKPOINT_EVERY_SECTIONS,
   TOWER_ZONES,
   FINISH_RADIUS,
   FINISH_TOUCH_MARGIN,
@@ -955,29 +956,29 @@ function createSpine(height: number, accent: Color3): Entity[] {
   })
   made.push(core)
 
-  // One band per zone, coloured by that zone's own accent, so the core itself
-  // carries the altitude ramp and reads as storeys rather than as a pole.
-  for (let zone = 1; zone <= TOWER_ZONES; zone++) {
+  // A collar on every zone read as a drill bit: twenty near-white rings up a
+  // brown pole, and twenty material slots spent on the worst detail in frame.
+  // Now a collar means one thing - a checkpoint is here - so the trunk itself
+  // tells you where the next place you cannot fall below is. Same gold as the
+  // checkpoint pads, because the same colour must never mean two things.
+  for (let zone = CHECKPOINT_EVERY_SECTIONS; zone <= TOWER_ZONES; zone += CHECKPOINT_EVERY_SECTIONS) {
     const t = zone / TOWER_ZONES
-    const y = height * t
-    const width = BASE + (TOP - BASE) * t + 1.1
+    const width = BASE + (TOP - BASE) * t + 0.9
 
-    const band = engine.addEntity()
-    Transform.create(band, {
-      position: Vector3.create(CENTER_X, y, CENTER_Z),
-      scale: Vector3.create(width, 0.35, width)
+    const collar = engine.addEntity()
+    Transform.create(collar, {
+      position: Vector3.create(CENTER_X, height * t, CENTER_Z),
+      scale: Vector3.create(width, 0.3, width)
     })
-    MeshRenderer.setCylinder(band, 0.5, 0.5)
-    const tone = sectionAccent(zone)
-    // Full-strength zone colour: the bands are how the core carries the
-    // altitude ramp, and at half strength they just read as grey collars.
-    Material.setPbrMaterial(band, {
-      albedoColor: Color4.create(tone.r, tone.g, tone.b, 1),
-      emissiveColor: tone,
-      emissiveIntensity: 0.9,
-      roughness: 0.4
+    MeshRenderer.setCylinder(collar, 0.5, 0.5)
+    Material.setPbrMaterial(collar, {
+      albedoColor: CP_ALBEDO,
+      emissiveColor: Color3.create(CP_ALBEDO.r, CP_ALBEDO.g, CP_ALBEDO.b),
+      emissiveIntensity: PAD_EMISSIVE.goal,
+      roughness: 0.4,
+      castShadows: false
     })
-    made.push(band)
+    made.push(collar)
   }
 
   return made

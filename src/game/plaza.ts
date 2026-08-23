@@ -813,28 +813,45 @@ export type BoardRow = { name: string; seconds: number }
  * first - a shared record of who closed each round out, not this player's
  * private history.
  */
-export function showBoard(entries: BoardRow[]) {
+/** Rows given to the solo half of the board before the pair half starts. */
+const SOLO_ROWS = 5
+
+export function showBoard(solo: BoardRow[], together: BoardRow[]) {
   if (rowEntities.length === 0) return
 
   for (let i = 0; i < rowEntities.length; i++) {
-    const entry = entries[i]
     const label = TextShape.getMutable(rowEntities[i].label)
     const value = TextShape.getMutable(rowEntities[i].value)
 
+    // The divider is the point of this board: it is the only place a player
+    // is told that climbing with somebody is a separate, recorded thing.
+    if (i === SOLO_ROWS) {
+      label.text = 'CLIMBED TOGETHER'
+      label.textColor = GOLD4
+      value.text = ''
+      continue
+    }
+
+    const pair = i > SOLO_ROWS
+    const rank = pair ? i - SOLO_ROWS : i + 1
+    const entry = pair ? together[rank - 1] : solo[i]
+
     if (!entry) {
       label.text = ''
+      label.textColor = DIM
       value.text = '- - : - -'
       value.textColor = DIM
       continue
     }
 
-    label.text = String(i + 1) + '.  ' + entry.name
+    label.text = String(rank) + '.  ' + entry.name
+    label.textColor = pair ? GOLD4 : DIM
     value.text = formatTime(entry.seconds)
-    value.textColor = Color4.White()
+    value.textColor = pair ? GOLD4 : Color4.White()
   }
 }
 
 /** Draws the empty board before the server has sent anything. */
 export function refreshBoard() {
-  showBoard([])
+  showBoard([], [])
 }

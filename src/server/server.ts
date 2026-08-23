@@ -25,6 +25,7 @@ import {
   Board,
   DailyBoard,
   LeverState,
+  PairBoard,
   Ranking,
   Ghost,
   ServerHeartbeat,
@@ -34,6 +35,7 @@ import {
 
 const STORAGE_KEY = 'obby.board.v2'
 const DAILY_KEY = 'obby.daily.v1'
+const PAIRS_KEY = 'obby.pairs.v1'
 const PLAYER_KEY = 'obby.stats.v1'
 
 type Entry = { name: string; seconds: number }
@@ -66,6 +68,17 @@ const startedClimb = new Map<string, number>()
 let state = engine.addEntity()
 let board: Entry[] = []
 let daily: Entry[] = []
+let pairs: Entry[] = []
+
+/**
+ * Who you rode the tandem plate with, for the climb you are on right now.
+ *
+ * Written only when the plate reaches FULL lift, because that is the moment
+ * two people actually got each other somewhere - standing on it together for
+ * an instant is not cooperation. Cleared when the climb ends or is abandoned,
+ * so a partnership cannot be banked and cashed in on a later solo run.
+ */
+const rodeWith = new Map<string, string>()
 
 /**
  * The tower, generated once. It never changes, so regenerating it inside a
@@ -89,6 +102,7 @@ export async function startServer() {
   ServerHeartbeat.create(state, { at: Date.now() })
   Board.create(state, { names: [], seconds: [] })
   DailyBoard.create(state, { names: [], seconds: [], day: utcDay(Date.now()) })
+  PairBoard.create(state, { names: [], seconds: [] })
   Ranking.create(state, { names: [], heights: [], climbers: 0 })
   ShortcutState.create(state, { open: false })
   LeverState.create(state, { halted: [] })
@@ -100,6 +114,7 @@ export async function startServer() {
     ServerHeartbeat.componentId,
     Board.componentId,
     DailyBoard.componentId,
+    PairBoard.componentId,
     Ranking.componentId,
     ShortcutState.componentId,
     LeverState.componentId,
@@ -249,9 +264,22 @@ function handleClaim(name: string, from: string) {
   daily = [...daily, entry].sort((a, b) => a.seconds - b.seconds).slice(0, BOARD_SIZE)
   publishBoard()
 
+  // A pair time is the point of the whole game, so it gets its own board.
+  // The partner's name comes from the server's own name map, never from the
+  // claiming client - otherwise anyone could type a stranger onto a record.
+  const partner = rodeWith.get(address)
+  if (partner) {
+    const together: Entry = {
+      name: entry.name + '  +  ' + (names.get(partner) ?? 'Guest'),
+      seconds
+    }
+    pairs = [...pairs, together].sort((a, b) => a.seconds - b.seconds).slice(0, BOARD_SIZE)
+  }
+
   // They have to walk back through the gate to start another climb.
   startedClimb.delete(address)
   tookCoin.delete(address)
+  rodeWith.delete(address)
 
   // Only the day's leader gets asked for a path, so the ghost is always the
   // run people are actually chasing.
@@ -415,6 +443,9 @@ function abandonIfBackAtTheStart(address: string, position: Vector3) {
 
   startedClimb.delete(address)
   tookCoin.delete(address)
+  // The partnership belongs to the climb, not to the player: walking back
+  // through the gate must not carry a pair credit into the next attempt.
+  rodeWith.delete(address)
 }
 
 /** Records the first moment a player is past the gate plane, inside its width. */
@@ -489,6 +520,15 @@ function watchPlate(dt: number) {
   const speed = target > view.lift ? PLATE_RISE_RATE : PLATE_FALL_RATE
   const next = Math.max(0, Math.min(1, view.lift + Math.sign(target - view.lift) * speed * dt))
 
+  // Full lift with two aboard is the moment the partnership is earned.
+  if (next >= 1 && aboard.size >= 2) {
+    const riders = [...aboard]
+    for (const rider of riders) {
+      const partner = riders.find((other) => other !== rider)
+      if (partner) rodeWith.set(rider, partner)
+    }
+  }
+
   // Written only on a real change: this runs every frame and a component write
   // re-broadcasts to every client.
   if (Math.abs(next - view.lift) > 0.002 || view.riders !== aboard.size) {
@@ -499,6 +539,10 @@ function watchPlate(dt: number) {
 }
 
 function publishBoard() {
+  const together = PairBoard.getMutable(state)
+  together.names = pairs.map((entry) => entry.name)
+  together.seconds = pairs.map((entry) => entry.seconds)
+
   const all = Board.getMutable(state)
   all.names = board.map((entry) => entry.name)
   all.seconds = board.map((entry) => entry.seconds)
@@ -571,6 +615,9 @@ async function persistBoard() {
     board: daily
   })
   if (!okDaily) console.log('[SERVER] daily board did not persist')
+
+  const okPairs = await Storage.set<Stored>(PAIRS_KEY, { version: 1, board: pairs })
+  if (!okPairs) console.log('[SERVER] pair board did not persist')
 }
 
 /**
@@ -604,6 +651,18 @@ async function restoreBoard() {
     }
   } catch (error) {
     console.log('[SERVER] stored daily board unreadable: ' + error)
+  }
+
+  try {
+    const stored = await Storage.get<Stored>(PAIRS_KEY)
+    if (stored && stored.version === 1 && Array.isArray(stored.board)) {
+      pairs = stored.board
+        .filter((entry) => typeof entry?.name === 'string' && typeof entry?.seconds === 'number')
+        .slice(0, BOARD_SIZE)
+      console.log('[SERVER] restored ' + pairs.length + ' pair entries')
+    }
+  } catch (error) {
+    console.log('[SERVER] stored pair board unreadable: ' + error)
   }
 
   const view = DailyBoard.getOrNull(state)

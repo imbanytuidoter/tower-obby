@@ -96,6 +96,20 @@ export const DailyBoard = engine.defineComponent('obby::daily', {
 })
 
 /**
+ * The fastest climbs made as a PAIR.
+ *
+ * This is the board the game is actually about. The tandem plate only rises
+ * with two different people standing on it, so a pair time is proof that two
+ * strangers cooperated - which is the one thing a solo obby cannot record.
+ * Names are stored already joined ("alice + bob") so the board stays a flat
+ * pair of arrays like the other two and needs no extra schema.
+ */
+export const PairBoard = engine.defineComponent('obby::pairs', {
+  names: Schemas.Array(Schemas.String),
+  seconds: Schemas.Array(Schemas.Float)
+})
+
+/**
  * Only the server may write any of this. Guarded by isServer() because
  * validateBeforeChange has no meaning on a client and errors there.
  */
@@ -113,4 +127,5 @@ export function protectServerState() {
   ServerHeartbeat.validateBeforeChange(serverOnly)
   Board.validateBeforeChange(serverOnly)
   DailyBoard.validateBeforeChange(serverOnly)
+  PairBoard.validateBeforeChange(serverOnly)
 }

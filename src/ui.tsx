@@ -45,6 +45,8 @@ const PANEL = Color4.create(0.02, 0.03, 0.06, 0.82)
 const NEON = Color4.create(0.3, 0.95, 1, 1)
 const GOLD = Color4.create(1, 0.82, 0.25, 1)
 const DIM = Color4.create(1, 1, 1, 0.5)
+/** The unfilled part of the progress bar. Dark enough to read on bright sky. */
+const TRACK = Color4.create(0, 0, 0, 0.45)
 const WARN = Color4.create(1, 0.45, 0.4, 1)
 
 /** Everything that differs between a phone and a monitor lives here. */
@@ -58,7 +60,8 @@ const style = () => ({
   banner: compact ? 30 : 30,
   buttonHeight: compact ? 116 : 84,
   buttonWidth: compact ? 380 : 300,
-  buttonText: compact ? 34 : 30
+  buttonText: compact ? 34 : 30,
+  barHeight: compact ? 14 : 11
 })
 
 /** mm:ss for the shared round clock. */
@@ -94,6 +97,56 @@ const button = (text: string, onClick: () => void, color: Color4 = NEON) => {
       onMouseDown={onClick}
     >
       <Label value={text} fontSize={s.buttonText} color={Color4.Black()} />
+    </UiEntity>
+  )
+}
+
+
+/**
+ * How far up the tower you are, as one glance.
+ *
+ * "SECTION 7/20" is a number you have to read and then convert into a feeling.
+ * A bar is the feeling directly, which is what matters on a phone held in one
+ * hand. Four segments rather than twenty: at twenty each slice is two pixels
+ * wide on a small screen and the whole thing turns into a dashed line.
+ *
+ * The segments are the four bands, so the bar and the band name underneath it
+ * are saying the same thing in two ways rather than competing.
+ */
+const SEGMENTS = 4
+
+const progressBar = () => {
+  const s = style()
+  const total = Math.max(1, run.totalSections)
+  const done = Math.min(1, Math.max(0, (run.section - 1) / total))
+  const perSegment = 1 / SEGMENTS
+
+  return (
+    <UiEntity uiTransform={{ width: '100%', height: s.barHeight, flexDirection: 'row' }}>
+      {[0, 1, 2, 3].map((index) => {
+        const start = index * perSegment
+        // How much of THIS segment is behind the climber, 0..1.
+        const filled = Math.min(1, Math.max(0, (done - start) / perSegment))
+        // PositionUnit is `${number}%`, so the percentage has to be typed as a
+        // template literal rather than assembled with string concatenation.
+        const width: `${number}%` = `${Math.round(filled * 100)}%`
+        return (
+          <UiEntity
+            key={index}
+            uiTransform={{
+              flexGrow: 1,
+              height: '100%',
+              margin: { right: index === SEGMENTS - 1 ? 0 : 4 }
+            }}
+            uiBackground={{ color: TRACK }}
+          >
+            <UiEntity
+              uiTransform={{ width, height: '100%' }}
+              uiBackground={{ color: filled >= 1 ? GOLD : NEON }}
+            />
+          </UiEntity>
+        )
+      })}
     </UiEntity>
   )
 }
@@ -136,11 +189,9 @@ const hud = () => {
         textAlign="middle-left"
       />
       <Label value={formatTime(run.time)} fontSize={s.clock} color={NEON} textAlign="middle-left" />
+      {progressBar()}
       <Label
-        value={
-          'SECTION ' + run.section + '/' + run.totalSections +
-          '  ·  ' + run.band + '   FALLS ' + run.falls
-        }
+        value={run.band + '   ·   FALLS ' + run.falls}
         fontSize={s.line}
         color={Color4.White()}
         textAlign="middle-left"
