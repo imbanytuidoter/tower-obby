@@ -413,6 +413,17 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     const a = Math.atan2(t.z - cfg.CENTER_Z, t.x - cfg.CENTER_X)
     quadrants.add(Math.floor(((a + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 2)))
   }
+  // A canopy poking through the boundary wall reads as a tree growing out of
+  // a solid surface. The wall is a square, so this is a per-axis test.
+  let worstPoke = -Infinity
+  for (const t of trees) {
+    const px = Math.abs(t.x - cfg.CENTER_X) + cfg.TREE_CANOPY_RADIUS - cfg.BACKDROP_HALF
+    const pz = Math.abs(t.z - cfg.CENTER_Z) + cfg.TREE_CANOPY_RADIUS - cfg.BACKDROP_HALF
+    worstPoke = Math.max(worstPoke, px, pz)
+  }
+  note(worstPoke < 0, 'no canopy grows through the wall',
+    'closest canopy stops ' + (-worstPoke).toFixed(1) + ' m short of it')
+
   note(quadrants.size === 4, 'forest surrounds the clearing',
     quadrants.size + ' of 4 quadrants have trees')
 }
@@ -467,7 +478,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 34
+const MIN_CHECKS = 35
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 

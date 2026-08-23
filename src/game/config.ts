@@ -106,7 +106,7 @@ export const TREE_RING_RADIUS = 30
  * against the wall rather than deleted. Must stay inside BACKDROP_HALF minus
  * a canopy, or half a tree gets clipped by the scene boundary.
  */
-export const TREE_RING_OUTER = 33
+export const TREE_RING_OUTER = 33.5
 export const TREE_COUNT = 24
 /**
  * tree-fir-02 stands 5.55 m at scale 1, so this is roughly a 14 m tree.
@@ -278,7 +278,13 @@ export const START_PAD_Z = CENTER_Z + Math.sin(startAngle) * START_RADIUS
  */
 export const LOBBY_X = START_PAD_X + Math.cos(startAngle) * 10
 export const LOBBY_Z = START_PAD_Z + Math.sin(startAngle) * 10
-export const LOBBY_SIZE = 24
+/**
+ * 24 m of deck for a walk of eight. The size was not the problem on its own -
+ * the problem is that the tree exclusion is measured off it, and at 24 m the
+ * box reached from z=5.1 to z=30.9 and left no room for a single tree behind
+ * the board. 20 gives the forest somewhere to stand.
+ */
+export const LOBBY_SIZE = 20
 export const LOBBY_Y = 0.4
 
 /** The start gate straddles the line between the lobby and the first pad. */
@@ -318,7 +324,7 @@ export const LOBBY_SPAWN_Z = LOBBY_Z - GATE_DIR_Z * LOBBY_SPAWN_BACK
  * eye height, facing the spawn. The board is for browsing, and browsing wants
  * the whole thing square in front of you, not angled off to one side.
  */
-export const BOARD_FORWARD = -9
+export const BOARD_FORWARD = -7.5
 export const BOARD_LATERAL = 0
 export const GATE_WIDTH = 6
 
