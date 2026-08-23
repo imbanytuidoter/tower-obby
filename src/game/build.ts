@@ -581,10 +581,16 @@ function buildPlate(layout: Layout, entities: Entity[]): BuiltPlate | null {
   // Box, for the same reason the landmarks are: this one carries two people
   // twelve metres and neither of them should fall through it on a phone.
   MeshCollider.setBox(entity)
+  // Cyan albedo under a pale lilac emissive at 1.2 rendered as a white disc -
+  // the fourth time in this file the same mistake produced the same result.
+  // The plate IS safe ground, so it keeps the safe colour, and the fact that
+  // it is special is carried by being brighter than ordinary safe ground
+  // rather than by being a different colour.
   Material.setPbrMaterial(entity, {
+    texture: Material.Texture.Common({ src: SLAB_TEXTURE }),
     albedoColor: SAFE_FILL,
-    emissiveColor: CHOICE_EDGE_3,
-    emissiveIntensity: 1.2,
+    emissiveColor: Color3.create(SAFE_FILL.r, SAFE_FILL.g, SAFE_FILL.b),
+    emissiveIntensity: PAD_EMISSIVE.safe * 2,
     roughness: 0.6
   })
 
@@ -775,10 +781,14 @@ function createPressurePad(at: { x: number; y: number; z: number }, entities: En
 }
 
 function paintPressurePad(pad: Entity, pressed: boolean) {
+  // Gold waiting, green held: the same pair the checkpoints use, because it
+  // means the same thing - here is a thing to do, and now it is done. The
+  // change of state is carried by the colour AND by brightness, which is what
+  // a momentary state wants; a permanent identity would use only hue.
   Material.setPbrMaterial(pad, {
     albedoColor: pressed ? CP_DONE_ALBEDO : CP_ALBEDO,
     emissiveColor: pressed ? CP_DONE_EMISSIVE : CP_EMISSIVE,
-    emissiveIntensity: pressed ? 5 : 2
+    emissiveIntensity: pressed ? PAD_EMISSIVE.goal * 2 : PAD_EMISSIVE.goal
   })
 }
 
@@ -790,10 +800,15 @@ export function setShortcutOpen(shortcut: BuiltShortcut, open: boolean) {
   for (const entity of shortcut.route) {
     if (open) {
       MeshCollider.setBox(entity)
+      // Ground you can now walk on is safe ground, and safe ground is cyan.
+      // In gold it was a third meaning for that colour - checkpoint, coin and
+      // now route - which is precisely what the palette rule exists to stop.
+      // That it just opened is said by being brighter, not by being gold.
       Material.setPbrMaterial(entity, {
-        albedoColor: CP_ALBEDO,
-        emissiveColor: CP_EMISSIVE,
-        emissiveIntensity: 2.5
+        texture: Material.Texture.Common({ src: SLAB_TEXTURE }),
+        albedoColor: SAFE_FILL,
+        emissiveColor: Color3.create(SAFE_FILL.r, SAFE_FILL.g, SAFE_FILL.b),
+        emissiveIntensity: PAD_EMISSIVE.safe * 2
       })
     } else {
       MeshCollider.deleteFrom(entity)
