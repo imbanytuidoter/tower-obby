@@ -447,14 +447,40 @@ export const VERTICAL_CLEARANCE = 2.4
 /**
  * What a jump can cover, and the share of it this course is allowed to use.
  *
- * The design brief is explicit: every required jump must need at most 70% of
- * what the ability allows, because the game is judged on a phone and a thumb
- * on a virtual stick is nothing like a keyboard. The engine's doubleJumpHeight
- * is 2 m (docs-confirmed). REACH_ABILITY is an estimate, not a documented
- * figure - it is the horizontal distance a run-jump covers, and it is the one
- * number here I have not been able to source, so it is deliberately
- * conservative.
+ * The client's own locomotion defaults are documented and verified against
+ * unity-explorer's CharacterControllerSettings asset: walkSpeed 1.5,
+ * jogSpeed 8, runSpeed 10, jumpHeight 1, runJumpHeight 1.5,
+ * doubleJumpHeight 2. Gravity is NOT documented anywhere, and an attempt to
+ * measure it by timing falls through the Explorer failed honestly: at 0.18 s
+ * per poll, a 15 m fall is three samples and the numbers came out anywhere
+ * between 14 and 39 m/s2. So it stays unknown.
+ *
+ * REACH_ABILITY is therefore still an estimate. What is NOT an estimate is
+ * that the budget clears by a wide margin, and that can be shown without
+ * knowing gravity at all:
+ *
+ *   the widest required gap is 3.03 m
+ *   at the documented jog speed of 8 m/s that is 0.38 s of airtime
+ *   a double jump reaches 2 m, so its airtime is 2 * sqrt(2h/g)
+ *   for that to drop below 0.38 s, gravity would have to exceed 112 m/s2
+ *
+ * Earth is 9.8 and game engines run 15 to 30. The gap is crossable under any
+ * physics that still produces a 2 m jump.
  */
+/**
+ * Client defaults, verified against unity-explorer's own settings asset.
+ * These are documented; REACH_ABILITY below is not.
+ */
+export const JOG_SPEED = 8
+
+/**
+ * A pessimistic gravity, used only to bound the airtime argument. The real
+ * value is not documented and could not be measured with the tools here, so
+ * the check assumes a value at the harsh end of what game engines use - if
+ * the gap clears under that, it clears under anything gentler.
+ */
+export const PESSIMISTIC_GRAVITY = 30
+
 export const DOUBLE_JUMP_HEIGHT = 2
 export const REACH_ABILITY = 5.5
 /**

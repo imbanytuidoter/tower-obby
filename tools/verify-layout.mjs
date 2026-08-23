@@ -501,6 +501,24 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     'from ' + ys[0].toFixed(0) + ' m to ' + ys[ys.length - 1].toFixed(0) + ' m')
 }
 
+// The widest gap has to be crossable by a documented jump, not by an estimate.
+//
+// REACH_ABILITY is the one number in config.ts with no source, and every claim
+// about difficulty was resting on it. This check does not use it. It uses the
+// documented jog speed and a deliberately harsh gravity, and asks whether the
+// airtime of a double jump covers the airtime the widest gap demands.
+{
+  const airtimeNeeded = worstReach / cfg.JOG_SPEED
+  const apex = cfg.DOUBLE_JUMP_HEIGHT
+  const airtimeAvailable = 2 * Math.sqrt((2 * apex) / cfg.PESSIMISTIC_GRAVITY)
+  const share = airtimeNeeded / airtimeAvailable
+
+  note(share <= 0.6, 'the widest gap fits inside a documented jump',
+    'needs ' + airtimeNeeded.toFixed(2) + ' s of the ' + airtimeAvailable.toFixed(2) +
+    ' s a double jump gives at ' + cfg.PESSIMISTIC_GRAVITY + ' m/s2 (' +
+    Math.round(share * 100) + '%)')
+}
+
 // A colour may not mean two things.
 //
 // Unstable ground and a checkpoint were fourteen degrees of hue and 0.15 of
@@ -576,7 +594,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 42
+const MIN_CHECKS = 43
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 
