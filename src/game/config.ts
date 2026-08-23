@@ -116,6 +116,16 @@ export const TREE_CANOPY_RADIUS = 4.1
 
 export const BACKDROP_RADIUS = 34
 
+/**
+ * Half-width of the square boundary wall, from the centre of the scene.
+ *
+ * The boundary follows the field, not a circle inscribed in it: a round wall
+ * inside a square plot leaves four unexplained wedges of ground in the corners
+ * and never lines up with the parcel edge the player can see. 39 keeps the
+ * 0.4 m wall inside the 0..80 scene with room to spare.
+ */
+export const BACKDROP_HALF = 39
+
 /** Bark, canopy, mist, grass. None of these may exceed DECOR_MAX_SATURATION. */
 export const FOREST = {
   // #4A3628 is what the brief specified, and it measures 0.30 saturation
@@ -218,11 +228,17 @@ export const GROUND_SIZE = 80
 
 /**
  * Direction of the first pad from the tower centre, and its fixed distance.
+ *
+ * Kept on the X axis of the scene rather than on its diagonal. On the diagonal
+ * the lobby, the gate and the board all sat at 45 degrees to the square the
+ * scene actually is, so nothing lined up with anything and the whole approach
+ * read as crooked. On the axis the tower, the gate, the spawn and the board
+ * are one straight line down the middle of the field.
  * The radius must NOT follow the difficulty curve: the lobby, the start gate
  * and the spawn point are all built around this pad, so it has to sit in the
  * same place in every round.
  */
-export const START_X = 20
+export const START_X = 40
 export const START_Z = 20
 export const START_RADIUS = 12
 
@@ -267,8 +283,19 @@ export const LOBBY_SPAWN_X = LOBBY_X - GATE_DIR_X * LOBBY_SPAWN_BACK
 export const LOBBY_SPAWN_Z = LOBBY_Z - GATE_DIR_Z * LOBBY_SPAWN_BACK
 
 /** Board placement, relative to the lobby centre, in gate-space. */
-export const BOARD_FORWARD = 6.6
-export const BOARD_LATERAL = 9.6
+/**
+ * Where the board stands, measured from the lobby centre along the line to
+ * the gate. NEGATIVE means behind the spawn.
+ *
+ * This deliberately reverses an earlier rule. The board used to sit 43 degrees
+ * off the arrival gaze so it would be read on arrival, and directly behind was
+ * called out as the mistake that made nobody read it. It is back there on
+ * purpose now: the number that matters on arrival is on the gate itself, at
+ * eye height, facing the spawn. The board is for browsing, and browsing wants
+ * the whole thing square in front of you, not angled off to one side.
+ */
+export const BOARD_FORWARD = -9
+export const BOARD_LATERAL = 0
 export const GATE_WIDTH = 6
 
 /** How close the player must be for an approach prompt to appear. */

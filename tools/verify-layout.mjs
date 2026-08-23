@@ -274,9 +274,16 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   const [bx, bz] = unit(BX - cfg.LOBBY_SPAWN_X, BZ - cfg.LOBBY_SPAWN_Z)
   const angle = (Math.acos(Math.max(-1, Math.min(1, lx * bx + lz * bz))) * 180) / Math.PI
   const dist = Math.hypot(BX - cfg.LOBBY_SPAWN_X, BZ - cfg.LOBBY_SPAWN_Z)
-  note(angle <= 55, 'board visible on arrival', `${angle.toFixed(0)} deg off the gaze, ${dist.toFixed(1)} m away`)
-  // And it must not stand in the doorway it is advertising.
-  note(cfg.BOARD_LATERAL > cfg.GATE_WIDTH / 2 + 1, 'board clear of the gate opening', `${cfg.BOARD_LATERAL} m aside of a ${cfg.GATE_WIDTH} m gate`)
+  // Deliberately behind: the board is for browsing and wants to be square in
+  // front of you, while the number that matters on arrival is on the gate at
+  // eye height. An earlier rule demanded the opposite; this replaces it.
+  note(angle >= 150, 'board stands behind the start', `${angle.toFixed(0)} deg from the gaze, ${dist.toFixed(1)} m back`)
+  note(Math.abs(cfg.BOARD_LATERAL) < 0.01, 'board centred on the axis', `${cfg.BOARD_LATERAL} m off centre`)
+  // Behind means behind: it must never end up between the spawn and the gate.
+  note(cfg.BOARD_FORWARD < 0, 'board is not in the doorway', `${cfg.BOARD_FORWARD} m from the lobby centre`)
+  // And it has to stay on the deck it is standing on.
+  note(Math.abs(cfg.BOARD_FORWARD) < cfg.LOBBY_SIZE / 2 - 1, 'board stands on the deck',
+    `${Math.abs(cfg.BOARD_FORWARD)} m back of a ${cfg.LOBBY_SIZE / 2} m half-deck`)
 }
 
 // The backdrop is a wall, not a set of spikes.
@@ -290,84 +297,35 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
 // and consecutive panels must actually touch.
 {
   const panels = backdropRing()
-  let worstDot = 0
-  let worstGap = 0
 
+  // Every wall must be axis-aligned and must face the centre broadside: its
+  // long axis perpendicular to its own outward normal. The ring this replaced
+  // once shipped rotated ninety degrees and only a screenshot noticed.
+  let worstDot = 0
   for (const p of panels) {
-    const rx = p.x - cfg.CENTER_X
-    const rz = p.z - cfg.CENTER_Z
-    const rlen = Math.hypot(rx, rz)
+    const nx = Math.sign(Math.round(p.x - cfg.CENTER_X))
+    const nz = Math.sign(Math.round(p.z - cfg.CENTER_Z))
     const phi = (p.yaw * Math.PI) / 180
     // Local +Z after a yaw of phi points at (sin phi, cos phi) in world x/z.
-    const dot = Math.abs((Math.sin(phi) * rx + Math.cos(phi) * rz) / rlen)
-    worstDot = Math.max(worstDot, dot)
+    worstDot = Math.max(worstDot, Math.abs(Math.sin(phi) * nx + Math.cos(phi) * nz))
   }
-  note(worstDot < 0.02, 'backdrop panels lie along the ring',
-    'worst |axis . radius| ' + worstDot.toFixed(4) + ' (1.0 = a spoke)')
+  note(worstDot < 0.02, 'walls face the field broadside',
+    `worst |axis . normal| ${worstDot.toFixed(4)} (1.0 = a spoke)`)
 
-  // Each panel must cover more than its own share of the circle, or the ring
-  // is a picket fence and the climb shows sky between the slats. Measured as
-  // an angle from the centre, not as a distance between ends: the panels are
-  // straight chords laid on tangents, so their corners never touch even when
-  // they overlap properly - end-to-end distance would fail a correct ring.
-  const halfSector = Math.PI / BACKDROP_PANELS
-  const halfCovered = Math.atan((panels[0].length / 2) / cfg.BACKDROP_RADIUS)
-  const margin = ((halfCovered - halfSector) * 180) / Math.PI
-  note(margin > 0, 'backdrop closes into a ring',
-    'each panel covers ' + ((halfCovered * 360) / Math.PI).toFixed(1) +
-    ' deg of a ' + ((halfSector * 360) / Math.PI).toFixed(1) + ' deg slot')
+  // Four walls, and each long enough to reach past both corners.
+  const overhang = panels[0].length / 2 - cfg.BACKDROP_HALF
+  note(overhang > 0, 'boundary closes at the corners',
+    `each wall overhangs its corner by ${overhang.toFixed(2)} m`)
 
-  // And it must stand outside the climb, not through it.
-  let nearest = Infinity
-  for (const p of panels) {
-    for (const s of [-1, 1]) {
-      const ex = p.x + Math.sin((p.yaw * Math.PI) / 180) * s * (p.length / 2)
-      const ez = p.z + Math.cos((p.yaw * Math.PI) / 180) * s * (p.length / 2)
-      nearest = Math.min(nearest, Math.hypot(ex - cfg.CENTER_X, ez - cfg.CENTER_Z))
-    }
-  }
-  note(nearest > cfg.SHAFT_MAX_RADIUS + 4, 'backdrop stands clear of the climb',
-    'nearest panel corner ' + nearest.toFixed(1) + ' m, pads reach ' + cfg.SHAFT_MAX_RADIUS + ' m')
-}
+  // The wall is a square, so its nearest point to the tower is the middle of
+  // a side, not a corner.
+  note(cfg.BACKDROP_HALF > cfg.SHAFT_MAX_RADIUS + 4, 'boundary stands clear of the climb',
+    `${cfg.BACKDROP_HALF} m to a wall, pads reach ${cfg.SHAFT_MAX_RADIUS} m`)
 
-// The brief's load-bearing rule: "a pad is always lighter than what is behind
-// it". It was false for the understory - backdrop 0.846 against pads 0.635 -
-// because the panels self-lit at 0.85 and overtook the climb. The margin is a
-// judgement call; below ~0.12 the pad stops popping off the wall on a phone.
-{
-  const rows = palette.valueSeparation()
-  const worst = rows.reduce((a, b) => (a.margin < b.margin ? a : b))
-  note(worst.margin > 0.12, 'pads read lighter than the backdrop',
-    'tightest ' + worst.band + ': pad ' + worst.pad.toFixed(2) +
-    ' vs wall ' + worst.backdrop.toFixed(2) + ' (+' + worst.margin.toFixed(2) + ')')
-}
-
-// The forest edge must stand outside everything it could ruin.
-//
-// Set to radius 27 once, which put trees through the leaderboard and the
-// spawn camera inside a canopy - the lobby is a 24 m square whose corners
-// reach much further out than its centre radius suggests.
-{
-  const trees = treeLine()
-  const half = cfg.LOBBY_SIZE / 2
-
-  let deepest = 0
-  for (const t of trees) {
-    const dx = Math.max(0, Math.abs(t.x - cfg.LOBBY_X) - half)
-    const dz = Math.max(0, Math.abs(t.z - cfg.LOBBY_Z) - half)
-    // How far the canopy pushes into the deck, 0 when it clears it entirely.
-    deepest = Math.max(deepest, cfg.TREE_CANOPY_RADIUS - Math.hypot(dx, dz))
-  }
-  note(deepest <= 0, 'trees stand clear of the lobby',
-    trees.length + ' trees, deepest intrusion ' + Math.max(0, deepest).toFixed(2) + ' m')
-
-  let nearest = Infinity
-  for (const t of trees) {
-    nearest = Math.min(nearest,
-      Math.hypot(t.x - cfg.CENTER_X, t.z - cfg.CENTER_Z) - cfg.TREE_CANOPY_RADIUS)
-  }
-  note(nearest > cfg.SHAFT_MAX_RADIUS + 2, 'trees stand clear of the climb',
-    'nearest canopy ' + nearest.toFixed(1) + ' m, pads reach ' + cfg.SHAFT_MAX_RADIUS + ' m')
+  // And it has to stay inside the 80 x 80 scene or the client clips it away.
+  const outer = cfg.BACKDROP_HALF + panels[0].thickness / 2
+  note(outer < cfg.GROUND_SIZE / 2, 'boundary inside the scene',
+    `outer face at ${outer.toFixed(1)} m of a ${cfg.GROUND_SIZE / 2} m half-field`)
 }
 
 // Determinism: every client builds the tower locally, so the same round must

@@ -1,5 +1,5 @@
 import {
-  BACKDROP_RADIUS,
+  BACKDROP_HALF,
   BANDS,
   CENTER_X,
   CENTER_Z,
@@ -1179,41 +1179,46 @@ export type BandPanel = {
   backdrop: string
 }
 
-/** How many panels make up one band ring. */
-export const BACKDROP_PANELS = 8
+/** Four walls per band: one per side of the field. */
+export const BACKDROP_PANELS = 4
+
+/** Corner overlap, so the four walls close into a box with no gap. */
+const CORNER_OVERLAP = 1.2
 
 /**
- * How much longer than its exact slot each panel is cut.
+ * The boundary wall, as pure numbers.
  *
- * The exact length is the side of the circumscribed polygon, 2R tan(pi/N).
- * Deriving it means the ring stays closed when N changes; the old fixed 1.2 m
- * overlap was tuned for N = 14 and would have opened gaps at N = 8 without
- * saying so.
- */
-const PANEL_OVERLAP_FACTOR = 1.06
-
-/**
- * The backdrop ring, as pure numbers.
+ * A square, following the field, not a circle inscribed in it. The ring it
+ * replaced left four unexplained wedges of ground in the corners and never
+ * agreed with the parcel edge the player can actually see.
  *
- * This lives here rather than in build.ts for one reason: it was wrong for two
- * commits and nothing could tell. A yaw of -angle + 90 turned every panel from
- * a piece of wall into a spoke pointing out of the tower, and the only witness
- * was a screenshot. Numbers can be asserted; a screenshot cannot.
+ * It also costs half as much: four walls per band instead of eight panels, so
+ * sixteen material slots come back for the climb to spend.
+ *
+ * Kept here rather than in build.ts for the reason the ring was: this geometry
+ * shipped rotated ninety degrees once and nothing but a screenshot noticed.
  */
 export function backdropRing(): BandPanel[] {
   const panels: BandPanel[] = []
-  const length =
-    2 * BACKDROP_RADIUS * Math.tan(Math.PI / BACKDROP_PANELS) * PANEL_OVERLAP_FACTOR
+  const length = BACKDROP_HALF * 2 + CORNER_OVERLAP
+
+  // Long axis along X for the two walls that face up and down the Z axis, and
+  // along Z for the other two. A yaw of 90 puts local +Z on world +X.
+  const sides = [
+    { dx: 0, dz: 1, yaw: 90 },
+    { dx: 0, dz: -1, yaw: 90 },
+    { dx: 1, dz: 0, yaw: 0 },
+    { dx: -1, dz: 0, yaw: 0 }
+  ]
 
   for (const band of BANDS) {
     const height = band.high - band.low
-    for (let i = 0; i < BACKDROP_PANELS; i++) {
-      const angle = (i / BACKDROP_PANELS) * Math.PI * 2
+    for (const side of sides) {
       panels.push({
-        x: CENTER_X + Math.cos(angle) * BACKDROP_RADIUS,
-        z: CENTER_Z + Math.sin(angle) * BACKDROP_RADIUS,
+        x: CENTER_X + side.dx * BACKDROP_HALF,
+        z: CENTER_Z + side.dz * BACKDROP_HALF,
         y: band.low + height / 2,
-        yaw: (-angle * 180) / Math.PI,
+        yaw: side.yaw,
         height,
         length,
         thickness: 0.4,
