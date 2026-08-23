@@ -21,8 +21,9 @@ import {
   REACH_BUDGET,
   TOWER_SEED,
   TOWER_ZONES,
-  TREE_CANOPY_RADIUS,
+  TREE_TRUNK_RADIUS,
   TREE_COUNT,
+  TREE_RING_OUTER,
   TREE_RING_RADIUS,
   TREE_SCALE,
   PAD_SEPARATION,
@@ -1247,7 +1248,7 @@ export type TreeDef = { x: number; z: number; yaw: number; scale: number }
  */
 export function treeLine(): TreeDef[] {
   const trees: TreeDef[] = []
-  const halfLobby = LOBBY_SIZE / 2 + TREE_CANOPY_RADIUS
+  const halfLobby = LOBBY_SIZE / 2 + TREE_TRUNK_RADIUS
 
   for (let i = 0; i < TREE_COUNT; i++) {
     const angle = (i / TREE_COUNT) * Math.PI * 2
@@ -1257,13 +1258,25 @@ export function treeLine(): TreeDef[] {
 
     // The lobby deck is an axis-aligned square, so this is a box test, not a
     // radius test. A radius test would leave trees standing on the corners.
-    const insideLobby =
-      Math.abs(x - LOBBY_X) < halfLobby && Math.abs(z - LOBBY_Z) < halfLobby
-    if (insideLobby) continue
+    const clearsLobby = (px: number, pz: number) =>
+      Math.abs(px - LOBBY_X) >= halfLobby || Math.abs(pz - LOBBY_Z) >= halfLobby
+
+    // Dropping a tree that lands on the deck left a bald third of the ring
+    // exactly behind the board - the one direction a player faces while
+    // reading it, and the only place in the clearing with no forest in it.
+    // Push it outward instead, to the last radius that still clears the wall.
+    let px = x
+    let pz = z
+    if (!clearsLobby(px, pz)) {
+      const out = TREE_RING_OUTER
+      px = CENTER_X + Math.cos(angle) * out
+      pz = CENTER_Z + Math.sin(angle) * out
+      if (!clearsLobby(px, pz)) continue
+    }
 
     trees.push({
-      x,
-      z,
+      x: px,
+      z: pz,
       yaw: (i * 47) % 360,
       scale: TREE_SCALE * (1 + Math.sin(i * 1.107) * 0.22)
     })

@@ -107,6 +107,9 @@ const GOLD4 = Color4.create(1, 0.82, 0.25, 1)
  * thing they stop to watch is each other.
  */
 const RAIL_HEIGHT = 7.5
+
+/** How far to one side of the board the climber rail stands. */
+const RAIL_ASIDE = BOARD_W / 2 + 3.4
 let railMarkers: Entity[] = []
 
 function createProgressRail() {
@@ -121,8 +124,18 @@ function createProgressRail() {
   // marker posts, both lamps, the gate posts and the doorway itself - rather
   // than by picking a number and looking at it, which is how the rail ended up
   // inside a marker post the first time and inside the gate the second.
-  const x = BOARD_X + FRONT_X * 3.2 - SIDE_X * 2.4
-  const z = BOARD_Z + FRONT_Z * 3.2 - SIDE_Z * 2.4
+  // Beside the board, not in front of it.
+  //
+  // The old offsets were searched for a spot that overlapped nothing, and they
+  // found one - three metres in front of the board and two to the left, which
+  // overlaps nothing and stands squarely between the spawn and the thing the
+  // spawn is meant to read. Not overlapping and not blocking are different
+  // questions, and only the first one was being asked.
+  //
+  // Outside the torches, so the four objects read as one installation:
+  // board, torch, rail.
+  const x = BOARD_X - SIDE_X * RAIL_ASIDE
+  const z = BOARD_Z - SIDE_Z * RAIL_ASIDE
 
   const rail = engine.addEntity()
   Transform.create(rail, {
@@ -606,10 +619,13 @@ function createBoard() {
     scale: Vector3.create(BOARD_W + 0.22, BOARD_H + 0.22, 0.06)
   })
   MeshRenderer.setBox(backing)
+  // A carved frame, not a lit screen. The neon outline made this read as a
+  // monitor bolted into a clearing, and it was the piece pulling hardest
+  // against every other thing in the scene.
   Material.setPbrMaterial(backing, {
-    albedoColor: CYAN4,
-    emissiveColor: CYAN3,
-    emissiveIntensity: 2.5
+    albedoColor: Color4.fromHexString(FOREST.bark),
+    metallic: 0,
+    roughness: 0.9
   })
 
   const face = engine.addEntity()
@@ -638,9 +654,9 @@ function createBoard() {
   })
   MeshRenderer.setBox(headerBar)
   Material.setPbrMaterial(headerBar, {
-    albedoColor: Color4.create(0.05, 0.1, 0.16, 1),
-    emissiveColor: Color3.create(0.03, 0.16, 0.26),
-    emissiveIntensity: 1,
+    albedoColor: Color4.fromHexString(FOREST.canopyNear),
+    emissiveColor: Color3.create(0.06, 0.14, 0.08),
+    emissiveIntensity: 0.6,
     metallic: 0,
     roughness: 0.95
   })
@@ -726,9 +742,9 @@ function createDressing() {
     MeshRenderer.setCylinder(post)
     MeshCollider.setCylinder(post)
     Material.setPbrMaterial(post, {
-      albedoColor: Color4.create(0.12, 0.13, 0.18, 1),
-      metallic: 0.85,
-      roughness: 0.3
+      albedoColor: Color4.fromHexString(FOREST.bark),
+      metallic: 0,
+      roughness: 0.9
     })
 
     const marker = engine.addEntity()
@@ -746,10 +762,23 @@ function createDressing() {
     markers.push(marker)
 
     const lampOffset = side(direction * (BOARD_W / 2 + 1.9))
-    placeProp(MODELS.lampPost, {
-      position: Vector3.create(BOARD_X + lampOffset.x, 0.06, BOARD_Z + lampOffset.z),
-      yaw: BOARD_YAW,
-      scale: 1.4
+    // No collider meshes in this GLB, and a torch beside a noticeboard is
+    // scenery: solid stays false so nobody can get wedged on it.
+    //
+    // Its origin sits 2.23 m ABOVE its own base - measured out of the file,
+    // with the node rotation applied, not read off the catalog. Placed at
+    // ground level it buries itself and leaves 28 cm of tripod showing, which
+    // is exactly what happened for one commit.
+    const TORCH_SCALE = 1.15
+    const TORCH_BASE_TO_ORIGIN = 2.23
+    placeProp(MODELS.torch, {
+      position: Vector3.create(
+        BOARD_X + lampOffset.x,
+        0.06 + TORCH_BASE_TO_ORIGIN * TORCH_SCALE,
+        BOARD_Z + lampOffset.z
+      ),
+      yaw: BOARD_YAW + direction * 12,
+      scale: TORCH_SCALE
     })
   }
 

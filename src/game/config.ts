@@ -101,6 +101,12 @@ export const BANDS = [
  */
 /** The forest edge: outside every pad, inside the backdrop wall. */
 export const TREE_RING_RADIUS = 30
+/**
+ * Where a tree goes when its place on the ring falls on the lobby deck: out
+ * against the wall rather than deleted. Must stay inside BACKDROP_HALF minus
+ * a canopy, or half a tree gets clipped by the scene boundary.
+ */
+export const TREE_RING_OUTER = 33
 export const TREE_COUNT = 24
 /**
  * tree-fir-02 stands 5.55 m at scale 1, so this is roughly a 14 m tree.
@@ -113,6 +119,17 @@ export const TREE_COUNT = 24
 export const TREE_SCALE = 3.0
 /** Half the canopy width at TREE_SCALE: tree-fir-02 is 2.7 m wide at scale 1. */
 export const TREE_CANOPY_RADIUS = 4.1
+
+/**
+ * What actually has to stay off the deck: the trunk, not the canopy.
+ *
+ * Keeping a whole canopy clear of a 24 m lobby erased every tree in the
+ * southern half of the field - the exclusion box reached from z=1.9 to z=34.1
+ * - and left the board standing against bare wall. A canopy over the edge of
+ * a clearing is what the edge of a clearing looks like; a trunk in the middle
+ * of the deck is an obstacle. Only the second one is a problem.
+ */
+export const TREE_TRUNK_RADIUS = 0.9
 
 export const BACKDROP_RADIUS = 34
 

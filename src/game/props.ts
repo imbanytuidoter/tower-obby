@@ -35,7 +35,16 @@ export const MODELS = {
    */
   tree: 'assets/Models/tree-fir-02.glb',
   /** 1 mesh / 1 material / 1 texture, clip "fernidle", no collider meshes. */
-  fern: 'assets/Models/fern.glb'
+  fern: 'assets/Models/fern.glb',
+  /**
+   * A wooden torch on a tripod, for the clearing. Audited: 2 meshes /
+   * 2 materials / 5 textures, no animation, NO collider meshes - so collision
+   * goes on the visible mesh or nowhere. 1.43 x 2.51 x 1.53 m at scale 1.
+   *
+   * Replaces LampPostSciFi_01 beside the board. A chrome sci-fi lamp post in a
+   * forest clearing was the loudest single style clash in the scene.
+   */
+  torch: 'assets/Models/torch.glb'
 } as const
 
 /** Clip names read out of the GLBs, not guessed. */

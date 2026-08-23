@@ -39,7 +39,9 @@ const MAX_RISE = cfg.MAX_STEP_RISE
 const MAX_REACH = cfg.REACH_BUDGET
 
 const fail = []
+let checks = 0
 const note = (ok, label, detail) => {
+  checks++
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label.padEnd(34)} ${detail}`)
   if (!ok) fail.push(label)
 }
@@ -275,6 +277,20 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   const [bx, bz] = unit(BX - cfg.LOBBY_SPAWN_X, BZ - cfg.LOBBY_SPAWN_Z)
   const angle = (Math.acos(Math.max(-1, Math.min(1, lx * bx + lz * bz))) * 180) / Math.PI
   const dist = Math.hypot(BX - cfg.LOBBY_SPAWN_X, BZ - cfg.LOBBY_SPAWN_Z)
+  // Nothing may stand between the spawn and the board's face. The climber
+  // rail did for two commits: its position had been searched for a spot that
+  // OVERLAPPED nothing, which is a different question from blocking nothing,
+  // and it landed three metres directly in front.
+  const RAIL_ASIDE = cfg.BOARD_W_TEST !== undefined ? cfg.BOARD_W_TEST : 5.6 / 2 + 3.4
+  const railX = BX - sx * RAIL_ASIDE
+  const railZ = BZ - sz * RAIL_ASIDE
+  const [rx, rz] = unit(railX - cfg.LOBBY_SPAWN_X, railZ - cfg.LOBBY_SPAWN_Z)
+  const railAngle = (Math.acos(Math.max(-1, Math.min(1, rx * bx + rz * bz))) * 180) / Math.PI
+  // Half the board's angular width from the spawn, plus a margin.
+  const halfBoard = (Math.atan((5.6 / 2) / dist) * 180) / Math.PI
+  note(railAngle > halfBoard + 4, 'nothing blocks the board from the spawn',
+    `rail sits ${railAngle.toFixed(0)} deg off, board spans ${halfBoard.toFixed(0)} deg`)
+
   // Deliberately behind: the board is for browsing and wants to be square in
   // front of you, while the number that matters on arrival is on the gate at
   // eye height. An earlier rule demanded the opposite; this replaces it.
@@ -361,6 +377,46 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     'closest to the edge: ' + culprit + ', ' + (-worst).toFixed(1) + ' m of margin')
 }
 
+// The forest edge must stand outside everything it could ruin.
+//
+// Set to radius 27 once, which put trees through the leaderboard and the
+// spawn camera inside a canopy - the lobby is a 24 m square whose corners
+// reach much further out than its centre radius suggests.
+{
+  const trees = treeLine()
+  const half = cfg.LOBBY_SIZE / 2
+
+  let deepest = 0
+  for (const t of trees) {
+    const dx = Math.max(0, Math.abs(t.x - cfg.LOBBY_X) - half)
+    const dz = Math.max(0, Math.abs(t.z - cfg.LOBBY_Z) - half)
+    // The TRUNK must clear the deck. A canopy overhanging the edge of a
+    // clearing is the point of a clearing; a trunk on the deck is an obstacle.
+    deepest = Math.max(deepest, cfg.TREE_TRUNK_RADIUS - Math.hypot(dx, dz))
+  }
+  note(deepest <= 0, 'tree trunks stand clear of the deck',
+    trees.length + ' trees, deepest intrusion ' + Math.max(0, deepest).toFixed(2) + ' m')
+
+  let nearest = Infinity
+  for (const t of trees) {
+    nearest = Math.min(nearest,
+      Math.hypot(t.x - cfg.CENTER_X, t.z - cfg.CENTER_Z) - cfg.TREE_CANOPY_RADIUS)
+  }
+  note(nearest > cfg.SHAFT_MAX_RADIUS + 2, 'canopies stand clear of the climb',
+    'nearest canopy ' + nearest.toFixed(1) + ' m, pads reach ' + cfg.SHAFT_MAX_RADIUS + ' m')
+
+  // The ring must actually surround the clearing. A third of it went missing
+  // once - deleted rather than moved - leaving the board against bare wall in
+  // the one direction a player faces to read it.
+  const quadrants = new Set()
+  for (const t of trees) {
+    const a = Math.atan2(t.z - cfg.CENTER_Z, t.x - cfg.CENTER_X)
+    quadrants.add(Math.floor(((a + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 2)))
+  }
+  note(quadrants.size === 4, 'forest surrounds the clearing',
+    quadrants.size + ' of 4 quadrants have trees')
+}
+
 // The brief's load-bearing rule: "a pad is always lighter than what is behind
 // it". It was false for the understory once - backdrop 0.846 against pads
 // 0.635 - because the panels self-lit at 0.85 and overtook the climb.
@@ -406,6 +462,14 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
 const once = JSON.stringify(buildTower())
 const twice = JSON.stringify(buildTower())
 note(once === twice, 'deterministic across builds', once.length + ' bytes')
+
+// A count guard, because this file has twice lost checks to a careless
+// region-replace edit: the value-separation rule and then the whole tree
+// block, both cut out along with the code they happened to sit between, both
+// unnoticed until a screenshot showed the damage. Raise this when you add one.
+const MIN_CHECKS = 34
+note(checks >= MIN_CHECKS, 'no invariant has gone missing',
+  checks + ' checks ran, floor is ' + MIN_CHECKS)
 
 console.log(`\n  pads ${maxPads}   height ${minH.toFixed(1)} to ${maxH.toFixed(1)} m of ${cfg.MAX_PAD_HEIGHT} m`)
 console.log(`  clean climb model ${cfg.estimateClimbSeconds(buildTower().pads).toFixed(0)} s\n`)
