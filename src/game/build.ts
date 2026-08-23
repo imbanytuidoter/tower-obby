@@ -283,6 +283,12 @@ function createPickups(layout: Layout, entities: Entity[]): BuiltPickup[] {
   })
 }
 
+/**
+ * Gold beacons - the ante coin, the plate's target line, a checkpoint ring,
+ * the crown's ring - were at 4 and 5. Gold at that intensity renders white,
+ * which costs a beacon the exact thing that makes it one. Bright, but still
+ * gold: emphasis by brightness, identity by hue, the same rule everywhere.
+ */
 /** Landmarks are round, plain pads are square: readable at a glance. */
 const isLandmark = (pad: Pad) => pad.kind === 'checkpoint' || pad.kind === 'finish'
 
@@ -553,7 +559,7 @@ function buildCoin(layout: Layout, entities: Entity[]): BuiltCoin | null {
   Material.setPbrMaterial(entity, {
     albedoColor: FINISH_ALBEDO,
     emissiveColor: FINISH_EMISSIVE,
-    emissiveIntensity: 4
+    emissiveIntensity: PAD_EMISSIVE.goal * 2
   })
 
   const anchor = def.route[def.route.length - 1]
@@ -606,7 +612,7 @@ function buildPlate(layout: Layout, entities: Entity[]): BuiltPlate | null {
   Material.setPbrMaterial(mark, {
     albedoColor: FINISH_ALBEDO,
     emissiveColor: FINISH_EMISSIVE,
-    emissiveIntensity: 2
+    emissiveIntensity: PAD_EMISSIVE.goal * 2
   })
 
   entities.push(...routeSign(
@@ -1077,7 +1083,7 @@ function createCheckpointMarker(pad: Pad, number: number) {
   Material.setPbrMaterial(ring, {
     albedoColor: CP_ALBEDO,
     emissiveColor: CP_EMISSIVE,
-    emissiveIntensity: 4
+    emissiveIntensity: PAD_EMISSIVE.goal * 2
   })
 
   // A slim beacon, visible from far below. Kept narrow and very transparent:
@@ -1357,7 +1363,7 @@ function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
   Material.setPbrMaterial(ring, {
     albedoColor: FINISH_ALBEDO,
     emissiveColor: FINISH_EMISSIVE,
-    emissiveIntensity: 5
+    emissiveIntensity: PAD_EMISSIVE.goal * 3
   })
   made.push(ring)
 
