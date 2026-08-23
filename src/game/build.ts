@@ -20,6 +20,7 @@ import {
   DECOR_MAX_SATURATION,
   FOREST,
   PAD_EMISSIVE,
+  SHADOW_MAX_HEIGHT,
   CHECKPOINT_EVERY_SECTIONS,
   TOWER_ZONES,
   FINISH_RADIUS,
@@ -342,7 +343,8 @@ export function buildWorld(layout: Layout): World {
     // edge, which it now does. The plinth gave the slab mass, and a thicker
     // slab gives the same read: the top face is lit by the sky and the sides
     // are not, so a single box is still two-tone in practice.
-    entities.push(createGroundShadow(pad))
+    const blob = createGroundShadow(pad)
+    if (blob) entities.push(blob)
 
     const top = Vector3.create(pad.x, pad.y + PAD_TOP, pad.z)
 
@@ -508,7 +510,8 @@ function buildCoin(layout: Layout, entities: Entity[]): BuiltCoin | null {
       emissiveIntensity: PAD_EMISSIVE.unstable * 5,
       roughness: 0.7
     })
-    entities.push(createGroundShadow(pad))
+    const blob = createGroundShadow(pad)
+    if (blob) entities.push(blob)
   }
 
   // The coin itself stays a primitive - it has to read as gold and nothing
@@ -803,7 +806,18 @@ export function clearWorld(world: World | null) {
  * position is ambiguous, and players cannot judge where a platform actually is.
  * Higher pads cast a larger, fainter blob, which also reads as distance.
  */
-function createGroundShadow(pad: Pad): Entity {
+function createGroundShadow(pad: Pad): Entity | null {
+  // A blob on the ground under a pad forty metres up is never in frame with
+  // the pad it belongs to: by then the ground is behind you and out of sight,
+  // and the anchor it was drawing anchors nothing. One per pad cost 119
+  // material slots - a quarter of the whole mobile budget - to draw an anchor
+  // that ninety of them could not be seen next to.
+  //
+  // The cut is the top of the understory band rather than a round number,
+  // because that is exactly the height above which the clearing floor stops
+  // sharing the screen with the climb.
+  if (pad.y > SHADOW_MAX_HEIGHT) return null
+
   const lift = quantise(pad.y, SHADOW_STEPS)
   const shadow = engine.addEntity()
 

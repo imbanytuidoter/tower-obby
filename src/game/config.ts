@@ -146,6 +146,13 @@ export const FOREST = {
 } as const
 
 /** How much a pad lights itself, per meaning, so it survives canopy shade. */
+/**
+ * Above this height a pad gets no ground blob. Tied to the top of the first
+ * band: that is the altitude above which the clearing floor and the climb stop
+ * sharing a screen, so an anchor drawn on the floor anchors nothing.
+ */
+export const SHADOW_MAX_HEIGHT = BANDS[0].high
+
 export const PAD_EMISSIVE = {
   safe: 0.35,
   hurts: 0.2,
