@@ -175,8 +175,16 @@ eight optional coins                              COINS 8/8, hidden as taken
 the collection survives a restart                 still 8/8 after a reload
 fork choice recorded from where the feet landed   "Zone 3 - took the bold arm -3.7s"
 ante: client claims, server validates, token granted
-ghost accepted by the server        [SERVER] ghost replaced by imbanytui (44.1s)
+ghost accepted, stored and replayed               a mote on the path, in frame
+coin finds reach the disk                         "found": [0,1,2] in storage
 ```
+
+The ghost took three attempts to see, and the reason is worth writing down:
+the server only invites a path from the climber who leads the day, and the
+board was full of times set by teleporting the test client around - 0.96 s
+among them. No real climb could ever top that, so the invitation could never
+be issued. The local boards were cleared and a climb of 8.04 s put a reachable
+number back on them.
 
 Still unverified, and honestly so:
 
