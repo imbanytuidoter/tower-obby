@@ -90,7 +90,7 @@ export const BANDS = [
   { name: 'UNDERSTORY', from: 1, to: 5, low: 0, high: 17, backdrop: '#3A4432FF' },
   { name: 'MID BOUGHS', from: 6, to: 10, low: 17, high: 28.8, backdrop: '#2E3B2CFF' },
   { name: 'UPPER CANOPY', from: 11, to: 15, low: 28.8, high: 44.6, backdrop: '#2F4038FF' },
-  { name: 'CROWN', from: 16, to: 20, low: 44.6, high: 78, backdrop: '#243040FF' }
+  { name: 'CROWN', from: 16, to: 20, low: 44.6, high: 90, backdrop: '#243040FF' }
 ] as const
 
 /** Where the backdrop stands: outside every pad, inside the ground plate. */

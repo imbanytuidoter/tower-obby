@@ -1098,26 +1098,38 @@ export function paintPad(entity: Entity, pad: Pad) {
     return
   }
 
+  // The landmarks kept the emissive levels they had before the brief's table
+  // arrived, while every other pad moved onto it. At 1.8 and 4 they blew out
+  // to white plates: the gold that says "checkpoint" was the first thing to
+  // go, and a landmark that loses its colour stops being a landmark.
+  //
+  // They also skipped the slab texture, so they had no rim while everything
+  // around them had one. Same texture, so the edge reads the same way.
   switch (pad.kind) {
     case 'start':
       Material.setPbrMaterial(entity, {
+        texture: Material.Texture.Common({ src: SLAB_TEXTURE }),
         albedoColor: START_ALBEDO,
         emissiveColor: START_EMISSIVE,
-        emissiveIntensity: 2
+        emissiveIntensity: PAD_EMISSIVE.goal
       })
       return
     case 'checkpoint':
       Material.setPbrMaterial(entity, {
+        texture: Material.Texture.Common({ src: SLAB_TEXTURE }),
         albedoColor: CP_ALBEDO,
         emissiveColor: CP_EMISSIVE,
-        emissiveIntensity: 1.8
+        emissiveIntensity: PAD_EMISSIVE.goal
       })
       return
     case 'finish':
+      // The one pad allowed to be brighter than the rule: it is the only pad
+      // in the tower you are trying to reach from three zones below.
       Material.setPbrMaterial(entity, {
+        texture: Material.Texture.Common({ src: SLAB_TEXTURE }),
         albedoColor: FINISH_ALBEDO,
         emissiveColor: FINISH_EMISSIVE,
-        emissiveIntensity: 4
+        emissiveIntensity: PAD_EMISSIVE.goal * 1.6
       })
       return
     default: {
