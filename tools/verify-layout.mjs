@@ -329,6 +329,22 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     `outer face at ${outer.toFixed(1)} m of a ${cfg.GROUND_SIZE / 2} m half-field`)
 }
 
+// The brief's load-bearing rule: "a pad is always lighter than what is behind
+// it". It was false for the understory once - backdrop 0.846 against pads
+// 0.635 - because the panels self-lit at 0.85 and overtook the climb.
+//
+// This check was silently deleted while the backdrop block around it was being
+// rewritten for the square wall, and nothing noticed for one commit. It counts
+// the slab texture now: an untextured wall delivers all of its albedo, a
+// textured pad does not.
+{
+  const rows = palette.valueSeparation()
+  const worst = rows.reduce((a, b) => (a.margin < b.margin ? a : b))
+  note(worst.margin > 0.12, 'pads read lighter than the backdrop',
+    'tightest ' + worst.band + ': pad ' + worst.pad.toFixed(2) +
+    ' vs wall ' + worst.backdrop.toFixed(2) + ' (+' + worst.margin.toFixed(2) + ')')
+}
+
 // A collar on the trunk means "a checkpoint is at this height", so it has to
 // be at that height. They were first spaced evenly up the trunk while the
 // climb rises unevenly, which put every one of them off by metres.

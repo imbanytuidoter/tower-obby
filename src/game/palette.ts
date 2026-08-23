@@ -25,6 +25,18 @@ const ZONE_STEPS = 10
  */
 export const BACKDROP_EMISSIVE = 0.12
 
+/**
+ * How much of a pad's albedo the slab texture lets through on its FACE.
+ *
+ * The texture is greyscale and multiplies albedoColor, so a face painted at
+ * 135/255 halves the colour that actually reaches the eye. Without this the
+ * value check compared the colour in the source against a wall that has no
+ * texture at all, passed, and said nothing about what renders.
+ *
+ * Measured from images/textures/slab.png, which tools/make-textures.py writes.
+ */
+export const SLAB_FACE_ALBEDO = 135 / 255
+
 /** 0 at the gate, 1 at the crown, quantised to bound the material count. */
 export function zoneRamp(section: number): number {
   const t = Math.min(1, Math.max(0, (section - 1) / (TOWER_ZONES - 1)))
@@ -83,8 +95,11 @@ export type BandContrast = {
 export function valueSeparation(): BandContrast[] {
   return BANDS.map((band) => {
     const mid = Math.round((band.from + band.to) / 2)
+    // The wall is untextured, so all of its albedo arrives. The pad's does not:
+    // the slab texture darkens the face, while the emissive is not textured
+    // and comes through whole. Hence face * albedo + emissive, not 1 + emissive.
     const backdrop = apparent(hexRgb(band.backdrop), BACKDROP_EMISSIVE)
-    const pad = apparent(bodyRgb(mid), PAD_EMISSIVE.safe)
+    const pad = apparent(bodyRgb(mid), PAD_EMISSIVE.safe - (1 - SLAB_FACE_ALBEDO))
     return { band: band.name, backdrop, pad, margin: pad - backdrop }
   })
 }
