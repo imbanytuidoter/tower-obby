@@ -329,6 +329,38 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     `outer face at ${outer.toFixed(1)} m of a ${cfg.GROUND_SIZE / 2} m half-field`)
 }
 
+// Nothing may stick out of the 80 x 80 scene. Content outside the parcels is
+// clipped by the client - a wall gets its end sliced off, a tree loses half a
+// canopy - and the Creator Hub only reports a count, never which entity.
+//
+// The half-extent has to be rotated: a 0.4 x 79.2 wall is 39.6 m wide along
+// ONE axis, and which one depends on its yaw.
+{
+  const FIELD = cfg.GROUND_SIZE
+  let worst = -Infinity
+  let culprit = 'nothing'
+
+  const check = (name, x, z, hx, hz) => {
+    const over = Math.max(-(x - hx), x + hx - FIELD, -(z - hz), z + hz - FIELD)
+    if (over > worst) { worst = over; culprit = name }
+  }
+
+  for (const p of backdropRing()) {
+    const a = (p.yaw * Math.PI) / 180
+    const c = Math.abs(Math.cos(a))
+    const si = Math.abs(Math.sin(a))
+    const sx = p.thickness / 2
+    const sz = p.length / 2
+    check('wall', p.x, p.z, sx * c + sz * si, sx * si + sz * c)
+  }
+  for (const t of treeLine()) check('tree', t.x, t.z, cfg.TREE_CANOPY_RADIUS, cfg.TREE_CANOPY_RADIUS)
+  for (const pad of buildTower().pads) check('pad', pad.x, pad.z, pad.size / 2, pad.size / 2)
+  check('lobby', cfg.LOBBY_X, cfg.LOBBY_Z, cfg.LOBBY_SIZE / 2, cfg.LOBBY_SIZE / 2)
+
+  note(worst <= 0, 'everything stays inside the field',
+    'closest to the edge: ' + culprit + ', ' + (-worst).toFixed(1) + ' m of margin')
+}
+
 // The brief's load-bearing rule: "a pad is always lighter than what is behind
 // it". It was false for the understory once - backdrop 0.846 against pads
 // 0.635 - because the panels self-lit at 0.85 and overtook the climb.

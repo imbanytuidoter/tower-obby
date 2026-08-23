@@ -124,7 +124,7 @@ export const BACKDROP_RADIUS = 34
  * and never lines up with the parcel edge the player can see. 39 keeps the
  * 0.4 m wall inside the 0..80 scene with room to spare.
  */
-export const BACKDROP_HALF = 39
+export const BACKDROP_HALF = 38
 
 /** Bark, canopy, mist, grass. None of these may exceed DECOR_MAX_SATURATION. */
 export const FOREST = {
