@@ -103,3 +103,62 @@ export function valueSeparation(): BandContrast[] {
     return { band: band.name, backdrop, pad, margin: pad - backdrop }
   })
 }
+
+
+/**
+ * What each colour in the tower MEANS, as hex.
+ *
+ * Here rather than in build.ts so the one rule the whole readability of the
+ * scene rests on can be checked by arithmetic: a colour may not mean two
+ * things. It did. Unstable ground was #FF9D2E and a checkpoint was #FFD23F -
+ * fourteen degrees of hue and 0.15 of luminance apart, which is one colour on
+ * a phone at twenty metres.
+ */
+export const MEANING = {
+  safe: '#4EE3F2',
+  hurts: '#FF3B4D',
+  unstable: '#D2651A',
+  goal: '#FFD23F'
+} as const
+
+function hueOf(rgb: [number, number, number]): number {
+  const [r, g, b] = rgb
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const span = max - min
+  if (span === 0) return 0
+  const h = max === r ? ((g - b) / span) % 6 : max === g ? (b - r) / span + 2 : (r - g) / span + 4
+  return (h * 60 + 360) % 360
+}
+
+export type ColourGap = { a: string; b: string; hue: number; luminance: number }
+
+/**
+ * How far apart every pair of meanings is.
+ *
+ * Two ways to be distinguishable and either will do: a different hue, or a
+ * different brightness. Requiring both would rule out palettes that read
+ * perfectly well, and requiring neither is what produced the collision above.
+ */
+export function colourGaps(): ColourGap[] {
+  const names = Object.keys(MEANING) as (keyof typeof MEANING)[]
+  const gaps: ColourGap[] = []
+
+  for (let i = 0; i < names.length; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      const one = hexRgb(MEANING[names[i]])
+      const two = hexRgb(MEANING[names[j]])
+      const raw = Math.abs(hueOf(one) - hueOf(two))
+      gaps.push({
+        a: names[i],
+        b: names[j],
+        hue: Math.min(raw, 360 - raw),
+        luminance: Math.abs(
+          0.2126 * one[0] + 0.7152 * one[1] + 0.0722 * one[2] -
+          (0.2126 * two[0] + 0.7152 * two[1] + 0.0722 * two[2])
+        )
+      })
+    }
+  }
+  return gaps
+}

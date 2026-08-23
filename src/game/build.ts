@@ -39,7 +39,7 @@ import {
   SpinnerDef,
   treeLine
 } from './layout'
-import { accentRgb, BACKDROP_EMISSIVE, bodyRgb, zoneRamp } from './palette'
+import { accentRgb, BACKDROP_EMISSIVE, bodyRgb, MEANING, zoneRamp } from './palette'
 
 export type BuiltPad = {
   entity: Entity
@@ -205,8 +205,12 @@ const SLAB_TEXTURE = 'images/textures/slab.png'
 
 const HAZARD_ALBEDO = Color4.fromHexString('#FF3B4DFF')
 const HAZARD_EMISSIVE = Color3.create(1, 0.12, 0.16)
-const CRUMBLE_ALBEDO = Color4.fromHexString('#FF9D2EFF')
-const CRUMBLE_EMISSIVE = Color3.create(1, 0.4, 0.08)
+// Was #FF9D2E, fourteen degrees of hue from the checkpoint gold. Moved down
+// and warmer: 21 degrees and 0.35 of luminance from gold, 30 degrees from the
+// hazard red. Kept in palette.ts as MEANING.unstable so the separation between
+// every pair of meanings is checked rather than trusted.
+const CRUMBLE_ALBEDO = Color4.fromHexString(MEANING.unstable + 'FF')
+const CRUMBLE_EMISSIVE = Color3.create(0.86, 0.34, 0.06)
 const FINISH_ALBEDO = Color4.fromHexString('#FFD23FFF')
 const FINISH_EMISSIVE = Color3.create(1, 0.7, 0.1)
 const CP_ALBEDO = Color4.fromHexString('#FFD23FFF')
@@ -510,10 +514,16 @@ function buildCoin(layout: Layout, entities: Entity[]): BuiltCoin | null {
     })
     MeshRenderer.setBox(slab)
     MeshCollider.setBox(slab)
+    // At unstable * 5 the emissive drowned the albedo and a dark orange slab
+    // rendered cream - the same failure already found and written up on the
+    // hazard bars, which came out salmon-pink at intensity 4. The table value
+    // is the table value; a colour that only exists in the source is not a
+    // colour the player can read.
     Material.setPbrMaterial(slab, {
+      texture: Material.Texture.Common({ src: SLAB_TEXTURE }),
       albedoColor: CRUMBLE_ALBEDO,
       emissiveColor: CRUMBLE_EMISSIVE,
-      emissiveIntensity: PAD_EMISSIVE.unstable * 5,
+      emissiveIntensity: PAD_EMISSIVE.unstable,
       roughness: 0.7
     })
     const blob = createGroundShadow(pad)
@@ -1106,9 +1116,10 @@ function paintHazard(entity: Entity) {
 export function paintPad(entity: Entity, pad: Pad) {
   if (pad.crumble) {
     Material.setPbrMaterial(entity, {
+      texture: Material.Texture.Common({ src: SLAB_TEXTURE }),
       albedoColor: CRUMBLE_ALBEDO,
       emissiveColor: CRUMBLE_EMISSIVE,
-      emissiveIntensity: 1.6,
+      emissiveIntensity: PAD_EMISSIVE.unstable,
       roughness: 0.7
     })
     return

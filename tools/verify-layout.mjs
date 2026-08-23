@@ -501,6 +501,26 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     'from ' + ys[0].toFixed(0) + ' m to ' + ys[ys.length - 1].toFixed(0) + ' m')
 }
 
+// A colour may not mean two things.
+//
+// Unstable ground and a checkpoint were fourteen degrees of hue and 0.15 of
+// luminance apart - one colour on a phone at twenty metres, and the whole
+// readability of the tower rests on being able to tell them apart at exactly
+// that distance. Two ways to be distinguishable and either will do: a
+// different hue or a different brightness.
+{
+  const gaps = palette.colourGaps()
+  const HUE = 20
+  const LUM = 0.25
+  const bad = gaps.filter((g) => g.hue < HUE && g.luminance < LUM)
+  const worst = gaps.reduce((a, b) =>
+    Math.max(a.hue / HUE, a.luminance / LUM) < Math.max(b.hue / HUE, b.luminance / LUM) ? a : b)
+
+  note(bad.length === 0, 'no colour means two things',
+    'closest pair ' + worst.a + '/' + worst.b + ': ' + worst.hue.toFixed(0) +
+    ' deg of hue, ' + worst.luminance.toFixed(2) + ' of luminance')
+}
+
 // A hazard may not hit you before it touches you.
 //
 // The hit box was a free 0.85 against a beam whose visible half-thickness was
@@ -554,7 +574,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 41
+const MIN_CHECKS = 42
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 
