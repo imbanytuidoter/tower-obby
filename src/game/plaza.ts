@@ -202,7 +202,7 @@ let rowEntities: Row[] = []
 const markers: Entity[] = []
 let spin = 0
 
-export function buildPlaza(opening: Opening) {
+export function buildPlaza() {
   // Pin the time of day.
   //
   // The scene was rendering at whatever hour the client happened to be on,
@@ -217,11 +217,9 @@ export function buildPlaza(opening: Opening) {
 
   createGround()
   createProgressRail()
-  createPerimeter()
   createLobby()
   createStartGate()
   createGuideArrows()
-  createPracticeHops(opening)
   createBoard()
   createDressing()
   refreshBoard()
@@ -417,70 +415,6 @@ function createStartGate() {
  * type-checking perfectly. Caught in the client console, which is the only
  * place it appears.
  */
-export type Opening = { gap: number; size: number }
-
-function createPracticeHops(opening: Opening) {
-  const gap = Math.max(1, opening.gap)
-  const size = opening.size
-  const share = Math.round((gap / REACH_ABILITY) * 100)
-
-  // Opposite side of the walk from the leaderboard: the two things a new
-  // arrival reads should not be stacked on top of each other.
-  const asideX = GATE_DIR_Z
-  const asideZ = -GATE_DIR_X
-  const originX = GATE_X + asideX * 8.5 - GATE_DIR_X * 2
-  const originZ = GATE_Z + asideZ * 8.5 - GATE_DIR_Z * 2
-  const step = gap + size
-
-  // Two pads, one gap: the jump the tower opens with and nothing else.
-  for (let i = 0; i < 2; i++) {
-    const x = originX + GATE_DIR_X * (i * step - step / 2)
-    const z = originZ + GATE_DIR_Z * (i * step - step / 2)
-
-    const pad = engine.addEntity()
-    Transform.create(pad, {
-      position: Vector3.create(x, LOBBY_Y + 0.45, z),
-      scale: Vector3.create(size, 0.5, size)
-    })
-    MeshRenderer.setBox(pad)
-    MeshCollider.setBox(pad)
-    Material.setPbrMaterial(pad, {
-      albedoColor: SAFE_FILL,
-      emissiveColor: CYAN3,
-      emissiveIntensity: 0.9,
-      roughness: 0.75
-    })
-  }
-
-  // The span itself, drawn on the ground in the choice colour. This is the
-  // 70% rule made visible - it teaches the budget without a word of HUD.
-  const span = engine.addEntity()
-  Transform.create(span, {
-    position: Vector3.create(originX, LOBBY_Y + 0.12, originZ),
-    rotation: Quaternion.fromEulerDegrees(0, -yawFacing(originX, originZ, originX + GATE_DIR_X, originZ + GATE_DIR_Z), 0),
-    scale: Vector3.create(0.18, 0.04, gap)
-  })
-  MeshRenderer.setBox(span)
-  Material.setPbrMaterial(span, {
-    albedoColor: CHOICE_EDGE,
-    emissiveColor: CHOICE_EDGE_3,
-    emissiveIntensity: 1.6
-  })
-
-  // TextShape height scales with fontSize, so the gaps have to scale with it
-  // too - at 0.7 m apart these three lines were drawn through each other.
-  label(originX, LOBBY_Y + 5.2, originZ, 'FREE PRACTICE', CYAN4, 2.4)
-  label(
-    originX,
-    LOBBY_Y + 3.9,
-    originZ,
-    gap.toFixed(1) + ' m  -  ' + share + '% OF YOUR JUMP',
-    CHOICE_EDGE,
-    1.8
-  )
-  label(originX, LOBBY_Y + 3.0, originZ, 'THE RACE OPENS WITH THIS JUMP', DIM, 1.4)
-}
-
 /** A billboarded line of text standing in the world. */
 function label(x: number, y: number, z: number, text: string, colour: Color4, fontSize: number) {
   const sign = engine.addEntity()
@@ -563,39 +497,6 @@ function createGround() {
  * under an empty sky reads as a bug. These give the space a boundary without
  * putting anything near the course.
  */
-function createPerimeter() {
-  const count = 16
-  const radius = GROUND_SIZE / 2 - 5
-
-  for (let i = 0; i < count; i++) {
-    const angle = (i / count) * Math.PI * 2
-    const x = CENTER_X + Math.cos(angle) * radius
-    const z = CENTER_Z + Math.sin(angle) * radius
-
-    // Obelisks from the catalog rather than stretched boxes. Native size is
-    // 2 x 4 x 2 m and it has no _collider meshes, so collision goes on the
-    // visible mesh; the ring alternates height to break the rhythm.
-    const scale = 0.9 + (i % 3) * 0.45
-    placeProp(MODELS.obelisk, {
-      position: Vector3.create(x, 0, z),
-      yaw: (angle * 180) / Math.PI + 90,
-      scale: Vector3.create(scale, scale, scale),
-      solid: true
-    })
-
-    // A shard leaning at its foot, so the boundary reads as weathered rather
-    // than as sixteen identical markers.
-    if (i % 2 === 0) {
-      const lean = angle + 0.9
-      placeProp(MODELS.shard, {
-        position: Vector3.create(x + Math.cos(lean) * 1.9, 0, z + Math.sin(lean) * 1.9),
-        yaw: (lean * 180) / Math.PI,
-        scale: 1.6
-      })
-    }
-  }
-}
-
 /** A point pushed off the board face towards the reader. */
 function front(distance: number): { x: number; z: number } {
   return { x: BOARD_X + FRONT_X * distance, z: BOARD_Z + FRONT_Z * distance }

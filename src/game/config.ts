@@ -375,8 +375,26 @@ export const RESPAWN_COOLDOWN = FALL_FREEZE_SECONDS + 0.3
 
 /** Hazards only bite within this vertical window, so jumping over them works. */
 export const HAZARD_CLEARANCE = 0.85
-export const HAZARD_HALF_WIDTH = 0.85
-export const HAZARD_THICKNESS = 0.7
+
+/**
+ * How thick a sweeping beam is. Its LENGTH is not a free choice - it has to
+ * span the ring of pads it guards or it stops being an obstacle - so this is
+ * the only dimension that can come down, and at 0.7 the beam read as a slab.
+ */
+export const HAZARD_THICKNESS = 0.42
+
+/** Roughly the radius of a Decentraland avatar's capsule. */
+const PLAYER_RADIUS = 0.3
+
+/**
+ * How close to a beam's centre line counts as a hit.
+ *
+ * Derived, not chosen. It was a free 0.85 against a beam whose visible half
+ * was 0.35, so the beam killed you half a metre before it touched you and the
+ * player had no way to know why. Deriving it means the hit box can never drift
+ * away from the thing on screen again.
+ */
+export const HAZARD_HALF_WIDTH = HAZARD_THICKNESS / 2 + PLAYER_RADIUS
 
 /** Crumbling pads: how long before they drop, and how long until they return. */
 export const CRUMBLE_DELAY = 0.7

@@ -112,19 +112,8 @@ function startClient() {
   assertDecorIsQuiet()
   applyFairness()
 
-  // Built once and shared: the plaza needs the opening jump to size the
-  // warm-up pad, and buildWorld needs the whole thing.
   const layout = buildTower()
-  const firstPad = layout.pads[1]
-  const fromPad = layout.pads[firstPad ? firstPad.fromIndex : 0] ?? layout.pads[0]
-  buildPlaza({
-    gap:
-      firstPad && fromPad
-        ? Math.hypot(firstPad.x - fromPad.x, firstPad.z - fromPad.z) -
-          (firstPad.size + fromPad.size) / 2
-        : 2,
-    size: fromPad ? fromPad.size : 3
-  })
+  buildPlaza()
   setupSound()
   setupUi({ next: () => {}, retry: retryClimb, restart: retryClimb })
   buildTheTower()

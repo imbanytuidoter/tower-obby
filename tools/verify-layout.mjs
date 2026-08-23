@@ -468,6 +468,19 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     'closest pair ' + tightest.toFixed(1) + ' m')
 }
 
+// A hazard may not hit you before it touches you.
+//
+// The hit box was a free 0.85 against a beam whose visible half-thickness was
+// 0.35: it killed half a metre off the bar, and nothing on screen explained
+// the death. Fair means the hit distance is the visible half plus the width
+// of the avatar, and no more.
+{
+  const visibleHalf = cfg.HAZARD_THICKNESS / 2
+  const slack = cfg.HAZARD_HALF_WIDTH - visibleHalf
+  note(slack > 0 && slack <= 0.35, 'hazards hit where they look',
+    'hit box reaches ' + slack.toFixed(2) + ' m past the bar, avatar is about 0.30 m wide')
+}
+
 // The shape of the climb is pinned, and changing it has to be deliberate.
 //
 // It changed by accident once: the pad generator rejected candidates within
@@ -504,7 +517,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 36
+const MIN_CHECKS = 37
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 
