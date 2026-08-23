@@ -44,7 +44,14 @@ export const MODELS = {
    * Replaces LampPostSciFi_01 beside the board. A chrome sci-fi lamp post in a
    * forest clearing was the loudest single style clash in the scene.
    */
-  torch: 'assets/Models/torch.glb'
+  torch: 'assets/Models/torch.glb',
+  /**
+   * The greeter at the crown. Audited: 2 meshes / 1 material / 2 textures,
+   * an `idle` clip, and it ships a collider mesh (named Dragon_collider in
+   * the file, which is somebody else's leftover but is still a collider mesh
+   * and has to be treated as one). Origin at its feet, 2.36 x 1.15 x 1.04 m.
+   */
+  owl: 'assets/Models/owl.glb'
 } as const
 
 /** Clip names read out of the GLBs, not guessed. */

@@ -76,6 +76,10 @@ export const PICKUP_RADIUS = 1.4
 /** Slack the server allows on a pickup claim, for lag between the two clocks. */
 export const PICKUP_GRACE = 1.2
 
+/** How many shards burst from the crown on a summit, and for how long. */
+export const CELEBRATION_SHARDS = 14
+export const CELEBRATION_SECONDS = 1.8
+
 export const PLATE_RISE_RATE = 0.22
 export const PLATE_FALL_RATE = 0.5
 
@@ -193,8 +197,15 @@ export const PAD_EMISSIVE = {
 /** How often the server proves it is alive. */
 export const HEARTBEAT_SECONDS = 2
 
-/** How close the server needs a player to be to accept a finish claim. */
-export const FINISH_RADIUS = 3.5
+/**
+ * How close the server needs a player to be to accept a finish claim.
+ *
+ * Has to cover the whole slab or standing on its corner claims nothing. The
+ * crown is 5.2 m across, so its furthest corner is 5.2/2 * sqrt(2) = 3.68 m
+ * from the centre; at the old 3.5 the corner was a dead zone, which is
+ * exactly what widening the slab produced and what the invariant caught.
+ */
+export const FINISH_RADIUS = 4.0
 
 /**
  * How far past the slab's own corner still counts as touching the finish.

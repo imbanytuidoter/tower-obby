@@ -286,7 +286,11 @@ export function buildTower(): Layout {
   const last = out.pads[out.pads.length - 1]
   last.kind = 'finish'
   last.crumble = false
-  last.size = Math.max(last.size, 3.2)
+  // The crown is the one pad in the tower you aim at from three zones below,
+  // and the one you want room to stand on when you get there. Widening it
+  // changes the fingerprint on purpose - it does not move any pad, so times
+  // set on the old slab are still times up the same climb.
+  last.size = Math.max(last.size, 5.2)
 
   relaxSightLines(out)
 

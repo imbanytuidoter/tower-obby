@@ -21,6 +21,7 @@ import {
   FOREST,
   PAD_EMISSIVE,
   SHADOW_MAX_HEIGHT,
+  CELEBRATION_SHARDS,
   CHECKPOINT_EVERY_SECTIONS,
   TOWER_ZONES,
   FINISH_RADIUS,
@@ -127,6 +128,8 @@ export type World = {
   coin: BuiltCoin | null
   /** Optional pickups. Hidden one at a time as this player finds them. */
   pickups: BuiltPickup[]
+  /** Shards that burst from the crown on a summit. Parked when idle. */
+  celebration: Entity[]
   entities: Entity[]
 }
 
@@ -452,6 +455,7 @@ export function buildWorld(layout: Layout): World {
     plate,
     coin,
     pickups: createPickups(layout, entities),
+    celebration: createCelebration(layout.pads[layout.pads.length - 1], entities),
     entities
   }
 }
@@ -1204,6 +1208,39 @@ export function paintCrumbled(entity: Entity) {
  * threshold seventy metres below, so arriving here rhymes with setting off.
  * Gold means goal everywhere else in the game and it means it hardest here.
  */
+/**
+ * The shards that burst out of the crown when somebody summits.
+ *
+ * Not a particle system: the docs list SDK particles as still missing on the
+ * mobile client, and the whole point of this scene is that it runs on a phone.
+ * Fourteen small emissive boxes flung outward by one system, parked far below
+ * the world the rest of the time, cost fourteen material slots and work
+ * everywhere.
+ */
+export function createCelebration(pad: Pad, entities: Entity[]): Entity[] {
+  const shards: Entity[] = []
+  for (let i = 0; i < CELEBRATION_SHARDS; i++) {
+    const shard = engine.addEntity()
+    entities.push(shard)
+    Transform.create(shard, {
+      position: Vector3.create(pad.x, PARKED_Y, pad.z),
+      scale: Vector3.create(0.22, 0.22, 0.5)
+    })
+    MeshRenderer.setBox(shard)
+    Material.setPbrMaterial(shard, {
+      albedoColor: FINISH_ALBEDO,
+      emissiveColor: FINISH_EMISSIVE,
+      emissiveIntensity: 3,
+      castShadows: false
+    })
+    shards.push(shard)
+  }
+  return shards
+}
+
+/** Where a shard waits between summits. Far enough down to never be seen. */
+export const PARKED_Y = -60
+
 function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
   const made: Entity[] = []
 
@@ -1301,6 +1338,30 @@ function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
   })
 
   gold(at(0, 0.06), Vector3.create(width, 0.08, 0.5), 4)
+
+
+  // A greeter at the top of the tree. It ships its own collider mesh, so
+  // collision goes on that and nothing on the visible one; solid because a
+  // bird you walk through is a decal.
+  made.push(
+    placeProp(MODELS.owl, {
+      // On the far edge along the approach, not off to one side: from there
+      // it is behind a pylon and half of it is hidden. Straight ahead is
+      // where a climber is already looking when they land.
+      position: Vector3.create(
+        pad.x + dirX * (half - 0.3),
+        deck,
+        pad.z + dirZ * (half - 0.3)
+      ),
+      yaw: yaw + 180,
+      // 2.36 m of wingspan: at 1.1 and a metre in from the edge it stood
+      // inside the space the climber lands on.
+      scale: 0.85,
+      solid: true,
+      hasColliderMeshes: true,
+      clip: 'idle'
+    })
+  )
 
   return made
 }

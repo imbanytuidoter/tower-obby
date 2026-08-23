@@ -535,7 +535,10 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   for (let i = 0; i < shape.length; i++) hash = (Math.imul(31, hash) + shape.charCodeAt(i)) | 0
   const fingerprint = (hash >>> 0).toString(16)
 
-  const PINNED = '5b43705'
+  // Changed once, deliberately: the crown slab went from 3.2 m to 5.2 m so
+  // there is room to stand on it. No pad MOVED, so times set on the narrower
+  // slab are still times up the same climb and the boards were left alone.
+  const PINNED = 'e2ba4407'
   note(fingerprint === PINNED, 'the tower is the tower the records were set on',
     'fingerprint ' + fingerprint)
 }

@@ -56,12 +56,14 @@ import {
   HEARTBEAT_SECONDS,
   GHOST_SAMPLE_SECONDS,
   GHOST_MAX_SAMPLES,
-  PICKUP_RADIUS
+  PICKUP_RADIUS,
+  CELEBRATION_SECONDS
 } from './game/config'
 import {
   activateCheckpoint,
   assertDecorIsQuiet,
   bandFor,
+  PARKED_Y,
   buildWorld,
   clearWorld,
   paintCrumbled,
@@ -119,6 +121,7 @@ function startClient() {
   setupUi({ next: () => {}, retry: retryClimb, restart: retryClimb })
   buildTheTower()
 
+  engine.addSystem(celebrationSystem, 1, 'celebrationSystem')
   engine.addSystem(hazardSystem, 1, 'hazardSystem')
   engine.addSystem(runSystem, 2, 'runSystem')
   engine.addSystem(decorSystem, 3, 'decorSystem')
@@ -140,6 +143,9 @@ function startClient() {
         : data.name + ' reached the crown in ' + formatTime(data.seconds)
     )
     play('finish')
+    // Everyone in the world sees the crown go off, not just the climber. The
+    // point of one shared tower is that somebody else's summit is an event.
+    celebrate()
   })
 
   // The server verified the player actually reached the coin. Nothing is
@@ -643,6 +649,50 @@ function reachForPickups(player: Vector3) {
     if (!isStateSyncronized()) continue
     room.send('takePickup', { index: i })
     pendingPickups.add(i)
+  }
+}
+
+/**
+ * The burst at the crown.
+ *
+ * Driven by one system rather than a tween per shard: fourteen tweens started
+ * at the same instant is fourteen components written in one frame, and the
+ * shards only move for under two seconds.
+ */
+let celebrationTimer = 0
+
+export function celebrate() {
+  celebrationTimer = CELEBRATION_SECONDS
+}
+
+function celebrationSystem(dt: number) {
+  if (!world || celebrationTimer <= 0) return
+
+  celebrationTimer -= dt
+  // world.finish is the walking surface of the crown, already PAD_TOP up.
+  const finish = world.finish
+  const done = celebrationTimer <= 0
+  // 0 at the moment of the summit, 1 when the burst is over.
+  const t = 1 - Math.max(0, celebrationTimer) / CELEBRATION_SECONDS
+
+  for (let i = 0; i < world.celebration.length; i++) {
+    const transform = Transform.getMutableOrNull(world.celebration[i])
+    if (!transform) continue
+
+    if (done) {
+      transform.position.y = PARKED_Y
+      continue
+    }
+
+    const angle = (i / world.celebration.length) * Math.PI * 2
+    const reach = 1.2 + t * 5.5
+    // Thrown up and falling back: the arc is what reads as a burst rather
+    // than as a ring of boxes sliding outward.
+    const lift = 6.5 * t - 7.5 * t * t
+    transform.position.x = finish.x + Math.cos(angle) * reach
+    transform.position.z = finish.z + Math.sin(angle) * reach
+    transform.position.y = finish.y + 0.6 + lift
+    transform.rotation = Quaternion.fromEulerDegrees(t * 320, (angle * 180) / Math.PI, t * 210)
   }
 }
 
