@@ -28,6 +28,9 @@ import {
   TREE_RING_RADIUS,
   TREE_SCALE,
   PAD_SEPARATION,
+  PICKUP_COUNT,
+  PICKUP_RADIUS,
+  PICKUP_RISE,
   SHAFT_MAX_RADIUS,
   SHAFT_MIN_RADIUS,
   START_PAD_X,
@@ -108,6 +111,8 @@ export type Layout = {
   plate: PlateDef | null
   /** The ante: a wager the climb offers, or null if it did not fit. */
   coin: CoinDef | null
+  /** Optional pickups. Nobody has to take one; the climb ignores them. */
+  pickups: Pickup[]
 }
 
 /**
@@ -118,6 +123,22 @@ export type Layout = {
  * The wager has to be legible before it is taken, so both halves are drawn:
  * the decay is visible on the pads, the reward is lit gold at the end of them.
  */
+/**
+ * A collectible hanging off the route.
+ *
+ * Deliberately not on the way to anything. A pickup that happens to be on the
+ * fast line is not a decision, it is scenery you walk through; this one costs
+ * you a jump out and a jump back, and the clock keeps running while you do it.
+ * Nothing in the climb requires one.
+ */
+export type Pickup = {
+  x: number
+  y: number
+  z: number
+  /** Index of the pad you can reach it from, for the reach invariant. */
+  fromPad: number
+}
+
 export type CoinDef = {
   /** The detour, in order. Every one of these crumbles. */
   route: Pad[]
@@ -280,7 +301,8 @@ export function buildTower(): Layout {
     shortcut,
     forks: out.forks,
     plate: buildPlate(out),
-    coin: buildCoin(out)
+    coin: buildCoin(out),
+    pickups: buildPickups(out)
   }
 }
 
@@ -291,6 +313,57 @@ export function buildTower(): Layout {
  * almost nothing - and late enough that a player has learned to jump before
  * they are offered a bet on it.
  */
+/**
+ * Hangs a pickup off to the side of pads spread up the whole climb.
+ *
+ * Searched, not assumed. Fixing an offset and an angle put pickups inside
+ * other pads: the 6-17 m band already holds 119 of them, and "outward from
+ * this pad" points straight at a neighbour more often than not.
+ */
+function buildPickups(out: Build): Pickup[] {
+  const pickups: Pickup[] = []
+  if (out.pads.length < 10) return pickups
+
+  const wanted = PICKUP_COUNT
+  const stride = Math.floor(out.pads.length / (wanted + 1))
+
+  for (let n = 1; n <= wanted; n++) {
+    const index = Math.min(out.pads.length - 1, n * stride)
+    const anchor = out.pads[index]
+    if (!anchor || anchor.kind === 'finish' || anchor.kind === 'start') continue
+
+    const outward = Math.atan2(anchor.z - CENTER_Z, anchor.x - CENTER_X)
+    let placed = false
+
+    for (let turn = 0; turn <= 6 && !placed; turn++) {
+      for (const sign of [1, -1]) {
+        const away = outward + sign * turn * 0.5
+        // Far enough that taking one is a jump out and a jump back. At 3.4 m
+        // from the pad centre the gap from its edge was 1.2 m of a 3.03 m
+        // budget - close enough to collect without leaving the route, which
+        // makes it scenery rather than a choice.
+        for (const distance of [5.6, 6.4, 4.9]) {
+          const x = anchor.x + Math.cos(away) * distance
+          const z = anchor.z + Math.sin(away) * distance
+          const y = anchor.y + PICKUP_RISE
+
+          if (!inDetourAir(x, z)) continue
+          // A pickup is a trigger, not a floor, but it must not hang inside a
+          // pad or it cannot be seen or reached.
+          if (!isClear(out, x, y, z, PICKUP_RADIUS * 2, anchor)) continue
+
+          pickups.push({ x, y, z, fromPad: index })
+          placed = true
+          break
+        }
+        if (placed || turn === 0) break
+      }
+    }
+  }
+
+  return pickups
+}
+
 function buildCoin(out: Build): CoinDef | null {
   const landings = out.pads
     .map((pad, index) => ({ pad, index }))

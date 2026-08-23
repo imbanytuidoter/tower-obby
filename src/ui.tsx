@@ -191,7 +191,10 @@ const hud = () => {
       <Label value={formatTime(run.time)} fontSize={s.clock} color={NEON} textAlign="middle-left" />
       {progressBar()}
       <Label
-        value={run.band + '   ·   FALLS ' + run.falls}
+        value={
+          run.band + '   ·   FALLS ' + run.falls +
+          (run.pickupsTotal > 0 ? '   ·   COINS ' + run.pickupsFound + '/' + run.pickupsTotal : '')
+        }
         fontSize={s.line}
         color={Color4.White()}
         textAlign="middle-left"

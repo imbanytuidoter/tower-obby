@@ -63,6 +63,19 @@ export const GHOST_MAX_SAMPLES = 600
 /** How close the server needs a player to be to grant the ante. */
 export const COIN_RADIUS = 3
 
+/**
+ * Optional pickups: how many, how far above their pad they hang, and how close
+ * you have to be to take one.
+ *
+ * Eight because the point is a collection you can be missing pieces of and
+ * come back for. Two would be a chore, thirty would be a job.
+ */
+export const PICKUP_COUNT = 8
+export const PICKUP_RISE = 1.1
+export const PICKUP_RADIUS = 1.4
+/** Slack the server allows on a pickup claim, for lag between the two clocks. */
+export const PICKUP_GRACE = 1.2
+
 export const PLATE_RISE_RATE = 0.22
 export const PLATE_FALL_RATE = 0.5
 
@@ -374,7 +387,14 @@ export const FALL_FREEZE_SECONDS = 1.5
 export const RESPAWN_COOLDOWN = FALL_FREEZE_SECONDS + 0.3
 
 /** Hazards only bite within this vertical window, so jumping over them works. */
-export const HAZARD_CLEARANCE = 0.85
+/**
+ * How high above its pads a beam sweeps.
+ *
+ * Raised from 0.85: at that height a beam sat close enough to the deck that
+ * there was no room to read it before it arrived. Higher means more air
+ * between the platform and the thing trying to sweep you off it.
+ */
+export const HAZARD_CLEARANCE = 1.15
 
 /**
  * How thick a sweeping beam is. Its LENGTH is not a free choice - it has to
@@ -468,9 +488,14 @@ export function curve(progress: number) {
      */
     jumpGap: lerp(1.6, 2.7),
     rise: lerp(0.8, 1.05),
-    spinnerSpeed: 45 + t * 85,
-    spinnerReach: lerp(2.4, 3.8),
-    moverSpeed: 1.1 + t * 2.1,
+    // Slowed on request. Every knob in this block is applied AFTER the random
+    // draws that place pads, so turning them changes how hard the tower is to
+    // survive without changing its shape - the fingerprint check proves it.
+    spinnerSpeed: 34 + t * 56,
+    // Shorter overhang past the ring it guards, so the ends of a beam stop
+    // reaching over ground a climber has no business defending.
+    spinnerReach: lerp(1.4, 2.4),
+    moverSpeed: 0.9 + t * 1.5,
     moverReach: lerp(2, 3.4),
     /** Share of sections that get a hazard on top of their own shape. */
     hazardChance: lerp(0, 0.85)

@@ -21,6 +21,9 @@ export const run = {
   sectionName: '',
   /** Which of the four bands the climber is in. Replaces a tutorial panel. */
   band: 'UNDERSTORY',
+  /** Optional pickups: how many this player has ever found, out of how many. */
+  pickupsFound: 0,
+  pickupsTotal: 0,
   /** Filled from the server-owned component. */
   serverAlive: false,
   /** Fastest climb today, and the fastest anyone has ever done it. */

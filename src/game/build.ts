@@ -32,6 +32,7 @@ import {
   backdropRing,
   checkpointAltitudes,
   Layout,
+  Pickup,
   MoverDef,
   Pad,
   SpinnerDef,
@@ -104,6 +105,8 @@ export type BuiltShortcut = {
   open: boolean
 }
 
+export type BuiltPickup = { entity: Entity; def: Pickup; taken: boolean }
+
 export type World = {
   /** Section names bottom to top, so the HUD can name the current one. */
   sectionNames: string[]
@@ -122,6 +125,8 @@ export type World = {
   plate: BuiltPlate | null
   /** The ante, or null when it did not fit. */
   coin: BuiltCoin | null
+  /** Optional pickups. Hidden one at a time as this player finds them. */
+  pickups: BuiltPickup[]
   entities: Entity[]
 }
 
@@ -240,36 +245,34 @@ export function sectionAccent(section: number): Color3 {
 }
 
 /**
- * A shaft of light standing over every goal.
+ * The optional pickups.
  *
- * The brief's reasoning is the good part: in a canopy the one place light
- * gets through is where you are trying to reach, so a goal becomes visible as
- * a beam before the pad itself is. On a phone that is worth more than the pad
- * being bigger - you can see it from below, through foliage, from three zones
- * down.
+ * Billboarded rather than spun by a system: a disc that always faces the
+ * player is legible from every angle for free, and a spin would cost a system
+ * running every frame for eight objects nobody has to interact with.
  *
- * Non-collidable by construction: it is a renderer with no MeshCollider, and
- * decoration that can be stood on is the classic bug this style invites.
+ * No collider by construction. It is a thing you pass through, and a
+ * collectible you can stand on is a platform the layout never accounted for.
  */
-function createGodray(pad: Pad, entities: Entity[]) {
-  const shaft = engine.addEntity()
-  entities.push(shaft)
-  Transform.create(shaft, {
-    position: Vector3.create(pad.x, pad.y + 9, pad.z),
-    scale: Vector3.create(pad.size * 0.62, 18, pad.size * 0.62)
-  })
-  MeshRenderer.setCylinder(shaft, 0.5, 0.14)
-  Material.setPbrMaterial(shaft, {
-    // Faint. A shaft that competes with the pad it is pointing at defeats the
-    // purpose, and from the clearing twenty of them at full strength wash the
-    // whole climb.
-    albedoColor: Color4.create(1, 0.9, 0.55, 0.07),
-    emissiveColor: Color3.create(1, 0.86, 0.45),
-    emissiveIntensity: PAD_EMISSIVE.goal * 0.5,
-    roughness: 1,
-    // A shaft of light that casts a shadow is a contradiction, and eighteen
-    // metres of it lands right on the pad it is meant to advertise.
-    castShadows: false
+function createPickups(layout: Layout, entities: Entity[]): BuiltPickup[] {
+  return layout.pickups.map((def) => {
+    const entity = engine.addEntity()
+    entities.push(entity)
+    Transform.create(entity, {
+      position: Vector3.create(def.x, def.y, def.z),
+      scale: Vector3.create(0.95, 0.1, 0.95),
+      rotation: Quaternion.fromEulerDegrees(90, 0, 0)
+    })
+    MeshRenderer.setCylinder(entity)
+    Billboard.create(entity, { billboardMode: BillboardMode.BM_Y })
+    Material.setPbrMaterial(entity, {
+      albedoColor: CP_ALBEDO,
+      emissiveColor: Color3.create(CP_ALBEDO.r, CP_ALBEDO.g, CP_ALBEDO.b),
+      emissiveIntensity: PAD_EMISSIVE.goal * 1.4,
+      roughness: 0.3,
+      castShadows: false
+    })
+    return { entity, def, taken: false }
   })
 }
 
@@ -353,7 +356,6 @@ export function buildWorld(layout: Layout): World {
     }
 
     if (pad.kind === 'checkpoint') {
-      createGodray(pad, entities)
 
       // A teal crystal on every ring. Cyan already means safe here, and this
       // is the same statement in an object: 15 triangles, animated, and it
@@ -380,7 +382,6 @@ export function buildWorld(layout: Layout): World {
     }
 
     if (pad.kind === 'finish') {
-      createGodray(pad, entities)
       finish = top
       // Half-diagonal: the furthest point a player can legitimately stand on
       // the slab. Clamped so the client stays inside the server's tolerance.
@@ -450,6 +451,7 @@ export function buildWorld(layout: Layout): World {
     forks,
     plate,
     coin,
+    pickups: createPickups(layout, entities),
     entities
   }
 }
@@ -988,14 +990,18 @@ function createSpine(height: number, checkpointYs: number[]): Entity[] {
   // put them several metres off, because the climb does not rise evenly.
   for (const y of checkpointYs) {
     const t = Math.min(1, Math.max(0, y / height))
-    const width = BASE + (TOP - BASE) * t + 0.9
+    const width = BASE + (TOP - BASE) * t + 0.32
 
+    // A flat disc the width of a dinner plate read as a plate bolted to the
+    // trunk. A collar wants to hug what it is around: barely wider than the
+    // bark, taller than it is proud of it, and tapered so the light catches
+    // one edge. setCylinder's two radii are what make the taper possible.
     const collar = engine.addEntity()
     Transform.create(collar, {
       position: Vector3.create(CENTER_X, y, CENTER_Z),
-      scale: Vector3.create(width, 0.3, width)
+      scale: Vector3.create(width, 0.62, width)
     })
-    MeshRenderer.setCylinder(collar, 0.5, 0.5)
+    MeshRenderer.setCylinder(collar, 0.5, 0.44)
     Material.setPbrMaterial(collar, {
       albedoColor: CP_ALBEDO,
       emissiveColor: Color3.create(CP_ALBEDO.r, CP_ALBEDO.g, CP_ALBEDO.b),

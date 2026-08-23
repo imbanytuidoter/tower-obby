@@ -55,7 +55,8 @@ import {
   RESPAWN_LIFT,
   HEARTBEAT_SECONDS,
   GHOST_SAMPLE_SECONDS,
-  GHOST_MAX_SAMPLES
+  GHOST_MAX_SAMPLES,
+  PICKUP_RADIUS
 } from './game/config'
 import {
   activateCheckpoint,
@@ -151,6 +152,10 @@ function startClient() {
       Transform.getMutable(world.coin.entity).scale = Vector3.Zero()
     }
     play('checkpoint')
+  })
+
+  room.onMessage('pickups', (data) => {
+    applyPickups([...data.found])
   })
 
   room.onMessage('stats', (data) => {
@@ -427,6 +432,7 @@ function runSystem(dt: number) {
   updatePrompt(player)
   noteForkChoice(player)
   reachForCoin(dt, player)
+  reachForPickups(player)
   spendToken()
   rideThePlate(player)
 
@@ -612,6 +618,59 @@ function rideThePlate(player: Vector3) {
  * because standing next to it would otherwise send one claim per frame.
  */
 let coinTimer = 0
+/**
+ * Touch a pickup to claim it. The client only ASKS - the server checks the
+ * distance itself, because a client that could name its own pickups could
+ * name all eight from the lobby.
+ *
+ * Deliberately not gated on Phase.Running: these are worth collecting on a
+ * stroll as much as on a timed climb, and the clock has no opinion about them.
+ */
+function reachForPickups(player: Vector3) {
+  if (!world) return
+
+  for (let i = 0; i < world.pickups.length; i++) {
+    const pickup = world.pickups[i]
+    if (pickup.taken) continue
+    const at = Vector3.create(pickup.def.x, pickup.def.y, pickup.def.z)
+    if (Vector3.distance(player, at) > PICKUP_RADIUS) continue
+    if (pendingPickups.has(i)) continue
+
+    // Marked as sent only once it HAS been sent. Marking first meant a touch
+    // that happened while the room was still connecting was recorded as
+    // pending and never retried - the pickup became uncollectable for the
+    // rest of the session, silently.
+    if (!isStateSyncronized()) continue
+    room.send('takePickup', { index: i })
+    pendingPickups.add(i)
+  }
+}
+
+/** Asked for but not yet confirmed, so one touch does not send every frame. */
+const pendingPickups = new Set<number>()
+
+/**
+ * The server's answer: everything this player has ever found. Hides them, and
+ * hides them again on a later visit without the player touching anything.
+ */
+function applyPickups(found: number[]) {
+  if (!world) return
+  run.pickupsFound = found.length
+  run.pickupsTotal = world.pickups.length
+
+  for (const index of found) {
+    const pickup = world.pickups[index]
+    if (!pickup || pickup.taken) continue
+    pickup.taken = true
+    // Parked under the floor rather than removed: the tower is rebuilt only
+    // on a reload, and a removed entity cannot come back for the next visitor
+    // sharing this client.
+    const transform = Transform.getMutableOrNull(pickup.entity)
+    if (transform) transform.position.y = -50
+    play('checkpoint')
+  }
+}
+
 function reachForCoin(dt: number, player: Vector3) {
   if (!world?.coin || world.coin.taken || run.token > 0) return
 

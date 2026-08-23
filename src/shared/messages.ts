@@ -43,6 +43,21 @@ export const room = registerMessages({
     /** Cosmetic label for the live ranking; the server has only addresses. */
     name: Schemas.String
   }),
+  /**
+   * "I touched pickup number n." The server checks the distance itself, the
+   * same way it checks a finish - a client that could name its own pickups
+   * could name all eight from the lobby.
+   */
+  takePickup: Schemas.Map({
+    index: Schemas.Int
+  }),
+  /**
+   * Which pickups this player has ever found. Sent on arrival and after each
+   * one, so a returning player sees the ones they are still missing.
+   */
+  pickups: Schemas.Map({
+    found: Schemas.Array(Schemas.Int)
+  }),
   /** Sent back to that one player: their history, restored from storage. */
   stats: Schemas.Map({
     bestSeconds: Schemas.Float,

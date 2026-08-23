@@ -16,6 +16,8 @@ import {
   HEARTBEAT_SECONDS,
   COIN_RADIUS,
   GHOST_MAX_SAMPLES,
+  PICKUP_GRACE,
+  PICKUP_RADIUS,
   PLATE_RISE_RATE,
   PLATE_FALL_RATE
 } from '../game/config'
@@ -46,7 +48,20 @@ function utcDay(at: number): number {
 }
 
 /** Versioned from day one: storage outlives deploys, so old shapes will turn up. */
-type PlayerStats = { version: number; bestSeconds: number; climbs: number }
+type PlayerStats = {
+  version: number
+  bestSeconds: number
+  climbs: number
+  /**
+   * Indices of the optional pickups this player has ever found.
+   *
+   * Kept for good rather than per climb: the whole point of an optional
+   * collection is that you can be missing pieces of it and come back. Written
+   * on a find, which is at most PICKUP_COUNT writes in a player's lifetime -
+   * nowhere near the storage write cap.
+   */
+  found?: number[]
+}
 
 /** Loaded once per player per session, then kept in memory. */
 const stats = new Map<string, PlayerStats>()
@@ -173,10 +188,16 @@ export async function startServer() {
     console.log('[SERVER] ghost replaced by ' + pending.name + ' (' + pending.seconds.toFixed(1) + 's)')
   })
 
+  room.onMessage('takePickup', (data, context) => {
+    if (!context) return
+    void handlePickup(data.index, context.from)
+  })
+
   room.onMessage('hello', (data, context) => {
     if (!context) return
     names.set(context.from.toLowerCase(), data.name.slice(0, 24) || 'Guest')
     void sendStats(context.from)
+    void sendPickups(context.from)
   })
 
   engine.addSystem(serverSystem)
@@ -290,6 +311,48 @@ function handleClaim(name: string, from: string) {
   room.send('summit', { name, seconds, record })
   void persistBoard()
   void recordClimb(from, seconds)
+}
+
+/** A returning player has to be told which ones they are still missing. */
+async function sendPickups(rawAddress: string) {
+  const mine = await loadStats(rawAddress.toLowerCase())
+  room.send('pickups', { found: mine.found ?? [] }, { to: [rawAddress] })
+}
+
+/**
+ * A pickup claim, checked the same way a finish is: the server knows where
+ * every pickup hangs, reads the player's verified position, and decides.
+ *
+ * Nothing about the climb depends on this. It does not gate the finish, it
+ * does not appear on any board, and taking none of them is a complete way to
+ * play the tower.
+ */
+async function handlePickup(index: number, from: string) {
+  const address = from.toLowerCase()
+  const pickup = tower.pickups[index]
+  if (!pickup) return
+
+  const position = playerPosition(from)
+  if (!position) return
+
+  const at = Vector3.create(pickup.x, pickup.y, pickup.z)
+  if (Vector3.distance(position, at) > PICKUP_RADIUS + PICKUP_GRACE) {
+    console.log('[SERVER] rejected pickup ' + index + ' from ' + from + ': too far')
+    return
+  }
+
+  const mine = await loadStats(address)
+  const found = mine.found ?? []
+  if (found.includes(index)) return
+
+  found.push(index)
+  mine.found = found
+
+  const ok = await Storage.player.set<PlayerStats>(address, PLAYER_KEY, mine)
+  if (!ok) console.log('[SERVER] pickup did not persist for ' + address)
+
+  room.send('pickups', { found }, { to: [from] })
+  console.log('[SERVER] ' + address + ' found pickup ' + index + ' (' + found.length + ' total)')
 }
 
 /**

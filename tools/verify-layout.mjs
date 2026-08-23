@@ -468,6 +468,39 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     'closest pair ' + tightest.toFixed(1) + ' m')
 }
 
+// Every pickup has to be takeable, and none of them may be required.
+//
+// Optional does not mean unreachable: a coin nobody can get is worse than no
+// coin, because the counter tells you it exists.
+{
+  const tower = buildTower()
+  const list = tower.pickups
+  let worstReach = 0
+  let worstRise = 0
+
+  for (const p of list) {
+    const pad = tower.pads[p.fromPad]
+    // From the EDGE of the pad you jump off, not its centre, and the pickup
+    // has a radius you only have to touch.
+    const gap = Math.hypot(p.x - pad.x, p.z - pad.z) - pad.size / 2 - cfg.PICKUP_RADIUS
+    worstReach = Math.max(worstReach, gap)
+    worstRise = Math.max(worstRise, p.y - pad.y)
+  }
+
+  note(list.length === cfg.PICKUP_COUNT, 'every pickup found a home',
+    list.length + ' of ' + cfg.PICKUP_COUNT + ' placed')
+  note(worstReach <= MAX_REACH, 'pickups are within a jump',
+    'furthest ' + worstReach.toFixed(2) + ' m of a ' + MAX_REACH.toFixed(2) + ' m budget')
+  note(worstRise <= MAX_RISE + 1.0, 'pickups hang within arm of a pad',
+    'highest ' + worstRise.toFixed(2) + ' m above its pad')
+
+  // And they must be spread, or "come back for the ones you missed" is one trip.
+  const ys = list.map((p) => p.y).sort((a, b) => a - b)
+  const spread = ys.length > 1 ? ys[ys.length - 1] - ys[0] : 0
+  note(spread > 30, 'pickups are spread up the climb',
+    'from ' + ys[0].toFixed(0) + ' m to ' + ys[ys.length - 1].toFixed(0) + ' m')
+}
+
 // A hazard may not hit you before it touches you.
 //
 // The hit box was a free 0.85 against a beam whose visible half-thickness was
@@ -517,7 +550,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 37
+const MIN_CHECKS = 41
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 
