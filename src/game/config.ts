@@ -327,6 +327,9 @@ export const LOBBY_Y = 0.4
  */
 export const LOBBY_KEEPOUT_RADIUS = 14
 
+/** How wide a checkpoint landing wants to be, if its neighbours allow it. */
+export const LANDING_SIZE = 4.6
+
 /** The start gate straddles the line between the lobby and the first pad. */
 /** Unit vector pointing from the lobby towards the tower. */
 export const GATE_DIR_X = -Math.cos(startAngle)

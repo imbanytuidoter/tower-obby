@@ -1063,10 +1063,16 @@ function createCheckpointMarker(pad: Pad, number: number) {
     scale: Vector3.create(0.4, 6.6, 0.4)
   })
   MeshRenderer.setCylinder(column)
+  // Cyan albedo under a gold emissive at intensity 5 came out white, which is
+  // two rule breaks in one material: cyan means safe ground everywhere else in
+  // this scene, and white is what everything turns into when the emissive is
+  // set by feel. Gold, at the level the collars and the landing use, because
+  // all four of them are saying the same word.
   Material.setPbrMaterial(column, {
-    albedoColor: Color4.create(0.25, 0.9, 1, 0.5),
+    albedoColor: Color4.create(CP_ALBEDO.r, CP_ALBEDO.g, CP_ALBEDO.b, 0.42),
     emissiveColor: CP_EMISSIVE,
-    emissiveIntensity: 5
+    emissiveIntensity: PAD_EMISSIVE.goal * 2,
+    castShadows: false
   })
 
   const label = engine.addEntity()

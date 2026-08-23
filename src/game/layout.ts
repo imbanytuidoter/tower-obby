@@ -11,6 +11,7 @@ import {
   GATE_Z,
   HAZARD_CLEARANCE,
   HAZARD_THICKNESS,
+  LANDING_SIZE,
   LOBBY_KEEPOUT_RADIUS,
   LOBBY_SIZE,
   LOBBY_X,
@@ -291,6 +292,8 @@ export function buildTower(): Layout {
   // changes the fingerprint on purpose - it does not move any pad, so times
   // set on the old slab are still times up the same climb.
   last.size = Math.max(last.size, 5.2)
+
+  widenLandings(out)
 
   relaxSightLines(out)
 
@@ -1374,4 +1377,33 @@ export function treeLine(): TreeDef[] {
  */
 export function checkpointAltitudes(layout: Layout): number[] {
   return layout.pads.filter((pad) => pad.kind === 'checkpoint').map((pad) => pad.y)
+}
+
+
+/**
+ * Grows every checkpoint into a landing you can see from below.
+ *
+ * A hundred and nineteen pads of nearly the same size, evenly spread up a
+ * pole, read as confetti: the twenty zones exist in the data and nowhere on
+ * the screen. Six wider floors give the climb a rhythm - haul, arrive, haul -
+ * and they mark the only places you cannot fall below, which is the one thing
+ * worth being able to see from three zones down.
+ *
+ * Grown by search rather than by a fixed number. The shaft already holds 119
+ * pads in an 11 m band, so how much room a landing has depends entirely on who
+ * its neighbours are; asking for a flat 4.4 m would silently overlap some of
+ * them. Runs AFTER placement, so no pad moves and no jump changes.
+ */
+function widenLandings(out: Build) {
+  for (const pad of out.pads) {
+    if (pad.kind !== 'checkpoint') continue
+
+    for (const candidate of [LANDING_SIZE, LANDING_SIZE - 0.4, LANDING_SIZE - 0.8]) {
+      if (candidate <= pad.size) break
+      const was = pad.size
+      pad.size = candidate
+      if (isClear(out, pad.x, pad.y, pad.z, candidate, pad)) break
+      pad.size = was
+    }
+  }
 }
