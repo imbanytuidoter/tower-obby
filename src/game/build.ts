@@ -215,7 +215,7 @@ const FINISH_ALBEDO = Color4.fromHexString('#FFD23FFF')
 const FINISH_EMISSIVE = Color3.create(1, 0.7, 0.1)
 const CP_ALBEDO = Color4.fromHexString('#FFD23FFF')
 const CP_EMISSIVE = Color3.create(1, 0.72, 0.15)
-const CP_DONE_ALBEDO = Color4.create(0.35, 1, 0.55, 1)
+const CP_DONE_ALBEDO = Color4.fromHexString(MEANING.banked + 'FF')
 const CP_DONE_EMISSIVE = Color3.create(0.25, 1, 0.45)
 const START_ALBEDO = Color4.fromHexString('#4EE3F2FF')
 const START_EMISSIVE = Color3.create(0.18, 0.85, 0.42)
@@ -1035,14 +1035,14 @@ export function activateCheckpoint(checkpoint: Checkpoint) {
     Material.setPbrMaterial(checkpoint.ring, {
       albedoColor: CP_DONE_ALBEDO,
       emissiveColor: CP_DONE_EMISSIVE,
-      emissiveIntensity: 4
+      emissiveIntensity: PAD_EMISSIVE.goal
     })
   }
   if (checkpoint.column) {
     Material.setPbrMaterial(checkpoint.column, {
-      albedoColor: Color4.create(0.35, 1, 0.55, 0.5),
+      albedoColor: Color4.create(CP_DONE_ALBEDO.r, CP_DONE_ALBEDO.g, CP_DONE_ALBEDO.b, 0.42),
       emissiveColor: CP_DONE_EMISSIVE,
-      emissiveIntensity: 5
+      emissiveIntensity: PAD_EMISSIVE.goal * 2
     })
   }
   if (checkpoint.label) {
@@ -1195,10 +1195,14 @@ export function paintPad(entity: Entity, pad: Pad) {
  * feedback is the floor already being gone, which reads as the game cheating.
  */
 export function paintCrumbling(entity: Entity) {
+  // Same colour, louder. The warning was a raw orange at intensity 6 - close
+  // enough to white that the pad appeared to change into something else
+  // rather than to become urgent. Identity is carried by hue; urgency is
+  // carried by brightness, and mixing the two costs you the identity.
   const warning = {
-    albedoColor: Color4.create(1, 0.55, 0.15, 1),
-    emissiveColor: Color3.create(1, 0.5, 0.05),
-    emissiveIntensity: 6
+    albedoColor: CRUMBLE_ALBEDO,
+    emissiveColor: CRUMBLE_EMISSIVE,
+    emissiveIntensity: PAD_EMISSIVE.unstable * 5
   }
   Material.setPbrMaterial(entity, warning)
 }

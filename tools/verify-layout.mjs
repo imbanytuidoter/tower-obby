@@ -512,6 +512,8 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   const gaps = palette.colourGaps()
   const HUE = 20
   const LUM = 0.25
+  // Five meanings now: safe, hurts, unstable, goal, and a checkpoint already
+  // banked. Ten pairs, and every one of them has to be separable.
   const bad = gaps.filter((g) => g.hue < HUE && g.luminance < LUM)
   const worst = gaps.reduce((a, b) =>
     Math.max(a.hue / HUE, a.luminance / LUM) < Math.max(b.hue / HUE, b.luminance / LUM) ? a : b)

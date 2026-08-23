@@ -118,7 +118,14 @@ export const MEANING = {
   safe: '#4EE3F2',
   hurts: '#FF3B4D',
   unstable: '#D2651A',
-  goal: '#FFD23F'
+  goal: '#FFD23F',
+  /**
+   * A checkpoint you have already banked. It was living in build.ts as a raw
+   * Color4 and was never checked against anything; it happens to sit 47
+   * degrees from the safe cyan and 93 from the gold, which is clear, but that
+   * was luck rather than a decision until it moved here.
+   */
+  banked: '#59FF8C'
 } as const
 
 function hueOf(rgb: [number, number, number]): number {
