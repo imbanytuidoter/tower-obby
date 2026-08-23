@@ -1270,3 +1270,17 @@ export function treeLine(): TreeDef[] {
   }
   return trees
 }
+
+
+/**
+ * The altitude of every checkpoint pad, in climb order.
+ *
+ * Exists so decoration cannot drift away from the thing it describes. The
+ * trunk's collars were first placed at height * zone / TOWER_ZONES - an even
+ * share of the tallest pad - while checkpoints land wherever the difficulty
+ * curve puts them. The collars said "a checkpoint is here" several metres from
+ * where one was.
+ */
+export function checkpointAltitudes(layout: Layout): number[] {
+  return layout.pads.filter((pad) => pad.kind === 'checkpoint').map((pad) => pad.y)
+}

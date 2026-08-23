@@ -27,7 +27,15 @@ import {
   HAZARD_THICKNESS,
   PAD_RADIUS
 } from './config'
-import { backdropRing, Layout, MoverDef, Pad, SpinnerDef, treeLine } from './layout'
+import {
+  backdropRing,
+  checkpointAltitudes,
+  Layout,
+  MoverDef,
+  Pad,
+  SpinnerDef,
+  treeLine
+} from './layout'
 import { accentRgb, BACKDROP_EMISSIVE, bodyRgb, zoneRamp } from './palette'
 
 export type BuiltPad = {
@@ -387,7 +395,7 @@ export function buildWorld(layout: Layout): World {
     pads.push({ entity, pad, state: 'solid', timer: 0 })
   }
 
-  entities.push(...createSpine(tallest, sectionAccent(0)))
+  entities.push(...createSpine(tallest, checkpointAltitudes(layout)))
 
   const spinners = layout.spinners.map((def) => {
     const entity = engine.addEntity()
@@ -934,7 +942,7 @@ function createTreeLine(entities: Entity[]) {
   }
 }
 
-function createSpine(height: number, accent: Color3): Entity[] {
+function createSpine(height: number, checkpointYs: number[]): Entity[] {
   const made: Entity[] = []
   const BASE = 5
   const TOP = 2.8
@@ -958,16 +966,19 @@ function createSpine(height: number, accent: Color3): Entity[] {
 
   // A collar on every zone read as a drill bit: twenty near-white rings up a
   // brown pole, and twenty material slots spent on the worst detail in frame.
-  // Now a collar means one thing - a checkpoint is here - so the trunk itself
-  // tells you where the next place you cannot fall below is. Same gold as the
-  // checkpoint pads, because the same colour must never mean two things.
-  for (let zone = CHECKPOINT_EVERY_SECTIONS; zone <= TOWER_ZONES; zone += CHECKPOINT_EVERY_SECTIONS) {
-    const t = zone / TOWER_ZONES
+  // Now a collar means one thing - a checkpoint is at this height - so the
+  // trunk tells you where the next place you cannot fall below is. Same gold
+  // as the checkpoint pads, because one colour must never mean two things.
+  //
+  // Heights come from the pads themselves. Spacing them evenly up the trunk
+  // put them several metres off, because the climb does not rise evenly.
+  for (const y of checkpointYs) {
+    const t = Math.min(1, Math.max(0, y / height))
     const width = BASE + (TOP - BASE) * t + 0.9
 
     const collar = engine.addEntity()
     Transform.create(collar, {
-      position: Vector3.create(CENTER_X, height * t, CENTER_Z),
+      position: Vector3.create(CENTER_X, y, CENTER_Z),
       scale: Vector3.create(width, 0.3, width)
     })
     MeshRenderer.setCylinder(collar, 0.5, 0.5)

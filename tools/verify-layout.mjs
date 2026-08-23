@@ -23,7 +23,8 @@ execSync(
 )
 // CommonJS output so Node resolves the extensionless relative imports tsc emits.
 const req = createRequire(join(out, 'x.cjs'))
-const { buildTower, backdropRing, BACKDROP_PANELS, treeLine } = req(join(out, 'layout.js'))
+const { buildTower, backdropRing, BACKDROP_PANELS, treeLine, checkpointAltitudes } =
+  req(join(out, 'layout.js'))
 const cfg = req(join(out, 'config.js'))
 const palette = req(join(out, 'palette.js'))
 
@@ -326,6 +327,30 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   const outer = cfg.BACKDROP_HALF + panels[0].thickness / 2
   note(outer < cfg.GROUND_SIZE / 2, 'boundary inside the scene',
     `outer face at ${outer.toFixed(1)} m of a ${cfg.GROUND_SIZE / 2} m half-field`)
+}
+
+// A collar on the trunk means "a checkpoint is at this height", so it has to
+// be at that height. They were first spaced evenly up the trunk while the
+// climb rises unevenly, which put every one of them off by metres.
+{
+  const tower = buildTower()
+  const ys = checkpointAltitudes(tower)
+  const marked = tower.pads.filter((pad) => pad.kind === 'checkpoint')
+
+  note(ys.length === marked.length && ys.length > 0, 'every checkpoint gets a collar',
+    ys.length + ' collars for ' + marked.length + ' checkpoints')
+
+  let worst = 0
+  for (let i = 0; i < marked.length; i++) worst = Math.max(worst, Math.abs(ys[i] - marked[i].y))
+  note(worst < 0.001, 'collars sit at the checkpoint height',
+    'worst drift ' + worst.toFixed(3) + ' m')
+
+  // And they have to be spread out, or the trunk says nothing.
+  const sorted = [...ys].sort((a, b) => a - b)
+  let tightest = Infinity
+  for (let i = 1; i < sorted.length; i++) tightest = Math.min(tightest, sorted[i] - sorted[i - 1])
+  note(tightest > 2, 'collars are far enough apart to read',
+    'closest pair ' + tightest.toFixed(1) + ' m')
 }
 
 // Determinism: every client builds the tower locally, so the same round must
