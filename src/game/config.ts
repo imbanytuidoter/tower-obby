@@ -287,6 +287,22 @@ export const LOBBY_Z = START_PAD_Z + Math.sin(startAngle) * 10
 export const LOBBY_SIZE = 20
 export const LOBBY_Y = 0.4
 
+/**
+ * How far from the lobby centre a pad may not be generated.
+ *
+ * Deliberately NOT derived from LOBBY_SIZE. It was, and that made the shape of
+ * the entire climb depend on the size of the deck: shrinking the deck from 24
+ * to 20 to make room for trees moved the finish from (27.6, 69.5, 50.0) to
+ * (38.1, 70.1, 56.1) and reshuffled every pad behind it. Every time on the
+ * leaderboard was set on a tower that no longer existed, and nothing said so.
+ *
+ * 14 is LOBBY_SIZE/2 + 2 evaluated when the deck was 24, so this pins the
+ * tower to the shape those records were set on. Changing this number is
+ * changing the game; tools/verify-layout.mjs will refuse the build until the
+ * fingerprint below is updated on purpose.
+ */
+export const LOBBY_KEEPOUT_RADIUS = 14
+
 /** The start gate straddles the line between the lobby and the first pad. */
 /** Unit vector pointing from the lobby towards the tower. */
 export const GATE_DIR_X = -Math.cos(startAngle)

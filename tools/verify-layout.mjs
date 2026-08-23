@@ -468,6 +468,32 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     'closest pair ' + tightest.toFixed(1) + ' m')
 }
 
+// The shape of the climb is pinned, and changing it has to be deliberate.
+//
+// It changed by accident once: the pad generator rejected candidates within
+// LOBBY_SIZE/2 + 2 of the lobby, so shrinking the deck from 24 m to 20 m to
+// make room for trees moved the finish from (27.6, 69.5, 50.0) to
+// (38.1, 70.1, 56.1) and reshuffled every pad behind it. Every time on the
+// leaderboard had been set on a tower that no longer existed, and the only
+// reason anyone noticed was a drop test aimed at coordinates that had gone
+// stale in the meantime.
+//
+// If this fails, decide on purpose: either put back whatever moved the tower,
+// or accept the new one, update the hash here, and clear the boards - because
+// the old times were set somewhere else.
+{
+  const shape = buildTower().pads
+    .map((p) => [p.x, p.y, p.z, p.size, p.kind, p.section].join(':'))
+    .join('|')
+  let hash = 0
+  for (let i = 0; i < shape.length; i++) hash = (Math.imul(31, hash) + shape.charCodeAt(i)) | 0
+  const fingerprint = (hash >>> 0).toString(16)
+
+  const PINNED = '5b43705'
+  note(fingerprint === PINNED, 'the tower is the tower the records were set on',
+    'fingerprint ' + fingerprint)
+}
+
 // Determinism: every client builds the tower locally, so the same round must
 // produce byte-identical geometry or players fall through each other's floors.
 const once = JSON.stringify(buildTower())
@@ -478,7 +504,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 35
+const MIN_CHECKS = 36
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 

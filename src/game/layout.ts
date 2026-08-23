@@ -11,6 +11,7 @@ import {
   GATE_Z,
   HAZARD_CLEARANCE,
   HAZARD_THICKNESS,
+  LOBBY_KEEPOUT_RADIUS,
   LOBBY_SIZE,
   LOBBY_X,
   LOBBY_Z,
@@ -1126,7 +1127,7 @@ function inShaft(x: number, z: number, y: number): boolean {
   if (radius < SHAFT_MIN_RADIUS || radius > SHAFT_MAX_RADIUS) return false
 
   if (y < 6) return true
-  if (Math.hypot(x - LOBBY_X, z - LOBBY_Z) < LOBBY_SIZE / 2 + 2) return false
+  if (Math.hypot(x - LOBBY_X, z - LOBBY_Z) < LOBBY_KEEPOUT_RADIUS) return false
   return Math.hypot(x - GATE_X, z - GATE_Z) >= 5
 }
 
