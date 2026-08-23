@@ -197,7 +197,6 @@ export async function startServer() {
     if (!context) return
     names.set(context.from.toLowerCase(), data.name.slice(0, 24) || 'Guest')
     void sendStats(context.from)
-    void sendPickups(context.from)
   })
 
   engine.addSystem(serverSystem)
@@ -313,12 +312,6 @@ function handleClaim(name: string, from: string) {
   void recordClimb(from, seconds)
 }
 
-/** A returning player has to be told which ones they are still missing. */
-async function sendPickups(rawAddress: string) {
-  const mine = await loadStats(rawAddress.toLowerCase())
-  room.send('pickups', { found: mine.found ?? [] }, { to: [rawAddress] })
-}
-
 /**
  * A pickup claim, checked the same way a finish is: the server knows where
  * every pickup hangs, reads the player's verified position, and decides.
@@ -348,10 +341,13 @@ async function handlePickup(index: number, from: string) {
   found.push(index)
   mine.found = found
 
+  // Answered BEFORE the write. A storage call that stalls must not hold up
+  // the one piece of feedback the player is waiting for; the find is already
+  // true in memory, and the write is what makes it survive a restart.
+  room.send('pickups', { found }, { to: [from] })
+
   const ok = await Storage.player.set<PlayerStats>(address, PLAYER_KEY, mine)
   if (!ok) console.log('[SERVER] pickup did not persist for ' + address)
-
-  room.send('pickups', { found }, { to: [from] })
   console.log('[SERVER] ' + address + ' found pickup ' + index + ' (' + found.length + ' total)')
 }
 
@@ -621,7 +617,11 @@ function publishBoard() {
  */
 async function sendStats(address: string) {
   const mine = await loadStats(address)
-  room.send('stats', { bestSeconds: mine.bestSeconds, climbs: mine.climbs }, { to: [address] })
+  room.send(
+    'stats',
+    { bestSeconds: mine.bestSeconds, climbs: mine.climbs, found: mine.found ?? [] },
+    { to: [address] }
+  )
 }
 
 /**
@@ -659,7 +659,11 @@ async function recordClimb(address: string, seconds: number) {
   const ok = await Storage.player.set<PlayerStats>(address, PLAYER_KEY, mine)
   if (!ok) console.log('[SERVER] stats did not persist for ' + address)
 
-  room.send('stats', { bestSeconds: mine.bestSeconds, climbs: mine.climbs }, { to: [address] })
+  room.send(
+    'stats',
+    { bestSeconds: mine.bestSeconds, climbs: mine.climbs, found: mine.found ?? [] },
+    { to: [address] }
+  )
 }
 
 type Stored = { version: number; board: Entry[] }

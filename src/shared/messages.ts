@@ -58,9 +58,17 @@ export const room = registerMessages({
   pickups: Schemas.Map({
     found: Schemas.Array(Schemas.Int)
   }),
-  /** Sent back to that one player: their history, restored from storage. */
+  /**
+   * Sent back to that one player: their history, restored from storage.
+   *
+   * The pickup list rides along here rather than in its own handshake message.
+   * It had one, answered once to `hello` with no retry, and a single dropped
+   * packet left the player with no counter and no way to ask again. This one
+   * is already retried until it arrives.
+   */
   stats: Schemas.Map({
     bestSeconds: Schemas.Float,
-    climbs: Schemas.Int
+    climbs: Schemas.Int,
+    found: Schemas.Array(Schemas.Int)
   })
 })
