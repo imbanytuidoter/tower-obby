@@ -6,52 +6,40 @@ import { Quaternion, Vector3 } from '@dcl/sdk/math'
  * assets/models. They are set dressing only - every surface the player
  * actually stands on stays a primitive, so collision is predictable.
  */
+/**
+ * Every model the scene places, and nothing else.
+ *
+ * The list had grown to twelve entries while five were being placed: leftovers
+ * from the perimeter ring, the sci-fi lamp the torch replaced, and candidates
+ * that were downloaded, compared and passed over. Declared-but-unplaced costs
+ * nothing at runtime and everything at deploy - the files still upload, and
+ * the signing window for a deploy is 300 seconds.
+ */
 export const MODELS = {
-  lampPost: 'assets/models/LampPostSciFi_01/LampPostSciFi_01.glb',
   /**
-   * From the OpenDCL catalog, chosen to fit the stone the gates are built
-   * from rather than to fill space. Audited before placing, as the skill
-   * requires: obelisk 2 x 4 x 2 m / 46 tri, crystals ~1.6-2 m / 15 tri each
-   * and animated, shard 0.07 x 0.86 x 1.26 m / 24 tri. None of them contains
-   * _collider meshes, so collision is set on the visible mesh or left off.
-   */
-  obelisk: 'assets/Models/obelisk.glb',
-  cliff: 'assets/Models/cliff-a.glb',
-  rockTall: 'assets/Models/rock-tall.glb',
-  crystalSafe: 'assets/Models/crystal-teal.glb',
-  crystalUnstable: 'assets/Models/crystal-orange.glb',
-  shard: 'assets/Models/stone-shard.glb',
-  /**
-   * The forest edge. Audited before placing: 2 meshes / 2 materials / 1
-   * texture, no animation, ships its own `TreeFir_02_collider`, so it goes in
-   * with hasColliderMeshes: true and nothing on the visible mesh. 412 tri.
-   *
-   * Chosen over wm-tree01 for two measured reasons: it is faceted rather than
-   * painted, which matches the flat-shaded pads, and it costs 2 material slots
-   * per instance instead of 3 - eighteen of the other one put the scene at 516
-   * against a 500 hard cap on mobile, which is a scene that does not load.
-   *
-   * Native bounding box is 270 x 253 x 555 units, so it wants a small scale.
+   * The forest edge. 2 meshes / 2 materials / 1 texture, no animation, ships
+   * its own `TreeFir_02_collider`, so it goes in with hasColliderMeshes: true.
+   * 5.11 m tall at scale 1, measured out of the file with node rotation
+   * applied - the catalog's "555 m" is the raw bbox with the GLB's own 0.01
+   * node scale ignored.
    */
   tree: 'assets/Models/tree-fir-02.glb',
-  /** 1 mesh / 1 material / 1 texture, clip "fernidle", no collider meshes. */
-  fern: 'assets/Models/fern.glb',
   /**
-   * A wooden torch on a tripod, for the clearing. Audited: 2 meshes /
-   * 2 materials / 5 textures, no animation, NO collider meshes - so collision
-   * goes on the visible mesh or nowhere. 1.43 x 2.51 x 1.53 m at scale 1.
-   *
-   * Replaces LampPostSciFi_01 beside the board. A chrome sci-fi lamp post in a
-   * forest clearing was the loudest single style clash in the scene.
+   * A wooden torch on a tripod, beside the board. 2 meshes / 2 materials /
+   * 5 textures, NO collider meshes. Its origin sits 2.23 m above its own base,
+   * so it buries itself if placed at ground level.
    */
   torch: 'assets/Models/torch.glb',
   /**
-   * The greeter at the crown. Audited: 2 meshes / 1 material / 2 textures,
-   * an `idle` clip, and it ships a collider mesh (named Dragon_collider in
-   * the file, which is somebody else's leftover but is still a collider mesh
-   * and has to be treated as one). Origin at its feet, 2.36 x 1.15 x 1.04 m.
+   * The greeter at the crown. 2 meshes / 1 material / 2 textures, an `idle`
+   * clip, and a collider mesh (named Dragon_collider in the file, which is
+   * somebody else's leftover but is still a collider mesh). Origin at its
+   * feet, 2.36 m of wingspan.
    */
-  owl: 'assets/Models/owl.glb'
+  owl: 'assets/Models/owl.glb',
+  /** Small animated crystals marking safe and unstable ground. 1 mesh each. */
+  crystalSafe: 'assets/Models/crystal-teal.glb',
+  crystalUnstable: 'assets/Models/crystal-orange.glb'
 } as const
 
 /** Clip names read out of the GLBs, not guessed. */
