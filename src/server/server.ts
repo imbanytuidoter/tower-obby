@@ -14,6 +14,7 @@ import {
   RANKING_SECONDS,
   RANKING_SIZE,
   HEARTBEAT_SECONDS,
+  STATS_FLUSH_SECONDS,
   COIN_RADIUS,
   GHOST_MAX_SAMPLES,
   PICKUP_GRACE,
@@ -106,6 +107,15 @@ const tookCoin = new Set<string>()
 
 /** Climbers the server has invited to upload a path, because they lead today. */
 const pendingGhost = new Map<string, { name: string; seconds: number }>()
+/**
+ * Players whose in-memory stats have run ahead of what is on disk.
+ *
+ * The documented rule is that live state lives in memory and storage is
+ * written at meaningful checkpoints, never per change.
+ */
+const dirtyStats = new Set<string>()
+let flushTimer = 0
+
 let heartbeatTimer = 0
 let rankingTimer = 0
 
@@ -220,6 +230,12 @@ function serverSystem(dt: number) {
   watchShortcutPads()
   watchLevers()
   watchPlate(dt)
+
+  flushTimer += dt
+  if (flushTimer >= STATS_FLUSH_SECONDS) {
+    flushTimer = 0
+    void flushStats()
+  }
 
   rankingTimer += dt
   if (rankingTimer >= RANKING_SECONDS) {
@@ -346,8 +362,16 @@ async function handlePickup(index: number, from: string) {
   // true in memory, and the write is what makes it survive a restart.
   room.send('pickups', { found }, { to: [from] })
 
-  const ok = await Storage.player.set<PlayerStats>(address, PLAYER_KEY, mine)
-  if (!ok) console.log('[SERVER] pickup did not persist for ' + address)
+  // Marked for a later write instead of written here.
+  //
+  // A write per find looked fine and was not: collecting eight in a row fires
+  // eight Storage.set calls inside a couple of seconds, the isolate's
+  // in-flight host-call cap swallows the excess, and Storage.set returns false
+  // rather than throwing. Nothing on the server or the client notices - the
+  // counter is served from memory, so it keeps saying 8/8 - and the loss only
+  // shows the next time the server actually restarts. Found by reading the
+  // storage file and seeing no `found` key at all.
+  dirtyStats.add(address)
   console.log('[SERVER] ' + address + ' found pickup ' + index + ' (' + found.length + ' total)')
 }
 
@@ -647,6 +671,29 @@ async function loadStats(rawAddress: string): Promise<PlayerStats> {
 
   stats.set(address, fresh)
   return fresh
+}
+
+/**
+ * Writes every player whose stats have moved since the last flush.
+ *
+ * One write per player per interval, however many coins they picked up in it.
+ * A failed write leaves the player marked, so the next flush tries again
+ * rather than losing the find silently.
+ */
+async function flushStats() {
+  if (dirtyStats.size === 0) return
+  const pending = [...dirtyStats]
+  dirtyStats.clear()
+
+  for (const address of pending) {
+    const mine = stats.get(address)
+    if (!mine) continue
+    const ok = await Storage.player.set<PlayerStats>(address, PLAYER_KEY, mine)
+    if (!ok) {
+      console.log('[SERVER] stats did not persist for ' + address + ', will retry')
+      dirtyStats.add(address)
+    }
+  }
 }
 
 /** Written on a finish only - one write per climb, never per tick. */

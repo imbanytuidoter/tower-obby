@@ -197,6 +197,9 @@ export const PAD_EMISSIVE = {
 /** How often the server proves it is alive. */
 export const HEARTBEAT_SECONDS = 2
 
+/** How often the server flushes changed player stats to storage. */
+export const STATS_FLUSH_SECONDS = 8
+
 /**
  * How close the server needs a player to be to accept a finish claim.
  *
