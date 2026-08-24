@@ -999,15 +999,38 @@ function theLever(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rn
     leverSection: index
   })
 
-  // The lever sits on its own pad, off the climbing line.
-  const side = cursor.angle + Math.PI / 2
-  const leverCursor: Cursor = {
-    x: guarded.x + Math.cos(side) * (c.jumpGap + c.padSize),
-    y: guarded.y,
-    z: guarded.z + Math.sin(side) * (c.jumpGap + c.padSize),
-    angle: cursor.angle
+  // The lever sits on its own pad, off the climbing line - searched for, not
+  // assumed.
+  //
+  // It used to be one fixed spot: ninety degrees to the side at exactly
+  // jumpGap + padSize. If anything was already there the whole mechanic was
+  // skipped and nothing said so, and BOTH lever zones failed that test - the
+  // tower shipped with zero levers while the submission described the lever as
+  // one of its three social mechanics. The same lesson the coin and the
+  // shortcut both learned earlier in this file, which never reached here.
+  let leverCursor: Cursor | null = null
+  for (const turn of [0, 1, -1, 2, -2, 3, -3]) {
+    for (const reach of [c.jumpGap + c.padSize, c.jumpGap + c.padSize * 1.4, c.jumpGap + c.padSize * 0.75]) {
+      const side = cursor.angle + Math.PI / 2 + turn * 0.5
+      const candidate: Cursor = {
+        x: guarded.x + Math.cos(side) * reach,
+        y: guarded.y,
+        z: guarded.z + Math.sin(side) * reach,
+        angle: cursor.angle
+      }
+      if (!inShaft(candidate.x, candidate.z, candidate.y)) continue
+      if (!isClear(out, candidate.x, candidate.y, candidate.z, c.padSize)) continue
+      // It has to be reachable from the pad it guards, or it is scenery.
+      const gap = Math.hypot(candidate.x - guarded.x, candidate.z - guarded.z) -
+        (guarded.size + c.padSize) / 2
+      if (gap > REACH_BUDGET) continue
+      leverCursor = candidate
+      break
+    }
+    if (leverCursor) break
   }
-  if (!isClear(out, leverCursor.x, leverCursor.y, leverCursor.z, c.padSize)) {
+
+  if (!leverCursor) {
     closeSection(index, cursor, c, rng, out, guarded)
     return
   }

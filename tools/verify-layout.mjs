@@ -519,6 +519,31 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     Math.round(share * 100) + '%)')
 }
 
+// Every mechanic the zone order asks for has to actually be in the tower.
+//
+// It asks for two lever zones. The tower shipped with ZERO levers: the pad was
+// placed at one fixed offset and skipped in silence whenever anything was
+// already there, which was both times. Nothing noticed, because nothing asked
+// - and the submission described the lever as one of three social mechanics.
+{
+  const tower = buildTower()
+  const asked = tower.sectionNames.filter((name) => name === 'the lever').length
+  note(tower.levers.length === asked, 'the tower has the levers it asks for',
+    tower.levers.length + ' built for ' + asked + ' lever zones')
+
+  // And each one has to be reachable from the pad it guards.
+  let worstGap = 0
+  for (const lever of tower.levers) {
+    const near = tower.pads
+      .map((pad) => ({ pad, d: Math.hypot(pad.x - lever.x, pad.z - lever.z) }))
+      .filter((entry) => Math.abs(entry.pad.y - lever.y) < 1.5)
+      .sort((a, b) => a.d - b.d)[1]
+    if (near) worstGap = Math.max(worstGap, near.d - near.pad.size / 2 - 1.5)
+  }
+  note(worstGap <= MAX_REACH, 'levers are within a jump of the climb',
+    'furthest ' + worstGap.toFixed(2) + ' m of a ' + MAX_REACH.toFixed(2) + ' m budget')
+}
+
 // A colour may not mean two things.
 //
 // Unstable ground and a checkpoint were fourteen degrees of hue and 0.15 of
@@ -579,7 +604,9 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   // ever moved and every time on the boards is still a time up this climb:
   //   1. the crown widened 3.2 -> 5.2 m, for room to stand on
   //   2. checkpoints grown into landings, by search, 3.2 -> 3.8..4.6 m
-  const PINNED = '41620f2f'
+  //   3. the two lever pads, which had never been built at all - this one DID
+  //      add pads, so the boards were cleared with it
+  const PINNED = '95d4f7a6'
   note(fingerprint === PINNED, 'the tower is the tower the records were set on',
     'fingerprint ' + fingerprint)
 }
@@ -594,7 +621,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 43
+const MIN_CHECKS = 45
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 

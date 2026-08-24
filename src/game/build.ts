@@ -440,7 +440,10 @@ export function buildWorld(layout: Layout): World {
 
   const levers = layout.levers.map((lever) => {
     const pad = createPressurePad(lever, entities)
-    labelPad(lever, 'STAND HERE - STOPS THE BEAM', entities)
+    // The point of the lever is that it is a favour. 'STOPS THE BEAM' reads
+    // as something you do for yourself, and you cannot: holding it means you
+    // are standing still while other people climb through.
+    labelPad(lever, 'STAND HERE - STOPS THE BEAM FOR EVERYONE ELSE', entities)
     return { pad, section: lever.section }
   })
 

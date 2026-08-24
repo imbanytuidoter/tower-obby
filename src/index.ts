@@ -602,6 +602,30 @@ function ghostSystem(dt: number) {
  * in something unverifiable is how a mechanic ships broken.
  */
 /**
+ * What the lever says to whoever is standing on it.
+ *
+ * The same gap the tandem plate had: a co-op mechanic whose whole point is
+ * that somebody gave something up, with nothing telling that person it
+ * worked. The pad turns green under their feet, but the beam they stopped is
+ * in the next zone where they cannot see it.
+ */
+function leverPrompt(player: Vector3): string {
+  if (!world) return ''
+
+  for (const lever of world.levers) {
+    const at = Transform.getOrNull(lever.pad)
+    if (!at) continue
+    if (
+      horizontalDistance(player, at.position) < PAD_RADIUS &&
+      Math.abs(player.y - at.position.y) < 3
+    ) {
+      return 'HOLDING THE BEAM FOR EVERYONE  -  YOU ARE NOT CLIMBING'
+    }
+  }
+  return ''
+}
+
+/**
  * What a coin says when you get near one.
  *
  * "COINS 0/8" in the corner tells a new player that eight of something exist
@@ -872,16 +896,24 @@ function updatePrompt(player: Vector3) {
     return
   }
 
-  // Before the phase branches, because a coin can be taken at any time - on a
-  // timed climb or on a wander - and an explanation that only appears during a
-  // run is not an explanation for the person who has not started one.
-  const coin = pickupPrompt(player)
-  if (coin !== '') {
-    run.prompt = coin
+  // What you are STANDING on comes first and is not gated on a phase. Holding
+  // a lever is a favour to other people whether or not your own clock is
+  // running, and the plate does not care either.
+  const standing = leverPrompt(player) || platePrompt(player)
+  if (standing !== '') {
+    run.prompt = standing
     return
   }
 
   if (run.phase === Phase.Ready) {
+    // A coin can be taken on a wander as well as on a timed climb, so its
+    // explanation cannot live only in the Running branch.
+    const idleCoin = pickupPrompt(player)
+    if (idleCoin !== '') {
+      run.prompt = idleCoin
+      return
+    }
+
     const distance = Math.sqrt((player.x - GATE_X) ** 2 + (player.z - GATE_Z) ** 2)
     run.prompt =
       distance < PROMPT_RANGE
@@ -891,15 +923,18 @@ function updatePrompt(player: Vector3) {
   }
 
   if (run.phase === Phase.Running) {
-    const plate = platePrompt(player)
-    if (plate !== '') {
-      run.prompt = plate
-      return
-    }
-
     const coop = shortcutPrompt(player)
     if (coop !== '') {
       run.prompt = coop
+      return
+    }
+
+    // After everything you can be STANDING on. Being on a lever or a plate is
+    // a thing you are doing; a coin four metres away is a thing you could do,
+    // and the first should not be talked over by the second.
+    const coin = pickupPrompt(player)
+    if (coin !== '') {
+      run.prompt = coin
       return
     }
 
