@@ -697,14 +697,19 @@ function routeSign(pad: Pad, title: string, cost: string, tone: Color3): Entity[
   Billboard.create(head, { billboardMode: BillboardMode.BM_Y })
   made.push(head)
 
+  // The cost line is the half a player is actually deciding on, and it was the
+  // half that could not be read: pale lilac at 1.7 against a near-black wall,
+  // which is the background it hangs in front of for most of the climb. White
+  // on a black outline is the only pairing that survives every background, and
+  // it is bigger, because the number is the point of the sign.
   const line = engine.addEntity()
-  Transform.create(line, { position: Vector3.create(pad.x, pad.y + 2.5, pad.z) })
+  Transform.create(line, { position: Vector3.create(pad.x, pad.y + 2.4, pad.z) })
   TextShape.create(line, {
     text: cost,
-    fontSize: 1.7,
-    textColor: CHOICE_EDGE,
+    fontSize: 2.1,
+    textColor: Color4.White(),
     outlineColor: Color4.Black(),
-    outlineWidth: 0.3,
+    outlineWidth: 0.35,
     textAlign: TextAlignMode.TAM_MIDDLE_CENTER
   })
   Billboard.create(line, { billboardMode: BillboardMode.BM_Y })

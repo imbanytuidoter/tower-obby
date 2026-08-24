@@ -444,8 +444,19 @@ const PLAYER_RADIUS = 0.3
  */
 export const HAZARD_HALF_WIDTH = HAZARD_THICKNESS / 2 + PLAYER_RADIUS
 
-/** Crumbling pads: how long before they drop, and how long until they return. */
-export const CRUMBLE_DELAY = 0.7
+/**
+ * How long a crumbling pad holds once it is stood on.
+ *
+ * 0.7 was set on a desktop and never revisited when the jump budget came down
+ * to 0.55 for a thumb. The widest hop is 3.03 m, which at the documented jog
+ * speed is 0.38 s in the air - so 0.7 left 0.32 s to see the pad go, decide
+ * and aim, on a virtual stick, with five of them in a row at the worst point.
+ *
+ * The rule now is that the pad must give at least as long to react as it takes
+ * to cross - equal halves, checked in tools/verify-layout.mjs. Runtime only:
+ * this changes nothing about where pads are, so the tower is untouched.
+ */
+export const CRUMBLE_DELAY = 1.0
 export const CRUMBLE_RESPAWN = 4
 
 /** No pad may sit above another one closer than this, or the climb is blocked. */

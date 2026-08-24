@@ -544,6 +544,29 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     'furthest ' + worstGap.toFixed(2) + ' m of a ' + MAX_REACH.toFixed(2) + ' m budget')
 }
 
+// A crumbling pad has to give you as long to think as it takes to cross.
+//
+// It gave 0.7 s while the widest hop needs 0.38 s of airtime at the documented
+// jog speed - 0.32 s to see it go, decide and aim, on a virtual stick, with
+// five of them in a row at the worst point in the tower.
+{
+  const tower = buildTower()
+  let longest = 0
+  let run = 0
+  for (const pad of tower.pads) {
+    run = pad.crumble ? run + 1 : 0
+    longest = Math.max(longest, run)
+  }
+
+  const crossing = worstReach / cfg.JOG_SPEED
+  const thinking = cfg.CRUMBLE_DELAY - crossing
+
+  note(thinking >= crossing, 'crumbling pads leave time to think',
+    'holds ' + cfg.CRUMBLE_DELAY.toFixed(2) + ' s, crossing takes ' +
+    crossing.toFixed(2) + ' s, leaving ' + thinking.toFixed(2) +
+    ' s - longest run is ' + longest + ' pads')
+}
+
 // A colour may not mean two things.
 //
 // Unstable ground and a checkpoint were fourteen degrees of hue and 0.15 of
@@ -621,7 +644,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 45
+const MIN_CHECKS = 46
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 
