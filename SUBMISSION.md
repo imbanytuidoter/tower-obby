@@ -261,6 +261,9 @@ Still unverified, and honestly so:
 - **Jump feel.** Every gap is inside the budget by arithmetic, and the harness
   proves it, but the test harness cannot jump — so no gap in this tower has
   been crossed by a real jump rather than a teleport.
+- **The ambience.** A forest loop was added and the scene loads it without
+  error, but there is no way to listen through the tooling here, so whether it
+  is audible at a sensible volume is unverified.
 - **Anything on a physical phone.** The mobile layout branches on `isMobile()`
   and every budget is inside the mobile limits, but no handset has run this
   build.

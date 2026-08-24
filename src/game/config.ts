@@ -46,6 +46,15 @@ export function estimateClimbSeconds(
  * the silhouette reads. A sunset sky was flattening the whole scene to
  * near-black regardless of what colours the materials carried.
  */
+/**
+ * The forest ambience: how loud at the floor, how high before it is gone, and
+ * how many volume steps between - quantised because AudioSource is synced and
+ * a per-frame write is a per-frame broadcast.
+ */
+export const FOREST_VOLUME = 0.45
+export const FOREST_FADE_HEIGHT = 34
+export const FOREST_STEPS = 8
+
 export const SKYBOX_TIME = 36000
 
 /**

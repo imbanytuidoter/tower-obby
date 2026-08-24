@@ -88,7 +88,7 @@ import {
   showClimbers,
   showTowerRecord
 } from './game/plaza'
-import { play, setupSound } from './game/sound'
+import { fadeForest, play, setupSound } from './game/sound'
 import { announce, completeRound, Phase, prepareRound, run, startClock, tickAnnouncement } from './game/state'
 import { setupUi } from './ui'
 
@@ -440,6 +440,7 @@ function runSystem(dt: number) {
   if (run.respawnCooldown > 0) run.respawnCooldown -= dt
 
   updatePrompt(player)
+  fadeForest(player.y)
   noteForkChoice(player)
   reachForCoin(dt, player)
   reachForPickups(player)
