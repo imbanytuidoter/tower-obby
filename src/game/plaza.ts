@@ -821,9 +821,16 @@ export function showBoard(solo: BoardRow[], together: BoardRow[]) {
     // The divider is the point of this board: it is the only place a player
     // is told that climbing with somebody is a separate, recorded thing.
     if (i === SOLO_ROWS) {
+      // Says how it is filled, not just what it is: a player who has never met
+      // the tandem plate reads an empty half-board and learns nothing.
+      //
+      // The hint goes in the VALUE column, which this row leaves empty, rather
+      // than on the end of the label. Appended it overran both edges of a
+      // 5.6 m board - the label is left-aligned to the row and nothing wraps.
       label.text = 'CLIMBED TOGETHER'
       label.textColor = GOLD4
-      value.text = ''
+      value.text = together.length > 0 ? '' : 'NEEDS TWO'
+      value.textColor = GOLD4
       continue
     }
 

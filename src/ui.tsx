@@ -216,7 +216,11 @@ const hud = () => {
           run.climbers > 1
             ? run.climbers + ' CLIMBING NOW'
             : run.serverAlive
-              ? 'YOU HAVE THE TOWER TO YOURSELF'
+              // The fourth line is the only place the game can say, to
+              // somebody standing alone in it, that being alone is not the
+              // whole of it. "You have the tower to yourself" is a fact; on
+              // its own it reads as an empty room rather than an invitation.
+              ? 'ALONE HERE  -  SOME OF THIS NEEDS TWO'
               : 'CONNECTING...'
         }
         fontSize={s.line}
