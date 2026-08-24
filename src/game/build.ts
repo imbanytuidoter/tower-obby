@@ -62,6 +62,8 @@ export type Checkpoint = {
   number: number
   /** Index of this checkpoint's pad in the course, for aiming the camera. */
   padIndex: number
+  /** The landing's own width, so banking can test the pad and not a circle. */
+  size: number
 }
 
 /**
@@ -365,7 +367,15 @@ export function buildWorld(layout: Layout): World {
     const top = Vector3.create(pad.x, pad.y + PAD_TOP, pad.z)
 
     if (pad.kind === 'start') {
-      checkpoints.push({ top, ring: null, column: null, label: null, number: 0, padIndex })
+      checkpoints.push({
+        top,
+        ring: null,
+        column: null,
+        label: null,
+        number: 0,
+        padIndex,
+        size: pad.size
+      })
     }
 
     if (pad.kind === 'checkpoint') {
@@ -390,7 +400,8 @@ export function buildWorld(layout: Layout): World {
         column: marker.column,
         label: marker.label,
         number: checkpoints.length,
-        padIndex
+        padIndex,
+        size: pad.size
       })
     }
 

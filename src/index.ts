@@ -35,7 +35,7 @@ import {
   TandemState
 } from './shared/schemas'
 import {
-  CHECKPOINT_RADIUS,
+  CHECKPOINT_TOUCH_MARGIN,
   GATE_DIR_X,
   GATE_DIR_Z,
   GATE_WIDTH,
@@ -461,7 +461,16 @@ function runSystem(dt: number) {
   for (let i = world.checkpoints.length - 1; i > run.checkpoint; i--) {
     const checkpoint = world.checkpoints[i]
     if (Math.abs(player.y - checkpoint.top.y) > 2) continue
-    if (horizontalDistance(player, checkpoint.top) <= CHECKPOINT_RADIUS) {
+    // The pad itself, not a circle around it. A radius wide enough to cover a
+    // 4.6 m landing's corner is also wide enough to bank it from the pad next
+    // door - MIN_PAD_SEPARATION is 3.4 - so it would hand out checkpoints to
+    // players who never stood on them. A box test is exactly the shape of the
+    // thing you are standing on, and needs no margin at all.
+    const half = checkpoint.size / 2 + CHECKPOINT_TOUCH_MARGIN
+    if (
+      Math.abs(player.x - checkpoint.top.x) <= half &&
+      Math.abs(player.z - checkpoint.top.z) <= half
+    ) {
       run.checkpoint = i
       activateCheckpoint(checkpoint)
       play('checkpoint')

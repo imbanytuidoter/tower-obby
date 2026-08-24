@@ -395,7 +395,27 @@ export const MAX_XZ = 75
 /** A fall this far below the active checkpoint sends the player back. */
 export const FALL_GRACE = 3.2
 
-export const CHECKPOINT_RADIUS = 2.2
+/**
+ * How close to a landing's centre banks the checkpoint.
+ *
+ * Derived from the landing, not chosen. It was a flat 2.2 while landings were
+ * 3.2 m wide, and stayed 2.2 when they were grown to 4.6 - which put the
+ * corner of every one of the six at 2.69 to 3.25 m and made it dead. Stand
+ * there, bank nothing, fall, and lose everything back to the previous
+ * checkpoint with no way to know why.
+ *
+ * This is the finish slab's dead zone repeated exactly, in the same file that
+ * documents it, caused by widening the pads without asking what measured them.
+ */
+export const CHECKPOINT_RADIUS = (LANDING_SIZE / 2) * Math.SQRT2 + 0.2
+
+/**
+ * Slack around a landing's own edge when banking it.
+ *
+ * Small on purpose: the test is a box the shape of the pad, so the margin only
+ * has to cover the width of the avatar standing with its toes over the lip.
+ */
+export const CHECKPOINT_TOUCH_MARGIN = 0.4
 export const RESPAWN_LIFT = 1.4
 /**
  * Seconds the player cannot move after a fall. This is what makes a fall cost

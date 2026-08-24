@@ -544,6 +544,54 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     'furthest ' + worstGap.toFixed(2) + ' m of a ' + MAX_REACH.toFixed(2) + ' m budget')
 }
 
+// Every landing must bank its checkpoint from anywhere you can stand on it.
+//
+// The radius was a flat 2.2 while landings were 3.2 m wide, and stayed 2.2
+// after they were grown to 4.6 - so the corner of all six was dead: stand
+// there, bank nothing, fall, lose everything back to the previous checkpoint
+// with no way to know why. Exactly the finish slab's dead zone, repeated,
+// because the pads were widened without asking what measured them.
+{
+  const tower = buildTower()
+  const landings = tower.pads.filter((pad) => pad.kind === 'checkpoint')
+  let worstCorner = 0
+  let dead = 0
+
+  for (const pad of landings) {
+    const corner = (pad.size / 2) * Math.SQRT2
+    worstCorner = Math.max(worstCorner, corner)
+    if (corner > cfg.CHECKPOINT_RADIUS) dead++
+  }
+
+  note(dead === 0 && landings.length > 0, 'every landing banks from its corners',
+    landings.length + ' landings, furthest corner ' + worstCorner.toFixed(2) +
+    ' m of a ' + cfg.CHECKPOINT_RADIUS.toFixed(2) + ' m radius, ' + dead + ' dead')
+
+  // And the box the client actually tests must not reach the pad next door.
+  // A circle wide enough for a 4.6 m landing's corner is 3.45 m, while pads
+  // are only separated by 3.4 - which would hand a checkpoint to somebody
+  // standing on the neighbour. The box is the shape of the pad, so it cannot.
+  // Measured to the neighbour's CENTRE, not its edge. Pads can sit edge to
+  // edge, and somebody whose feet are on the shared lip is standing half on
+  // each - banking there is fair. What must not happen is banking while
+  // standing comfortably on the pad next door.
+  let nearest = Infinity
+  for (const landing of landings) {
+    const half = landing.size / 2 + cfg.CHECKPOINT_TOUCH_MARGIN
+    for (const other of tower.pads) {
+      if (other === landing) continue
+      if (Math.abs(other.y - landing.y) > 2) continue
+      const reach = Math.max(
+        Math.abs(other.x - landing.x),
+        Math.abs(other.z - landing.z)
+      )
+      nearest = Math.min(nearest, reach - half)
+    }
+  }
+  note(nearest > 0, 'banking cannot reach the pad next door',
+    'nearest neighbour centre is ' + nearest.toFixed(2) + ' m outside the box')
+}
+
 // A crumbling pad has to give you as long to think as it takes to cross.
 //
 // It gave 0.7 s while the widest hop needs 0.38 s of airtime at the documented
@@ -644,7 +692,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 46
+const MIN_CHECKS = 48
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 
