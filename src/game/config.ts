@@ -159,8 +159,6 @@ export const TREE_CANOPY_RADIUS = 4.1
  */
 export const TREE_TRUNK_RADIUS = 0.9
 
-export const BACKDROP_RADIUS = 34
-
 /**
  * Half-width of the square boundary wall, from the centre of the scene.
  *
