@@ -251,9 +251,13 @@ Still unverified, and honestly so:
   Explorer starts its MCP once per machine, a second desktop instance never
   joins the realm, and the hosted web client cannot reach a local one. This one
   needs two people or two machines.
-- **Spending the skip token.** The grant is verified; the button press that
-  spends it cannot be sent programmatically, so the teleport it performs has
-  not been exercised.
+- **Spending the skip token.** Everything up to the press is verified: the
+  coin is claimed, the server validates the position, the token is granted and
+  the prompt reads "PRESS E TO SPEND THE COIN AND SKIP AHEAD". The press
+  itself cannot be sent - the Explorer's click tool synthesises a pointer
+  event scoped to an entity, while the spend listens on the global input, and
+  aiming it at the pad under the player's feet returns hit=false. Tried, not
+  assumed.
 - **Jump feel.** Every gap is inside the budget by arithmetic, and the harness
   proves it, but the test harness cannot jump — so no gap in this tower has
   been crossed by a real jump rather than a teleport.
