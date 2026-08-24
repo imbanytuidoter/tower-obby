@@ -168,7 +168,7 @@ and what it does not.
 |---|---|
 | Mobile-first experience | Jump budget cut to 55% of ability after a handset playtest, four HUD lines and no panels, `screenInset: 'interactable'`, box colliders everywhere because collider-shape parity with the mobile client is an open item in Decentraland's own tracker |
 | Social value | A plate that only rises for two people and a board that records the pair by name; a lever that freezes hazards for everyone while whoever holds it is not climbing; a live height ranking; every summit announced world-wide; the day's fastest run replaying as a ghost |
-| Mobile UX and onboarding | Taught in the world, not in a panel: the gate says what it does, a collar marks every checkpoint height, the plate says what it is waiting for, a coin explains itself when you approach it. **Text size on a real handset is unverified** |
+| Mobile UX and onboarding | Taught in the world, not in a panel: the gate says what it does, a collar marks every checkpoint height, the plate and the lever say what they are waiting for and what they cost, a coin explains itself when you approach it. Checked line by line against Decentraland's own mobile UI guidance - see below. **Text size on a real handset is unverified** |
 | Performance | 176-180 fps and no hiccup frames on desktop; every budget inside the mobile limits. **No handset has run it** |
 | Creativity | Forks that price both arms in seconds, an ante you can lose, and a pair board - none of which a solo obby can record |
 | Retention | A board that empties at midnight UTC, a ghost to chase, eight coins kept per wallet for good, a lifetime summit count |
@@ -178,6 +178,28 @@ The page is explicit that "every eligible project is tested directly in the
 Decentraland Mobile App", and that a simple polished mobile experience may
 score above a complex one that is hard to understand. That is the standard
 this has been built against.
+
+### Against Decentraland's own mobile UI guidance
+
+Read line by line rather than assumed, and one thing was wrong.
+
+| the guidance says | what this scene does |
+|---|---|
+| Branch the UI on `isMobile()` | 1600x720 virtual screen, larger type, thumb-sized button |
+| Pass the virtual screen explicitly | passed, even though the values are the defaults |
+| Keep critical UI in the safe area; `'interactable'` on mobile | exactly that, `'device'` on desktop |
+| Actionable dialogs at the centre | the summit panel, the one place a box is kept |
+| Non-actionable messages top-centre | the four status lines, and now the ranking too |
+| Context hints centre-bottom, above the interaction button | the prompt line |
+| **Not the top-right corner** - it reads as part of the client's HUD | **this was wrong.** The live ranking sat there. On a phone it now drops below the status block; desktop keeps the corner, where nothing competes |
+| Not the bottom-right corner - action buttons | nothing is placed there |
+| Don't bind actions to `IA_ACTION_3`-`IA_ACTION_6` | the only input in the whole scene is `IA_PRIMARY` |
+| Don't rely on small tap targets | one button, 380x116 |
+| Don't apply the old 3x scale-up blindly | mobile type is 1.15-1.4x desktop, not 3x |
+
+One caveat the docs raise and this cannot control: `screenInset: 'interactable'`
+needs mobile client `1.12.1` or newer. Older clients report no margins at all
+and scene UI covers the whole screen.
 
 ## Verifying the claims
 

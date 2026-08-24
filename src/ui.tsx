@@ -18,6 +18,13 @@ let compact = false
 /** Height of the client's own place-name card, top-left, in virtual units. */
 const PLACE_CARD_CLEARANCE = 120
 
+/**
+ * Where the live ranking sits on a phone: directly under the four status
+ * lines, still in the top-centre band the mobile guidance reserves for
+ * non-actionable information.
+ */
+const RANKING_TOP = 250
+
 export function setupUi(next: Handlers) {
   handlers = next
   compact = isMobile()
@@ -231,8 +238,17 @@ const rankingPanel = () => {
     <UiEntity
       uiTransform={{
         positionType: 'absolute',
-        position: { top: s.edge, right: s.edge },
-        width: compact ? 320 : 340,
+        // Top-right is the one corner the mobile docs single out: the profile
+        // and camera controls sit just outside the interactable area, so scene
+        // UI hugging it "reads as part of the client's HUD". On a phone this
+        // panel drops below the status block instead, which keeps it in
+        // top-centre - the place the same docs name for non-actionable
+        // information. Desktop keeps the corner, where nothing competes.
+        position: compact
+          ? { top: RANKING_TOP, left: '50%' }
+          : { top: s.edge, right: s.edge },
+        margin: compact ? { left: -(s.hudWidth / 2) } : {},
+        width: compact ? s.hudWidth : 340,
         flexDirection: 'column',
         padding: compact ? 14 : 16
       }}
