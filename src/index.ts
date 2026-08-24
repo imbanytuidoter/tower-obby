@@ -79,6 +79,7 @@ import { formatTime } from './game/format'
 import { buildTower } from './game/layout'
 import {
   buildPlaza,
+  flickerFlames,
   decorSystem,
   GATE_LOOK,
   refreshBoard,
@@ -122,6 +123,7 @@ function startClient() {
   buildTheTower()
 
   engine.addSystem(celebrationSystem, 1, 'celebrationSystem')
+  engine.addSystem(flickerFlames, 1, 'flickerFlames')
   engine.addSystem(hazardSystem, 1, 'hazardSystem')
   engine.addSystem(runSystem, 2, 'runSystem')
   engine.addSystem(decorSystem, 3, 'decorSystem')

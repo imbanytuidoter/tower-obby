@@ -81,6 +81,19 @@ limits and are the ones that decide whether the scene loads at all:
 | colliders | 154 | 1,200 | 1,500 |
 | content size | 4.3 MB | 120 MB | 150 MB |
 
+Frame time, measured in a running desktop client at four viewpoints - the
+lobby, looking straight up the shaft, mid-climb with most of the tower in
+frame, and the crown looking back down the whole thing:
+
+```
+render      176-180 fps average, 0 hiccup frames over 50 ms
+scene tick  38.9-39.1 fps against a target of 40
+```
+
+That is desktop, and it says nothing about a handset. What it does say is that
+nothing in the scene is stalling the scene thread, which is the part a phone
+would feel first.
+
 Materials is the only one that ever mattered. The mobile client counts one
 material per mesh, and reaching the hard limit blocks a scene from loading —
 this scene was at 620 and would very likely not have opened on a phone at all.

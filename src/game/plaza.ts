@@ -415,6 +415,60 @@ function createStartGate() {
  * type-checking perfectly. Caught in the client console, which is the only
  * place it appears.
  */
+/**
+ * A flame: a tapered cone that reads as light rather than as a surface.
+ *
+ * Warm white-gold rather than the orange of unstable ground. Fire and a
+ * crumbling pad are never in frame together, but the palette rule is easier to
+ * keep than to reason about exceptions to, and a flame that reads as LIGHT is
+ * closer to what it is anyway.
+ *
+ * No collider by construction, and no shadow: a light that casts one is a
+ * contradiction, and it would land on the board it is meant to light.
+ */
+const FLAME_COLOUR = Color4.create(1, 0.78, 0.36, 0.9)
+
+function createFlame(x: number, y: number, z: number): Entity {
+  const flame = engine.addEntity()
+  Transform.create(flame, {
+    position: Vector3.create(x, y, z),
+    scale: Vector3.create(0.34, 0.62, 0.34)
+  })
+  // radiusTop 0 gives a cone, which is the shape of a flame at this size.
+  MeshRenderer.setCylinder(flame, 0.5, 0)
+  Material.setPbrMaterial(flame, {
+    albedoColor: FLAME_COLOUR,
+    emissiveColor: Color3.create(1, 0.72, 0.3),
+    emissiveIntensity: 4,
+    castShadows: false
+  })
+  return flame
+}
+
+/** The flames, and the clock that makes them move. */
+const flames: Entity[] = []
+let flameClock = 0
+
+/**
+ * Flicker. Two sine waves at different rates per flame so the pair never
+ * pulses in step, which is what makes a loop read as a loop.
+ */
+export function flickerFlames(dt: number) {
+  if (flames.length === 0) return
+  flameClock += dt
+
+  for (let i = 0; i < flames.length; i++) {
+    const transform = Transform.getMutableOrNull(flames[i])
+    if (!transform) continue
+    const phase = flameClock * 9 + i * 2.1
+    const tall = 0.62 + Math.sin(phase) * 0.09 + Math.sin(phase * 2.37) * 0.05
+    const wide = 0.34 + Math.sin(phase * 1.7 + 1) * 0.035
+    transform.scale.y = tall
+    transform.scale.x = wide
+    transform.scale.z = wide
+  }
+}
+
 /** A billboarded line of text standing in the world. */
 function label(x: number, y: number, z: number, text: string, colour: Color4, fontSize: number) {
   const sign = engine.addEntity()
@@ -681,6 +735,17 @@ function createDressing() {
       yaw: BOARD_YAW + direction * 12,
       scale: TORCH_SCALE
     })
+
+    // Fire, without a particle system - the docs still list SDK particles as
+    // missing on the mobile client, and this scene has to run on a phone.
+    //
+    // The model's own top sits 0.28 above its origin before scaling, so the
+    // bowl is at placement + 0.28 * scale. Measured out of the GLB rather than
+    // nudged until it looked right, the same as the origin offset above it.
+    const bowlY = 0.06 + (TORCH_BASE_TO_ORIGIN + 0.28) * TORCH_SCALE
+    flames.push(
+      createFlame(BOARD_X + lampOffset.x, bowlY + 0.24, BOARD_Z + lampOffset.z)
+    )
   }
 
   const plate = front(0.7)
