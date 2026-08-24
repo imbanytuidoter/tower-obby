@@ -600,6 +600,37 @@ function ghostSystem(dt: number) {
  * cannot be tested without a second person. Guessing at undocumented physics
  * in something unverifiable is how a mechanic ships broken.
  */
+/**
+ * What the tandem plate says to whoever is standing on it.
+ *
+ * The rider count was travelling all the way from the server into
+ * `run.plateRiders` and then being displayed nowhere, which is the same
+ * anti-pattern this project has hit before: a number computed, synced, and
+ * never shown. Standing on the plate alone produced no feedback at all - it
+ * simply did not move, and nothing said why.
+ *
+ * This is the one mechanic in the tower that cannot be solved by skill, so it
+ * is the one that most needs to say what it is waiting for.
+ */
+function platePrompt(player: Vector3): string {
+  const plate = world?.plate
+  if (!plate) return ''
+
+  const deck = plate.baseY + run.plateLift * plate.rise
+  const aboard =
+    Math.abs(player.x - plate.x) < plate.size / 2 + 0.4 &&
+    Math.abs(player.z - plate.z) < plate.size / 2 + 0.4 &&
+    Math.abs(player.y - deck) < 2.4
+  if (!aboard) return ''
+
+  if (run.plateRiders >= 2) {
+    return run.plateLift >= 0.98
+      ? 'HOLD ON'
+      : 'RISING TOGETHER  ' + Math.round(run.plateLift * 100) + '%'
+  }
+  return 'THIS PLATE NEEDS TWO  -  WAITING FOR SOMEBODY'
+}
+
 function rideThePlate(player: Vector3) {
   const plate = world?.plate
   if (!plate || run.plateLift < 0.98 || run.respawnCooldown > 0) return
@@ -828,6 +859,12 @@ function updatePrompt(player: Vector3) {
   }
 
   if (run.phase === Phase.Running) {
+    const plate = platePrompt(player)
+    if (plate !== '') {
+      run.prompt = plate
+      return
+    }
+
     const coop = shortcutPrompt(player)
     if (coop !== '') {
       run.prompt = coop

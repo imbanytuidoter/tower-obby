@@ -201,11 +201,14 @@ number back on them.
 
 Still unverified, and honestly so:
 
-- **The tandem plate and the pair board.** Both need two people standing on one
-  slab and neither can be tested by one. The plate's arrival is a placement
-  rather than a physics ride specifically so it does not depend on undocumented
-  behaviour, and the pair entry is written by the same server code path that
-  writes the solo one.
+- **The second person on the tandem plate.** Everything up to that is verified:
+  standing on it alone, the server counts the rider, the plate refuses to move,
+  and the prompt says "THIS PLATE NEEDS TWO - WAITING FOR SOMEBODY". What has
+  not run is the branch that fires at two riders, and the pair board behind it.
+  Three routes to a second client were tried and all three failed - the
+  Explorer starts its MCP once per machine, a second desktop instance never
+  joins the realm, and the hosted web client cannot reach a local one. This one
+  needs two people or two machines.
 - **Spending the skip token.** The grant is verified; the button press that
   spends it cannot be sent programmatically, so the teleport it performs has
   not been exercised.
