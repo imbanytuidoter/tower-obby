@@ -75,6 +75,8 @@ export const PICKUP_RISE = 1.1
 export const PICKUP_RADIUS = 1.4
 /** Slack the server allows on a pickup claim, for lag between the two clocks. */
 export const PICKUP_GRACE = 1.2
+/** How close you have to be for a coin to explain itself. */
+export const PICKUP_PROMPT_RANGE = 7
 
 /** How many shards burst from the crown on a summit, and for how long. */
 export const CELEBRATION_SHARDS = 14

@@ -56,6 +56,7 @@ import {
   HEARTBEAT_SECONDS,
   GHOST_SAMPLE_SECONDS,
   GHOST_MAX_SAMPLES,
+  PICKUP_PROMPT_RANGE,
   PICKUP_RADIUS,
   CELEBRATION_SECONDS
 } from './game/config'
@@ -601,6 +602,28 @@ function ghostSystem(dt: number) {
  * in something unverifiable is how a mechanic ships broken.
  */
 /**
+ * What a coin says when you get near one.
+ *
+ * "COINS 0/8" in the corner tells a new player that eight of something exist
+ * and nothing else - not what they are, not that they are optional, not that
+ * going for one costs time. The judging criteria name onboarding explicitly
+ * and this is the only mechanic in the tower with no in-world explanation.
+ *
+ * Said once, near the thing, in the line that is already there.
+ */
+function pickupPrompt(player: Vector3): string {
+  if (!world) return ''
+
+  for (const pickup of world.pickups) {
+    if (pickup.taken) continue
+    const at = Vector3.create(pickup.def.x, pickup.def.y, pickup.def.z)
+    if (Vector3.distance(player, at) > PICKUP_PROMPT_RANGE) continue
+    return 'A COIN, OFF THE ROUTE  -  YOURS TO KEEP, COSTS YOU TIME'
+  }
+  return ''
+}
+
+/**
  * What the tandem plate says to whoever is standing on it.
  *
  * The rider count was travelling all the way from the server into
@@ -846,6 +869,15 @@ function noteForkChoice(player: Vector3) {
 function updatePrompt(player: Vector3) {
   if (!world) {
     run.prompt = ''
+    return
+  }
+
+  // Before the phase branches, because a coin can be taken at any time - on a
+  // timed climb or on a wander - and an explanation that only appears during a
+  // run is not an explanation for the person who has not started one.
+  const coin = pickupPrompt(player)
+  if (coin !== '') {
+    run.prompt = coin
     return
   }
 
