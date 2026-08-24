@@ -3,7 +3,7 @@
   "runtimeVersion": "7",
   "display": {
     "title": "Tower Obby",
-    "description": "Ten procedural parkour towers with a leaderboard.",
+    "description": "One tower, shared by everyone in the world. Race the clock to the crown, or ride the plate with a stranger - some of the way up needs two.",
     "favicon": "favicon_asset",
     "navmapThumbnail": "images/scene-thumbnail.png"
   },
