@@ -35,34 +35,35 @@ import {
   TandemState
 } from './shared/schemas'
 import {
+  CELEBRATION_SECONDS,
   CHECKPOINT_TOUCH_MARGIN,
+  COIN_BOB,
+  COIN_BOB_RATE,
+  COIN_SPIN,
+  CROWN_SPIN,
+  CRUMBLE_DELAY,
+  CRUMBLE_RESPAWN,
+  FALL_GRACE,
+  FINISH_TOUCH_RISE,
+  FORK_PROMPT_RANGE,
   GATE_DIR_X,
   GATE_DIR_Z,
   GATE_WIDTH,
   GATE_X,
   GATE_Z,
+  GHOST_MAX_SAMPLES,
+  GHOST_SAMPLE_SECONDS,
+  HAZARD_HALF_WIDTH,
+  HEARTBEAT_SECONDS,
   LOBBY_SPAWN_X,
   LOBBY_SPAWN_Z,
   LOBBY_Y,
   PAD_RADIUS,
-  PROMPT_RANGE,
-  CRUMBLE_DELAY,
-  CRUMBLE_RESPAWN,
-  FALL_GRACE,
-  FINISH_TOUCH_RISE,
-  HAZARD_HALF_WIDTH,
-  RESPAWN_COOLDOWN,
-  RESPAWN_LIFT,
-  HEARTBEAT_SECONDS,
-  GHOST_SAMPLE_SECONDS,
-  GHOST_MAX_SAMPLES,
   PICKUP_PROMPT_RANGE,
   PICKUP_RADIUS,
-  COIN_SPIN,
-  COIN_BOB,
-  COIN_BOB_RATE,
-  CROWN_SPIN,
-  CELEBRATION_SECONDS
+  PROMPT_RANGE,
+  RESPAWN_COOLDOWN,
+  RESPAWN_LIFT
 } from './game/config'
 import {
   activateCheckpoint,
@@ -978,6 +979,29 @@ function noteForkChoice(player: Vector3) {
 }
 
 /** Approach hints: what happens next, shown just before it happens. */
+/**
+ * Prices both arms of a fork while you are standing at the junction.
+ *
+ * Only at the junction: three metres away it is not your decision yet, and a
+ * hint that fires early is a hint that is on screen when something else needs
+ * the line.
+ */
+function forkPrompt(player: Vector3): string {
+  if (!world) return ''
+
+  for (const fork of world.forks) {
+    const at = fork.junction
+    if (Math.abs(player.y - at.y) > 3) continue
+    if (Math.hypot(player.x - at.x, player.z - at.z) > FORK_PROMPT_RANGE) continue
+    return (
+      'SAFE ' + fork.safePads + ' PADS  -  BOLD ' + fork.boldPads +
+      ' PADS, ' + fork.savesSeconds.toFixed(1) + 'S FASTER'
+    )
+  }
+
+  return ''
+}
+
 function updatePrompt(player: Vector3) {
   if (!world) {
     run.prompt = ''
@@ -1014,6 +1038,25 @@ function updatePrompt(player: Vector3) {
     const coop = shortcutPrompt(player)
     if (coop !== '') {
       run.prompt = coop
+      return
+    }
+
+    /**
+     * The fork's price, in the prompt line instead of on a board in the sky.
+     *
+     * It used to be two signs floating at the junction. On a phone, standing
+     * where you have to stand to make the choice, they filled the screen -
+     * "SAFE" and "4 pads no drop" in letters taller than the avatar, with the
+     * plate behind them clipped away by the near plane. The information was
+     * right and the delivery was wrong.
+     *
+     * The prompt line is where Decentraland's own mobile guidance puts
+     * contextual hints, it is inside the safe area, and it is already how
+     * every other choice in this tower explains itself.
+     */
+    const fork = forkPrompt(player)
+    if (fork !== '') {
+      run.prompt = fork
       return
     }
 

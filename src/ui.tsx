@@ -18,13 +18,6 @@ let compact = false
 /** Height of the client's own place-name card, top-left, in virtual units. */
 const PLACE_CARD_CLEARANCE = 120
 
-/**
- * Where the live ranking sits on a phone: directly under the four status
- * lines, still in the top-centre band the mobile guidance reserves for
- * non-actionable information.
- */
-const RANKING_TOP = 250
-
 export function setupUi(next: Handlers) {
   handlers = next
   compact = isMobile()
@@ -81,8 +74,24 @@ const countdown = (seconds: number) => {
 const uiRoot = () => (
   <UiEntity uiTransform={{ width: '100%', height: '100%', positionType: 'absolute' }}>
     {hud()}
-    {run.ranking.length > 0 && rankingPanel()}
-    {!run.serverAlive && wakingBanner()}
+    {/*
+      The ranking earns its place only when there is somebody to be ranked
+      against. Alone it read "HIGHEST NOW / 1. yourname 2m" - a scoreboard
+      announcing that you lead a field of one - and on a phone that is three
+      lines of nothing in the one part of the screen a player actually needs.
+      Desktop keeps the floating corner panel; the phone gets it inside the
+      HUD column, and only with company.
+    */}
+    {!compact && run.climbers > 1 && run.ranking.length > 0 && rankingPanel()}
+    {/*
+      Desktop only. On a phone the status block already says CONNECTING... on
+      its own last line, and this banner was pinned at a hard-coded 200 units
+      from the top - measured against a block that has since grown a line -
+      so it landed inside the HUD and printed a second sentence on top of the
+      first. Two messages saying the same thing, overlapping, on the smaller
+      screen. The same magic-offset mistake as the ranking, in the same file.
+    */}
+    {!compact && !run.serverAlive && wakingBanner()}
     {run.announcement !== '' && announcementBanner()}
     {run.prompt !== '' && promptBanner()}
     {(run.phase === Phase.RoundDone || run.phase === Phase.AllDone) && clearedPanel()}
@@ -251,13 +260,31 @@ const hud = () => {
               // somebody standing alone in it, that being alone is not the
               // whole of it. "You have the tower to yourself" is a fact; on
               // its own it reads as an empty room rather than an invitation.
-              ? 'ALONE HERE  -  SOME OF THIS NEEDS TWO'
+              // Shorter on a phone. At 430 units wide the full sentence wraps
+              // to two lines, and every line this block grows is a line the
+              // things below it have to dodge - which is how the ranking and
+              // the waking banner ended up printed on top of it.
+              ? compact
+                ? 'SOME OF THIS NEEDS TWO'
+                : 'ALONE HERE  -  SOME OF THIS NEEDS TWO'
               : 'CONNECTING...'
         }
         fontSize={s.line}
         color={run.climbers > 1 ? GOLD : NEON}
         textAlign="middle-left"
       />
+      {/*
+        On a phone the ranking is part of THIS column, not a floating panel.
+        
+        It used to be absolutely positioned at a hard-coded 250 units from the
+        top, measured against a status block that had four lines in it. Adding
+        a fifth - the score - pushed the block down to roughly 320 and the two
+        overlapped, which is only visible on a handset and was found on the
+        first one that ever ran this. A number that describes where something
+        else ends is a number that goes stale the moment that thing changes;
+        inside the column the layout cannot lie.
+      */}
+      {compact && run.climbers > 1 && run.ranking.length > 0 && rankingRows()}
     </UiEntity>
   )
 }
@@ -266,6 +293,29 @@ const hud = () => {
  * Who is highest in the tower right now. This is the point of playing here
  * rather than alone: the people above you are real and you can catch them.
  */
+const rankingRows = () => {
+  const s = style()
+  return (
+    <UiEntity uiTransform={{ flexDirection: 'column', margin: { top: 10 } }}>
+      <Label
+        value={'HIGHEST NOW   ' + run.climbers + ' CLIMBING'}
+        fontSize={s.line}
+        color={NEON}
+        textAlign="middle-left"
+      />
+      {run.ranking.map((climber, index) => (
+        <Label
+          key={index}
+          value={index + 1 + '. ' + climber.name + '   ' + climber.height + 'm'}
+          fontSize={s.line}
+          color={index === 0 ? GOLD : Color4.White()}
+          textAlign="middle-left"
+        />
+      ))}
+    </UiEntity>
+  )
+}
+
 const rankingPanel = () => {
   const s = style()
 
@@ -279,11 +329,9 @@ const rankingPanel = () => {
         // panel drops below the status block instead, which keeps it in
         // top-centre - the place the same docs name for non-actionable
         // information. Desktop keeps the corner, where nothing competes.
-        position: compact
-          ? { top: RANKING_TOP, left: '50%' }
-          : { top: s.edge, right: s.edge },
-        margin: compact ? { left: -(s.hudWidth / 2) } : {},
-        width: compact ? s.hudWidth : 340,
+        // Desktop only now - see the note where this is called.
+        position: { top: s.edge, right: s.edge },
+        width: 340,
         flexDirection: 'column',
         padding: compact ? 14 : 16
       }}

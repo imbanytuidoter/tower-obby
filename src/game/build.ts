@@ -83,6 +83,11 @@ export type BuiltFork = {
   bold: number[]
   safe: number[]
   saves: number
+  /** Where the choice is made, so the prompt knows when to speak. */
+  junction: Vector3
+  boldPads: number
+  safePads: number
+  savesSeconds: number
 }
 
 export type BuiltCoin = {
@@ -665,11 +670,17 @@ function buildForks(layout: Layout, entities: Entity[]): BuiltFork[] {
     const safe = layout.pads[fork.safeFirst]
     if (!junction || !bold || !safe) continue
 
+    // The ring stays; the two floating boards do not.
+    //
+    // They priced both arms before you committed, which is the right idea and
+    // was the wrong object: on a phone, from where you have to stand to make
+    // the choice, "SAFE" and "4 pads no drop" filled the screen in letters
+    // taller than the avatar, with the plate behind them clipped by the near
+    // plane so only the words were left hanging. The same numbers now go to
+    // the prompt line - the place Decentraland's mobile guidance reserves for
+    // contextual hints, and where every other choice in this tower already
+    // explains itself. See forkPrompt in index.ts.
     entities.push(createChoiceEdge(junction))
-    entities.push(
-      ...routeSign(bold, 'BOLD', fork.boldPads + ' pads   -' + fork.savesSeconds.toFixed(1) + 's', CRUMBLE_EMISSIVE),
-      ...routeSign(safe, 'SAFE', fork.safePads + ' pads   no drop', CP_EMISSIVE)
-    )
 
     const range = (start: number, count: number) =>
       Array.from({ length: count }, (unused, i) => start + i)
@@ -677,7 +688,11 @@ function buildForks(layout: Layout, entities: Entity[]): BuiltFork[] {
       zone: junction.section,
       bold: range(fork.boldFirst, fork.boldPads),
       safe: range(fork.safeFirst, fork.safePads),
-      saves: fork.savesSeconds
+      saves: fork.savesSeconds,
+      junction: Vector3.create(junction.x, junction.y, junction.z),
+      boldPads: fork.boldPads,
+      safePads: fork.safePads,
+      savesSeconds: fork.savesSeconds
     })
   }
 

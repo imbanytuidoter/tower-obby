@@ -572,6 +572,10 @@ export const GATE_WIDTH = 6
 /** How close the player must be for an approach prompt to appear. */
 export const PROMPT_RANGE = 11
 
+/** How close to a junction the fork's price appears. Tighter than the general
+ *  prompt range: three metres away it is not your decision yet. */
+export const FORK_PROMPT_RANGE = 5
+
 /**
  * How close you must be for a route sign to appear.
  *
