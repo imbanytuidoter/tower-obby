@@ -9,10 +9,12 @@ import {
   TextAlignMode,
   TextShape,
   Transform,
-  SkyboxTime
+  SkyboxTime,
+  LightSource
 } from '@dcl/sdk/ecs'
 import { Color3, Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 import { CHOICE_EDGE, CHOICE_EDGE_3, SAFE_FILL } from './build'
+import { createLegend } from './legend'
 import {
   CENTER_X,
   CENTER_Z,
@@ -31,6 +33,7 @@ import {
   START_PAD_Z,
   BOARD_SIZE,
   BOARD_FORWARD,
+  BOARD_W,
   FOREST,
   MAX_PAD_HEIGHT,
   RANKING_SIZE,
@@ -48,7 +51,7 @@ import { MODELS, placeProp } from './props'
  * It is built as a real table: one entity per column per row, so spacing is
  * exact instead of relying on line breaks inside a single block of text.
  */
-const BOARD_W = 5.6
+// BOARD_W now comes from config.ts so layout.ts can keep plants off it.
 const ROW_H = 0.44
 const HEADER_H = 1.05
 const BOARD_H = HEADER_H + BOARD_SIZE * ROW_H + 0.5
@@ -221,6 +224,7 @@ export function buildPlaza() {
   createStartGate()
   createGuideArrows()
   createBoard()
+  createLegend()
   createDressing()
   refreshBoard()
 }
@@ -746,6 +750,25 @@ function createDressing() {
     flames.push(
       createFlame(BOARD_X + lampOffset.x, bowlY + 0.24, BOARD_Z + lampOffset.z)
     )
+
+    // A real light in the torch bowl.
+    //
+    // LightSource is not a renderer, so it costs nothing against the material
+    // budget that governs everything else in this scene - and the budget is
+    // at 97%. It is also listed as unsupported on the mobile client, so the
+    // lobby has to read correctly WITHOUT it: the flame keeps its emissive
+    // and the boards keep their own contrast. This is a bonus where it lands,
+    // never a load-bearing part of the lighting.
+    const lamp = engine.addEntity()
+    Transform.create(lamp, {
+      position: Vector3.create(BOARD_X + lampOffset.x, bowlY + 0.35, BOARD_Z + lampOffset.z)
+    })
+    LightSource.create(lamp, {
+      type: LightSource.Type.Point({}),
+      color: Color3.create(1, 0.72, 0.35),
+      intensity: 9000,
+      range: 13
+    })
   }
 
   const plate = front(0.7)

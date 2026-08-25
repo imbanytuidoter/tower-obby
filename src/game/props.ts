@@ -23,29 +23,65 @@ export const MODELS = {
    * applied - the catalog's "555 m" is the raw bbox with the GLB's own 0.01
    * node scale ignored.
    */
-  tree: 'assets/Models/tree-fir-02.glb',
+  tree: 'assets/models/tree-fir-02.glb',
   /**
    * A wooden torch on a tripod, beside the board. 2 meshes / 2 materials /
    * 5 textures, NO collider meshes. Its origin sits 2.23 m above its own base,
    * so it buries itself if placed at ground level.
    */
-  torch: 'assets/Models/torch.glb',
+  torch: 'assets/models/torch.glb',
   /**
    * The greeter at the crown. 2 meshes / 1 material / 2 textures, an `idle`
    * clip, and a collider mesh (named Dragon_collider in the file, which is
    * somebody else's leftover but is still a collider mesh). Origin at its
    * feet, 2.36 m of wingspan.
    */
-  owl: 'assets/Models/owl.glb',
+  owl: 'assets/models/owl.glb',
   /** Small animated crystals marking safe and unstable ground. 1 mesh each. */
-  crystalSafe: 'assets/Models/crystal-teal.glb',
-  crystalUnstable: 'assets/Models/crystal-orange.glb'
+  crystalSafe: 'assets/models/crystal-teal.glb',
+  crystalUnstable: 'assets/models/crystal-orange.glb',
+
+  /**
+   * The jungle floor. Primitive counts measured out of each GLB, because the
+   * mobile client bills ONE MATERIAL PER PRIMITIVE PER INSTANCE and the
+   * catalog does not publish that number:
+   *
+   *   fern             1 primitive, 120 tri, ships an `fernidle` sway
+   *   junglePlant      1 primitive, 220 tri
+   *
+   * bush-green was here too and is gone: two primitives and 1 100 triangles
+   * apiece meant five of them cost the same as twenty-five jungle plants,
+   * measured in the running client, and the scene was at 400 of a 400
+   * material cap. Nothing referenced it afterwards, so the 512 KB went too.
+   *
+   * Two candidates were downloaded, looked at, and thrown away, which is the
+   * only reason this list is short:
+   *
+   *   redplant  - a bright RED plant. Red means pain in this scene; every
+   *               hazard beam is red. Scattering red through the clearing
+   *               would break the one rule the whole colour language rests
+   *               on, that a colour means exactly one thing.
+   *   palm      - the catalog's own description says "dark neon-tinted", and
+   *               the thumbnail is a purple synthwave palm. The other palm in
+   *               the catalog has a purple trunk too. There is no green palm
+   *               to be had, so the tall layer stays firs.
+   *
+   * The lesson, at the cost of two wasted downloads: READ THE THUMBNAIL. The
+   * category said nature/tree for both.
+   *
+   * None of them ship collider meshes, and none of them get colliders: this
+   * is scenery around a parkour tower, and a shrub you can get wedged on is
+   * a bug with leaves.
+   */
+  fern: 'assets/models/fern.glb',
+  junglePlant: 'assets/models/jungle-plant-06.glb'
 } as const
 
 /** Clip names read out of the GLBs, not guessed. */
 export const CLIPS = {
   crystalSafe: 'Crystals TealAction',
-  crystalUnstable: 'Crystals OrangeAction'
+  crystalUnstable: 'Crystals OrangeAction',
+  fern: 'fernidle'
 } as const
 
 export type PropOptions = {
