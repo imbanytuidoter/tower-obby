@@ -2,7 +2,7 @@ import ReactEcs, { Label, ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 import { Color4 } from '@dcl/sdk/math'
 import { isMobile } from '@dcl/sdk/platform'
 import { formatTime } from './game/format'
-import { Phase, run } from './game/state'
+import { lifetimeScore, Phase, run, runScore } from './game/state'
 
 type Handlers = { next: () => void; retry: () => void; restart: () => void }
 
@@ -197,13 +197,44 @@ const hud = () => {
       />
       <Label value={formatTime(run.time)} fontSize={s.clock} color={NEON} textAlign="middle-left" />
       {progressBar()}
+      {/*
+        Two labels, not one.
+        
+        This was a single line - band, falls and coins joined by separators -
+        and it fitted until the coin count went from 8 to 12. Then it wrapped
+        inside the panel and broke after a separator, leaving a dangling
+        middle dot on the first line and the word COINS orphaned on the
+        second. A HUD that reflows differently depending on how many coins
+        exist is a HUD that will do it again on the next tuning pass.
+      */}
       <Label
-        value={
-          run.band + '   ·   FALLS ' + run.falls +
-          (run.pickupsTotal > 0 ? '   ·   COINS ' + run.pickupsFound + '/' + run.pickupsTotal : '')
-        }
+        value={run.band + '   ·   FALLS ' + run.falls}
         fontSize={s.line}
         color={Color4.White()}
+        textAlign="middle-left"
+      />
+      {run.pickupsTotal > 0 && (
+        <Label
+          value={'COINS ' + run.pickupsFound + '/' + run.pickupsTotal}
+          fontSize={s.line}
+          /* Gold, because the coins are gold. Hue carries identity here. */
+          color={GOLD}
+          textAlign="middle-left"
+        />
+      )}
+      {/*
+        The score for THIS climb.
+        
+        A clock rewards exactly one kind of player - the one who already knows
+        the route. This is the number that moves for everybody else: banking a
+        checkpoint pays, taking a coin pays more, and reaching the crown pays
+        most. Somebody who never finishes still leaves with a number that went
+        up.
+      */}
+      <Label
+        value={'SCORE ' + runScore()}
+        fontSize={s.line}
+        color={NEON}
         textAlign="middle-left"
       />
       {/*
@@ -412,6 +443,24 @@ const clearedPanel = () => {
             color={GOLD}
           />
         )}
+        {/*
+          What the climb was worth, and what the wallet is worth.
+          
+          Two numbers rather than one because they answer different questions:
+          the first is "was this a good run", the second is "what do I have to
+          show for coming back". The lifetime figure is derived from the coins
+          found and the summits counted, so it cannot disagree with either.
+        */}
+        <Label
+          value={'This climb: ' + runScore() + ' points'}
+          fontSize={s.body}
+          color={NEON}
+        />
+        <Label
+          value={'Total: ' + lifetimeScore() + ' points'}
+          fontSize={s.body}
+          color={GOLD}
+        />
         <Label
           value={'Climb it again for a faster time.'}
           fontSize={s.body}

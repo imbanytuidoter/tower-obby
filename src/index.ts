@@ -58,6 +58,10 @@ import {
   GHOST_MAX_SAMPLES,
   PICKUP_PROMPT_RANGE,
   PICKUP_RADIUS,
+  COIN_SPIN,
+  COIN_BOB,
+  COIN_BOB_RATE,
+  CROWN_SPIN,
   CELEBRATION_SECONDS
 } from './game/config'
 import {
@@ -65,6 +69,7 @@ import {
   assertDecorIsQuiet,
   bandFor,
   PARKED_Y,
+  showNearbySigns,
   buildWorld,
   clearWorld,
   paintCrumbled,
@@ -75,6 +80,8 @@ import {
   setShortcutOpen,
   World
 } from './game/build'
+import { legendCoin } from './game/legend'
+import { crownHalo, setGreeting } from './game/build'
 import { applyFairness, freezeAfterFall } from './game/fairness'
 import { formatTime } from './game/format'
 import { buildTower } from './game/layout'
@@ -298,6 +305,7 @@ function sharedRoundSystem(dt: number) {
  * moment they arrive until they leave.
  */
 function buildTheTower() {
+  setGreeting(false)
   clearWorld(world)
   world = buildWorld(buildTower())
   prepareRound(world.checkpoints.length - 1, world.sectionNames)
@@ -306,6 +314,7 @@ function buildTheTower() {
 
 /** Reset your own attempt. The tower does not change; only your clock does. */
 function retryClimb() {
+  setGreeting(false)
   prepareRound(world ? world.checkpoints.length - 1 : 0, world ? world.sectionNames : [])
   sendToLobby()
 }
@@ -440,6 +449,9 @@ function runSystem(dt: number) {
   if (run.respawnCooldown > 0) run.respawnCooldown -= dt
 
   updatePrompt(player)
+  showNearbySigns(player)
+  spinPickups(dt)
+  turnCrown(dt)
   fadeForest(player.y)
   noteForkChoice(player)
   reachForCoin(dt, player)
@@ -501,6 +513,11 @@ function runSystem(dt: number) {
     // that was rejected.
     const improved = run.personalBest === 0 || run.time < run.personalBest
     completeRound(improved)
+    // Only for the climber who just arrived. The celebration at the crown is
+    // world-wide on purpose - somebody else's summit is an event - but the
+    // greeter's line is second person, and telling a spectator they made it
+    // to the top is a lie the moment two people are in the scene.
+    setGreeting(true)
     return
   }
 
@@ -744,6 +761,60 @@ function reachForPickups(player: Vector3) {
 }
 
 /**
+ * Turns and floats every uncollected coin.
+ *
+ * One system, not eight tweens: eight Tween components restarted on a loop is
+ * eight component writes a frame, and this is the same arithmetic done once
+ * against a shared clock. Taken coins are skipped - their entity is gone.
+ *
+ * The bob is deliberately small. A coin that swings a metre is a coin whose
+ * pickup radius no longer matches where it looks like it is, and that reads as
+ * the game refusing a touch that clearly connected.
+ */
+let coinPhase = 0
+
+function spinPickups(dt: number) {
+  coinPhase += dt
+
+  // The legend's sample turns on the same clock as the real ones. Two coins
+  // spinning at different rates would say they are two different objects,
+  // which is the opposite of what a legend is for.
+  if (legendCoin) {
+    const sample = Transform.getMutableOrNull(legendCoin)
+    if (sample) sample.rotation = Quaternion.fromEulerDegrees(90, coinPhase * COIN_SPIN, 0)
+  }
+
+  if (!world) return
+
+  for (const pickup of world.pickups) {
+    if (pickup.taken) continue
+    const transform = Transform.getMutableOrNull(pickup.entity)
+    if (!transform) continue
+
+    transform.rotation = Quaternion.fromEulerDegrees(90, coinPhase * COIN_SPIN, 0)
+    transform.position.y = pickup.def.y + Math.sin(coinPhase * COIN_BOB_RATE) * COIN_BOB
+  }
+}
+
+/**
+ * The halo over the crown turns.
+ *
+ * Slower than the coins on purpose. A coin spins to be NOTICED - it is asking
+ * to be taken. The halo is already yours by the time you can see it turning,
+ * so it only has to look ceremonial, and anything quick up there reads as a
+ * hazard in a game that has spent seventy metres teaching that moving things
+ * hurt.
+ */
+let crownPhase = 0
+
+function turnCrown(dt: number) {
+  if (!crownHalo) return
+  crownPhase += dt
+  const halo = Transform.getMutableOrNull(crownHalo)
+  if (halo) halo.rotation = Quaternion.fromEulerDegrees(0, crownPhase * CROWN_SPIN, 0)
+}
+
+/**
  * The burst at the crown.
  *
  * Driven by one system rather than a tween per shard: fourteen tweens started
@@ -796,6 +867,13 @@ const pendingPickups = new Set<number>()
  */
 function applyPickups(found: number[]) {
   if (!world) return
+  // Anything new since the last answer was taken JUST NOW, on this climb, and
+  // is what the run is scored on. Counted from the delta rather than from a
+  // separate counter, because the server's list is the only thing that knows
+  // for certain which coins are already spent.
+  const gained = found.length - run.pickupsFound
+  if (gained > 0 && run.pickupsFound > 0) run.pickupsThisRun += gained
+
   run.pickupsFound = found.length
   run.pickupsTotal = world.pickups.length
 

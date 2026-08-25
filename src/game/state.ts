@@ -1,3 +1,4 @@
+import { CHECKPOINT_POINTS, COIN_POINTS, SUMMIT_POINTS } from './config'
 export enum Phase {
   Ready = 'ready',
   Running = 'running',
@@ -24,6 +25,14 @@ export const run = {
   /** Optional pickups: how many this player has ever found, out of how many. */
   pickupsFound: 0,
   pickupsTotal: 0,
+  /**
+   * Coins banked during THIS climb, as opposed to ever.
+   *
+   * Separate because the two answer different questions: the lifetime count
+   * is what the collection is worth, and this is what the run is worth. A
+   * player who has all sixteen still scores nothing extra for a lap.
+   */
+  pickupsThisRun: 0,
   /** Filled from the server-owned component. */
   serverAlive: false,
   /** Fastest climb today, and the fastest anyone has ever done it. */
@@ -66,6 +75,33 @@ export const run = {
   announcementFor: 0
 }
 
+/**
+ * What this attempt is worth so far.
+ *
+ * Checkpoints count every climb because banking one is the thing a beginner
+ * can actually do; coins count only the ones taken on THIS run, so a player
+ * who already owns all sixteen gains nothing for walking past them; and the
+ * summit lands once, at the end.
+ */
+export function runScore(): number {
+  return (
+    run.checkpoint * CHECKPOINT_POINTS +
+    run.pickupsThisRun * COIN_POINTS +
+    (run.phase === Phase.RoundDone || run.phase === Phase.AllDone ? SUMMIT_POINTS : 0)
+  )
+}
+
+/**
+ * Everything this wallet has ever earned.
+ *
+ * Derived from the two numbers the server already persists rather than kept
+ * as a third: a stored total is a number that can drift out of step with the
+ * things it is supposed to total, and this one cannot.
+ */
+export function lifetimeScore(): number {
+  return run.pickupsFound * COIN_POINTS + run.climbs * SUMMIT_POINTS
+}
+
 export function prepareRound(totalCheckpoints: number, sections: string[]) {
   run.phase = Phase.Ready
   run.time = 0
@@ -74,6 +110,7 @@ export function prepareRound(totalCheckpoints: number, sections: string[]) {
   run.totalCheckpoints = totalCheckpoints
   run.respawnCooldown = 0
   run.lastWasBest = false
+  run.pickupsThisRun = 0
   run.prompt = ''
   run.section = 1
   run.totalSections = sections.length
