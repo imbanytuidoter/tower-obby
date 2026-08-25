@@ -32,6 +32,9 @@ import {
   LOBBY_Z,
   FOREST,
   PICKUP_COUNT,
+  CHECKPOINT_POINTS,
+  COIN_POINTS,
+  SUMMIT_POINTS,
   BOARD_W,
   LEGEND_FORWARD,
   LEGEND_LATERAL
@@ -41,7 +44,7 @@ import { MEANING } from './palette'
 const LEGEND_W = BOARD_W
 const ROW_H = 0.9
 const HEADER_H = 1.05
-const LEGEND_H = HEADER_H + 4 * ROW_H + 0.6
+const LEGEND_H = HEADER_H + 4 * ROW_H + 1.35
 const LEGEND_Y = 3.1
 
 /**
@@ -138,7 +141,15 @@ const ROWS: {
 }[] = [
   {
     name: 'CHECKPOINT',
-    note: 'ROUND AND CYAN. FALL, AND YOU RESTART HERE',
+    /**
+     * The price is on the same line as the thing.
+     *
+     * The HUD grew a SCORE line and nothing in the world said where the
+     * number came from - a player watched it jump by 100 and had to guess.
+     * The board already names every object; naming what each one is WORTH
+     * costs no extra material and puts the answer where the question is.
+     */
+    note: 'ROUND AND CYAN. FALL, YOU RESTART HERE.  ' + CHECKPOINT_POINTS + ' POINTS',
     tone: MEANING.safe,
     sample: (at, rotation) => {
       const e = engine.addEntity()
@@ -164,7 +175,9 @@ const ROWS: {
     // to twelve, and TWELVE after it went to sixteen. A board whose whole job
     // is to explain the game cannot be a place where the game's own numbers
     // go stale, and a hand-written number in a legend is a promise to forget.
-    note: 'OPTIONAL. ' + PICKUP_COUNT + ' UP THERE, EACH ON ITS OWN LEDGE',
+    note:
+      'OPTIONAL. ' + PICKUP_COUNT + ' UP THERE, YOURS FOR GOOD.  ' +
+      COIN_POINTS + ' POINTS',
     tone: MEANING.goal,
     sample: (at) => {
       const e = engine.addEntity()
@@ -188,6 +201,8 @@ const ROWS: {
   {
     name: 'CRUMBLING PAD',
     note: 'RUST ORANGE. IT DROPS A SECOND AFTER YOU LAND',
+    // No price: you do not earn anything for surviving one, and pretending
+    // otherwise would make the board a scoreboard instead of a legend.
     tone: MEANING.unstable,
     sample: (at, rotation) => {
       const e = engine.addEntity()
@@ -282,6 +297,25 @@ export function createLegend() {
     outlineColor: Color4.Black(),
     outlineWidth: 0.2,
     textAlign: TextAlignMode.TAM_MIDDLE_CENTER
+  })
+
+  // The crown has no sample on this board - it is the thing you are climbing
+  // towards, not an object you meet on the way - so its price goes in a line
+  // of its own under the rows.
+  const footerY = headerY - HEADER_H / 2 - ROW_H * (ROWS.length + 0.35)
+  const footerPos = onFace(0.17, -(LEGEND_W / 2 - 0.75))
+  const footer = engine.addEntity()
+  Transform.create(footer, {
+    position: Vector3.create(footerPos.x, footerY, footerPos.z),
+    rotation
+  })
+  TextShape.create(footer, {
+    text: 'REACH THE CROWN:  ' + SUMMIT_POINTS + ' POINTS',
+    fontSize: 1.5,
+    textColor: Color4.fromHexString(MEANING.goal),
+    outlineColor: Color4.Black(),
+    outlineWidth: 0.2,
+    textAlign: TextAlignMode.TAM_MIDDLE_LEFT
   })
 
   const firstRowY = headerY - HEADER_H / 2 - ROW_H * 0.65
