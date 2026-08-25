@@ -658,12 +658,28 @@ async function loadStats(rawAddress: string): Promise<PlayerStats> {
   const cached = stats.get(address)
   if (cached) return cached
 
-  const fresh: PlayerStats = { version: 1, bestSeconds: 0, climbs: 0 }
+  /**
+   * Rebuilt from the stored record FIELD BY FIELD used to be the shape of
+   * this, and that is what lost the coins: the reader copied bestSeconds and
+   * climbs, `found` was added to the type later, and nobody came back here.
+   * Every cold start then handed out a record with no coins and the next
+   * write persisted that over the real list.
+   *
+   * Starting from the stored object and repairing it means a field added to
+   * PlayerStats survives by default. Forgetting to ADD a line can no longer
+   * silently delete a player's data; the worst a future field can do is
+   * arrive unvalidated.
+   */
+  let fresh: PlayerStats = { version: 1, bestSeconds: 0, climbs: 0 }
   try {
     const stored = await Storage.player.get<PlayerStats>(rawAddress, PLAYER_KEY)
-    if (stored && stored.version === 1 && typeof stored.bestSeconds === 'number') {
-      fresh.bestSeconds = stored.bestSeconds
-      fresh.climbs = typeof stored.climbs === 'number' ? stored.climbs : 0
+    if (stored && stored.version === 1) {
+      fresh = { ...stored, version: 1 }
+      if (typeof fresh.bestSeconds !== 'number') fresh.bestSeconds = 0
+      if (typeof fresh.climbs !== 'number') fresh.climbs = 0
+      fresh.found = Array.isArray(fresh.found)
+        ? fresh.found.filter((n) => typeof n === 'number')
+        : undefined
     }
   } catch (error) {
     console.log('[SERVER] stats unreadable for ' + address + ': ' + error)
