@@ -23,7 +23,7 @@ execSync(
 )
 // CommonJS output so Node resolves the extensionless relative imports tsc emits.
 const req = createRequire(join(out, 'x.cjs'))
-const { buildTower, backdropRing, BACKDROP_PANELS, treeLine, checkpointAltitudes } =
+const { buildTower, backdropRing, BACKDROP_PANELS, treeLine, checkpointAltitudes, undergrowth, lobbyFixtures, trunkGrowth } =
   req(join(out, 'layout.js'))
 const cfg = req(join(out, 'config.js'))
 const palette = req(join(out, 'palette.js'))
@@ -489,8 +489,27 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
 
   note(list.length === cfg.PICKUP_COUNT, 'every pickup found a home',
     list.length + ' of ' + cfg.PICKUP_COUNT + ' placed')
-  note(worstReach <= MAX_REACH, 'pickups are within a jump',
-    'furthest ' + worstReach.toFixed(2) + ' m of a ' + MAX_REACH.toFixed(2) + ' m budget')
+  // This one measured the coin against the pad it belongs to, and now that
+  // every coin sits on its OWN ledge it can only ever read 0.00 - a check
+  // that cannot fail is a check that is lying about being one. What matters
+  // instead is that the ledge is REACHED FROM somewhere, which is the pad
+  // recorded in fromIndex, and that it exists at all.
+  let worstPerch = 0
+  let homeless = 0
+  for (const p of list) {
+    const perch = tower.pads[p.fromPad]
+    if (!perch || Math.hypot(p.x - perch.x, p.z - perch.z) > 0.01) { homeless++; continue }
+    const from = tower.pads[perch.fromIndex]
+    if (!from) { homeless++; continue }
+    worstPerch = Math.max(
+      worstPerch,
+      Math.hypot(perch.x - from.x, perch.z - from.z) - (perch.size + from.size) / 2
+    )
+  }
+  note(homeless === 0, 'every coin stands on a ledge',
+    homeless + ' of ' + list.length + ' hanging in open air')
+  note(worstPerch <= MAX_REACH, 'coin ledges are within a jump of the route',
+    'furthest ' + worstPerch.toFixed(2) + ' m of a ' + MAX_REACH.toFixed(2) + ' m budget')
   note(worstRise <= MAX_RISE + 1.0, 'pickups hang within arm of a pad',
     'highest ' + worstRise.toFixed(2) + ' m above its pad')
 
@@ -513,10 +532,319 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   const airtimeAvailable = 2 * Math.sqrt((2 * apex) / cfg.PESSIMISTIC_GRAVITY)
   const share = airtimeNeeded / airtimeAvailable
 
-  note(share <= 0.6, 'the widest gap fits inside a documented jump',
+  // 0.82, raised from 0.72, raised from 0.60 - three times now, each on an
+  // explicit request to open the gaps out further.
+  //
+  // This is the scene's safety margin against a thumb on a virtual stick, and
+  // it is being spent knowingly: 0.60 was itself a retreat from 0.70 after a
+  // phone player said the parkour was too hard. A literal 1.5x on the gaps
+  // measured 0.90 of the airtime, which is not a difficulty setting - it is
+  // the difference between hard and not completable - so this stops short of
+  // it and the number is stated rather than buried.
+  note(share <= 0.82, 'the widest gap fits inside a documented jump',
     'needs ' + airtimeNeeded.toFixed(2) + ' s of the ' + airtimeAvailable.toFixed(2) +
     ' s a double jump gives at ' + cfg.PESSIMISTIC_GRAVITY + ' m/s2 (' +
     Math.round(share * 100) + '%)')
+}
+
+// No pad may hang over another as a ceiling.
+//
+// VERTICAL_CLEARANCE is a RADIAL keep-out, so once two pads were 2.5 m apart
+// in height they could sit anywhere - including directly on top of each other.
+// Eleven pairs did, the worst overlapping 4.8 x 5.7 m with three metres of
+// headroom, and from below that reads as a heap of slabs rather than a climb.
+// It was reported three times by the first person to play it before anything
+// in this harness had an opinion about it.
+{
+  const pads = buildTower().pads
+  let worst = 0
+  let stacked = 0
+
+  for (let i = 0; i < pads.length; i++) {
+    for (let j = i + 1; j < pads.length; j++) {
+      const a = pads[i]
+      const b = pads[j]
+      const dy = Math.abs(a.y - b.y)
+      if (dy >= cfg.CEILING_CLEARANCE) continue
+
+      // Box test, not radial: two pads may stand close beside each other at
+      // different heights - that is a staircase - but neither may hang over
+      // the other.
+      const overX = (a.size + b.size) / 2 - Math.abs(a.x - b.x)
+      const overZ = (a.size + b.size) / 2 - Math.abs(a.z - b.z)
+      if (overX <= 0 || overZ <= 0) continue
+
+      // Pads inside the radial band are already governed by VERTICAL_CLEARANCE
+      // and may clip corners; the ceiling rule only owns the band above it.
+      if (dy <= cfg.VERTICAL_CLEARANCE) continue
+
+      stacked++
+      worst = Math.max(worst, Math.min(overX, overZ))
+    }
+  }
+
+  note(stacked === 0, 'no pad hangs over another',
+    stacked + ' stacked pairs, worst overlap ' + worst.toFixed(2) + ' m')
+}
+
+// The crown must be findable by KIND, and must be the top of the climb.
+//
+// It used to be identifiable by index - it was simply the last pad pushed -
+// and build.ts read `pads[pads.length - 1]` to place the finish celebration.
+// Then coin ledges started being appended AFTER the crown was marked, and the
+// last pad became a 2.6 m perch in the middle of the tower. The fireworks
+// moved there. Nothing threw, nothing logged, and the only symptom was a
+// summit that no longer celebrated.
+{
+  const pads = buildTower().pads
+  const finishes = pads.filter((p) => p.kind === 'finish')
+  const highest = pads.reduce((a, b) => (b.y > a.y ? b : a))
+
+  note(finishes.length === 1, 'exactly one pad is the crown',
+    finishes.length + ' pads marked finish')
+  note(finishes.length === 1 && finishes[0] === highest,
+    'the crown is the top of the climb',
+    finishes.length === 1
+      ? 'crown at ' + finishes[0].y.toFixed(1) + ' m, highest pad at ' + highest.y.toFixed(1) + ' m'
+      : 'no single crown to check')
+  note(finishes.length === 1 && finishes[0].size >= 9,
+    'the crown is wide enough to stand and look around',
+    finishes.length === 1 ? finishes[0].size.toFixed(1) + ' m across' : 'n/a')
+}
+
+// The jungle floor exists, stays out of the way, and stays affordable.
+//
+// Undergrowth is the cheapest thing in the scene to add and the easiest to
+// let sprawl: every instance is a material on a budget that is already at
+// 96%, and a plant that wanders into the shaft ends up embedded in a pad.
+{
+  const plants = undergrowth()
+  let inShaftCount = 0
+  let onDeck = 0
+  const halfLobby = cfg.LOBBY_SIZE / 2
+
+  for (const p of plants) {
+    if (Math.hypot(p.x - cfg.CENTER_X, p.z - cfg.CENTER_Z) < cfg.SHAFT_MAX_RADIUS) inShaftCount++
+    if (Math.abs(p.x - cfg.LOBBY_X) < halfLobby && Math.abs(p.z - cfg.LOBBY_Z) < halfLobby) onDeck++
+  }
+
+  // fern and junglePlant are 1 primitive each - measured out of the GLBs,
+  // because the catalog does not publish primitive counts.
+  const cost = plants.length
+
+  note(plants.length > 20, 'the jungle floor is actually planted',
+    plants.length + ' plants on the floor')
+  note(inShaftCount === 0, 'no plant grows inside the climb',
+    inShaftCount + ' inside the ' + cfg.SHAFT_MAX_RADIUS + ' m shaft')
+  note(onDeck === 0, 'no plant grows through the lobby deck', onDeck + ' on the deck')
+
+  // Plants and firs share the same radii, so this is not hypothetical: one
+  // plant landed 0.68 m from a trunk that needs 1.96, i.e. inside the tree.
+  let worstTrunk = 99
+  for (const plant of plants) {
+    for (const tree of treeLine()) {
+      const need = cfg.TREE_TRUNK_RADIUS * (tree.scale / cfg.TREE_SCALE) + 0.9
+      worstTrunk = Math.min(worstTrunk, Math.hypot(plant.x - tree.x, plant.z - tree.z) - need)
+    }
+  }
+  note(worstTrunk >= 0, 'no plant grows inside a tree',
+    'closest clearance ' + worstTrunk.toFixed(2) + ' m')
+
+  // The two noticeboards and the torches beside them. layout.ts could not see
+  // any of it until their coordinates moved into config.ts, and in the
+  // meantime a fern grew 0.64 m into the legend board and another clipped the
+  // leaderboard - on a board whose entire job is to be read.
+  let worstFixture = 99
+  for (const plant of plants) {
+    for (const f of lobbyFixtures()) {
+      worstFixture = Math.min(
+        worstFixture,
+        Math.hypot(plant.x - f.x, plant.z - f.z) - f.radius - plant.scale * 0.35
+      )
+    }
+  }
+  note(worstFixture >= 0, 'no plant grows through a noticeboard or a torch',
+    'closest clearance ' + worstFixture.toFixed(2) + ' m')
+  // 55, raised from 40 when the deck fringe went in. The allowance exists to
+  // stop the cheapest thing in the scene from sprawling unnoticed, not to
+  // block a deliberate increase - so it moves only alongside a matching cut
+  // somewhere else. This one was paid for by dropping ground shadows from
+  // 12 m to 9 m, which returned twelve slots nobody can see.
+  // Everything green, together, against one allowance.
+  //
+  // Checking the floor alone was not enough: adding trunk growth pushed the
+  // LIVE scene to 403 and then 404 of a 400 material soft limit twice in one
+  // sitting, and the harness said nothing both times because it was only
+  // watching one of the three places plants grow.
+  //
+  // Primitive counts are measured out of the GLBs - fern 1, junglePlant 1,
+  // bush 2, fir 2 - because the catalog does not publish them and they are
+  // what the mobile client actually bills.
+  const trunk = trunkGrowth(buildTower().pads)
+  const firs = treeLine().length
+  const green = cost + trunk.length + firs * 2
+
+  note(cost <= 55, 'the undergrowth stays inside its material allowance',
+    cost + ' materials of a 55 allowance')
+  note(green <= 78, 'all the vegetation together stays inside its allowance',
+    green + ' materials of a 78 allowance - floor ' + cost +
+    ', trunk ' + trunk.length + ', firs ' + firs)
+}
+
+// Growth on the trunk must never reach a surface a player lands on.
+//
+// The whole justification for putting the jungle up the tower rather than on
+// the pads is that the trunk tops out at radius 2.5 and the nearest pad sits
+// at 6. If that stops being true the plants stop being scenery and start
+// being obstacles, so it is checked rather than assumed.
+{
+  const tower = buildTower()
+  const growth = trunkGrowth(tower.pads)
+  let worst = 99
+  let tallest = 0
+
+  for (const plant of growth) {
+    tallest = Math.max(tallest, plant.y ?? 0)
+    for (const pad of tower.pads) {
+      // Vertical bands only: a plant 10 m below a pad cannot touch it.
+      if (Math.abs((plant.y ?? 0) - pad.y) > 3) continue
+      const gap =
+        Math.hypot(plant.x - pad.x, plant.z - pad.z) - pad.size / 2 - plant.scale * 0.7
+      worst = Math.min(worst, gap)
+    }
+  }
+
+  note(growth.length >= 8, 'the tower itself is planted', growth.length + ' plants on the trunk')
+  note(worst > 0, 'trunk growth never reaches a pad',
+    'closest approach ' + worst.toFixed(2) + ' m')
+  note(tallest > 40, 'the growth climbs with the player',
+    'highest plant at ' + tallest.toFixed(0) + ' m')
+}
+
+// The NARROWEST gap, not the widest.
+//
+// Every difficulty claim in this project was made about the widest jump, and
+// the widest jump is not the one you can see. Measured when somebody finally
+// looked at a screenshot instead of a number: shortest hop 1.63 m between
+// pads up to 3.9 m wide, 29 of 120 hops under 2.5 m, and a tower that reads
+// as a heap of slabs however good the maximum is.
+//
+// The cause was a one-sided clamp. hop() had capped the gap at REACH_BUDGET
+// since the beginning and never had a floor, so any section could multiply
+// its way down - the narrow bridge asks for 0.85, the piston hall 0.8.
+{
+  const tower = buildTower()
+  const gaps = []
+  for (const pad of tower.pads) {
+    // The crown is 9 m across and is meant to be easy to arrive on; detour
+    // ledges hang off the route by design.
+    if (pad.detour || pad.kind === 'finish') continue
+    const from = tower.pads[pad.fromIndex]
+    if (!from) continue
+    gaps.push(Math.hypot(pad.x - from.x, pad.z - from.z) - pad.size / 2 - from.size / 2)
+  }
+  gaps.sort((a, b) => a - b)
+  const median = gaps[Math.floor(gaps.length / 2)]
+  const cramped = gaps.filter((g) => g < 3).length
+
+  note(gaps[0] >= 2.5, 'no hop is shorter than a real jump',
+    'narrowest ' + gaps[0].toFixed(2) + ' m')
+  note(cramped <= 3, 'the tower is not a pile of slabs',
+    cramped + ' of ' + gaps.length + ' hops under 3 m')
+  note(median >= cfg.MIN_GAP - 0.05, 'the typical hop is a full jump',
+    'median ' + median.toFixed(2) + ' m against a ' + cfg.MIN_GAP + ' m floor')
+}
+
+// Coins may not bunch.
+{
+  const list = buildTower().pickups
+  let closest = Infinity
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      closest = Math.min(
+        closest,
+        Math.hypot(list[i].x - list[j].x, list[i].y - list[j].y, list[i].z - list[j].z)
+      )
+    }
+  }
+  note(closest >= cfg.COIN_SPACING, 'coins are spread out',
+    'closest pair ' + closest.toFixed(2) + ' m of a ' + cfg.COIN_SPACING + ' m minimum')
+}
+
+// The shortcut has to exist.
+//
+// It did not. `shortcut` came back NULL and nothing asked - the identical
+// failure the lever had, months apart, for the identical reason: a mechanic
+// built by a search, with no check that the search succeeded.
+//
+// What killed it was two of this session's own changes, neither of which
+// mentioned the shortcut. Opening the jumps out raised `jumpGap`, and the
+// chord's spacing test was written as a fraction of jumpGap + padSize, so the
+// bar it set rose with the tower until 91 of 95 candidates failed it. Then
+// the ceiling rule - no pad may hang over another - made isClear strict
+// enough that the remaining chords could not find a clear straight line.
+//
+// Both are the same shape of mistake: a rule expressed in terms of something
+// else that later moved.
+{
+  const tower = buildTower()
+  const cut = tower.shortcut
+  note(cut !== null && cut !== undefined, 'the shortcut exists',
+    cut ? cut.route.length + ' pads across the chord' : 'NOT BUILT - the labels promise it anyway')
+
+  if (cut) {
+    let worst = 0
+    const chain = [tower.pads[cut.fromIndex], ...cut.route, tower.pads[cut.toIndex]]
+    for (let i = 1; i < chain.length; i++) {
+      const gap =
+        Math.hypot(chain[i].x - chain[i - 1].x, chain[i].z - chain[i - 1].z) -
+        chain[i].size / 2 - chain[i - 1].size / 2
+      worst = Math.max(worst, gap)
+    }
+    note(worst <= MAX_REACH, 'every step of the shortcut is jumpable',
+      'longest ' + worst.toFixed(2) + ' m of a ' + MAX_REACH.toFixed(2) + ' m budget')
+  }
+}
+
+// EVERY zone delivers its mechanic - checked as a table, not one at a time.
+//
+// Two mechanics have now vanished silently in this project. The lever was
+// placed at one fixed offset and skipped in silence when anything was there;
+// the shortcut was a search with no check that the search succeeded, and it
+// died to two unrelated changes that never mentioned it. Both times the fix
+// was to add a check for THAT mechanic, which is how the second one was free
+// to break: nobody was watching the others.
+//
+// So this walks the zone order and asks, for every kind of zone in it,
+// whether the thing that zone is FOR came out the other end.
+{
+  const tower = buildTower()
+  const asked = {}
+  for (const name of tower.sectionNames) asked[name] = (asked[name] || 0) + 1
+
+  const centres = new Map()
+  for (const spin of tower.spinners) {
+    const key = spin.x.toFixed(2) + ',' + spin.y.toFixed(2) + ',' + spin.z.toFixed(2)
+    centres.set(key, (centres.get(key) || 0) + 1)
+  }
+  const crosses = [...centres.values()].filter((n) => n === 2).length
+
+  const delivered = {
+    'the lever': tower.levers.length,
+    'the fork': tower.forks.length,
+    'spinner floor': crosses,
+    'piston hall': tower.movers.length > 0 ? asked['piston hall'] || 0 : 0,
+    'crumbling run': tower.pads.filter((p) => p.crumble).length > 0 ? asked['crumbling run'] || 0 : 0
+  }
+
+  const missing = []
+  for (const [zone, count] of Object.entries(asked)) {
+    if (!(zone in delivered)) continue
+    if (delivered[zone] < count) missing.push(zone + ' ' + delivered[zone] + '/' + count)
+  }
+
+  note(missing.length === 0, 'every zone delivered its mechanic',
+    missing.length ? missing.join(', ') : Object.keys(delivered).length + ' zone kinds checked')
 }
 
 // Every mechanic the zone order asks for has to actually be in the tower.
@@ -677,7 +1005,32 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   //   2. checkpoints grown into landings, by search, 3.2 -> 3.8..4.6 m
   //   3. the two lever pads, which had never been built at all - this one DID
   //      add pads, so the boards were cleared with it
-  const PINNED = '95d4f7a6'
+  //   4. the stacking pass: a ceiling rule so no pad hangs over another, the
+  //      crown widened again 5.2 -> 7.0, the spinner floor cut from a scatter
+  //      of up to four beams to one crossed pair, and the first lever zone
+  //      moved 6 -> 7 because zone 6 has no room for it. This MOVED pads, so
+  //      the boards have to be cleared with it - old times are times up a
+  //      different climb.
+  //   5. the difficulty pass: jumpGap steepened 1.6-2.7 to 1.5-3.1 so the
+  //      ground floor is EASIER and the summit asks for twice its gap, pads
+  //      shrinking 3.9 -> 2.4, and twelve coins each on their own 2.6 m ledge
+  //      instead of eight hanging in open air. Pads moved and pads were added.
+  //   6. the crown widened again 7.0 -> 9.0. At 7 the arch's plinths were
+  //      centred on the disc's rim, so 0.75 m of each footing hung over
+  //      nothing and the gateway read as floating. Only the crown resized;
+  //      no other pad moved, so times still describe the same climb.
+  //   7. the gaps opened out on request: jumpGap 1.5-3.1 -> 1.9-4.05, which
+  //      is 1.31x on the widest gap. A literal 1.5x was measured first and
+  //      rejected - see the note on the airtime check.
+  //   8. the jungle pass: gaps 1.9-4.05 -> 2.2-4.6 (82% of the airtime),
+  //      coins 12 -> 16, and the fir ring cut 24 -> 10 to pay for 31 pieces
+  //      of single-primitive undergrowth.
+  //   9. the gap FLOOR. hop() had a ceiling and no floor, so the narrowest
+  //      hop was 1.63 m between 3.9 m pads and 29 of 120 were under 2.5 -
+  //      which is what a player sees, and what every number reported here
+  //      had been quietly ignoring. MIN_GAP 4.0, pads narrowed to 3.3-2.3,
+  //      lever pads routed through the same floor, coins spaced 11 m apart.
+  const PINNED = '19fccd58'
   note(fingerprint === PINNED, 'the tower is the tower the records were set on',
     'fingerprint ' + fingerprint)
 }
@@ -692,7 +1045,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 48
+const MIN_CHECKS = 70
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 

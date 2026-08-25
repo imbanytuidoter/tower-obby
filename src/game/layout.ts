@@ -1,45 +1,69 @@
 import {
   BACKDROP_HALF,
   BANDS,
+  BOARD_FORWARD,
+  BOARD_LATERAL,
+  BOARD_W,
+  CEILING_CLEARANCE,
   CENTER_X,
   CENTER_Z,
   CHECKPOINT_EVERY_SECTIONS,
-  curve,
-  HORIZONTAL_CLEARANCE,
-  VERTICAL_CLEARANCE,
+  COIN_SPACING,
+  FRINGE_COUNT,
+  FRINGE_MARGIN,
+  GATE_DIR_X,
+  GATE_DIR_Z,
+  GATE_WIDTH,
   GATE_X,
   GATE_Z,
   HAZARD_CLEARANCE,
   HAZARD_THICKNESS,
+  HORIZONTAL_CLEARANCE,
   LANDING_SIZE,
+  LEGEND_FORWARD,
+  LEGEND_LATERAL,
   LOBBY_KEEPOUT_RADIUS,
   LOBBY_SIZE,
+  LOBBY_SPAWN_X,
+  LOBBY_SPAWN_Z,
   LOBBY_X,
   LOBBY_Z,
   MAX_PAD_HEIGHT,
   MAX_SHORTCUT_RISE,
-  estimateClimbSeconds,
   MAX_STEP_RISE,
+  MIN_GAP,
+  PAD_SEPARATION,
+  PALM_COUNT,
+  PALM_RING_RADIUS,
+  PICKUP_COUNT,
+  PICKUP_PERCH_SIZE,
+  PICKUP_RADIUS,
+  PICKUP_RISE,
   REACH_BUDGET,
+  SHAFT_MAX_RADIUS,
+  SHAFT_MIN_RADIUS,
+  SHORTCUT_FROM_SECTION,
+  SHORTCUT_HOPS,
+  START_PAD_X,
+  START_PAD_Z,
+  START_X,
+  START_Z,
   TOWER_SEED,
   TOWER_ZONES,
-  TREE_TRUNK_RADIUS,
   TREE_COUNT,
   TREE_RING_OUTER,
   TREE_RING_RADIUS,
   TREE_SCALE,
-  PAD_SEPARATION,
-  PICKUP_COUNT,
-  PICKUP_RADIUS,
-  PICKUP_RISE,
-  SHAFT_MAX_RADIUS,
-  SHAFT_MIN_RADIUS,
-  START_PAD_X,
-  START_PAD_Z,
-  SHORTCUT_FROM_SECTION,
-  SHORTCUT_HOPS,
-  START_X,
-  START_Z
+  TREE_TRUNK_RADIUS,
+  TRUNK_GROWTH_COUNT,
+  TRUNK_GROWTH_HIGH,
+  TRUNK_GROWTH_LOW,
+  UNDERGROWTH_COUNT,
+  UNDERGROWTH_INNER,
+  UNDERGROWTH_OUTER,
+  VERTICAL_CLEARANCE,
+  curve,
+  estimateClimbSeconds
 } from './config'
 import { makeRng, Rng } from './rng'
 
@@ -54,6 +78,16 @@ export type Pad = {
   crumble: boolean
   /** Which section this pad belongs to. Drives its colour. */
   section: number
+  /**
+   * True for a ledge that hangs off the route rather than carrying it - right
+   * now, the perch under each coin.
+   *
+   * Without this the climb estimate walked the pad array in order and counted
+   * twelve detours as part of the ascent, which pushed a 211 s model to 287 s
+   * overnight and made the pacing look worse than it is. A number nobody can
+   * trust is worse than no number.
+   */
+  detour?: boolean
   /**
    * Index of the pad this one is reached from, or -1 for the start.
    *
@@ -291,7 +325,15 @@ export function buildTower(): Layout {
   // and the one you want room to stand on when you get there. Widening it
   // changes the fingerprint on purpose - it does not move any pad, so times
   // set on the old slab are still times up the same climb.
-  last.size = Math.max(last.size, 5.2)
+  // 7.0, up from 5.2. At 5.2 the arch columns stood on the slab's own corners
+  // and the greeter took a third of what was left, so the prize for a four
+  // minute climb was a ledge you had to stand still on. The crown is the one
+  // pad where a player wants to look around, take a screenshot and wait for
+  // somebody else - none of which fits on a landing-sized square.
+  //
+  // 9.0, up from 7.0, because at 7 the arch's plinths had no room to sit
+  // INSIDE the disc and the whole gateway looked like it was floating.
+  last.size = Math.max(last.size, 9.0)
 
   widenLandings(out)
 
@@ -335,36 +377,59 @@ function buildPickups(out: Build): Pickup[] {
   const stride = Math.floor(out.pads.length / (wanted + 1))
 
   for (let n = 1; n <= wanted; n++) {
-    const index = Math.min(out.pads.length - 1, n * stride)
-    const anchor = out.pads[index]
-    if (!anchor || anchor.kind === 'finish' || anchor.kind === 'start') continue
-
-    const outward = Math.atan2(anchor.z - CENTER_Z, anchor.x - CENTER_X)
+    const base = Math.min(out.pads.length - 1, n * stride)
     let placed = false
 
-    for (let turn = 0; turn <= 6 && !placed; turn++) {
+    // Try the neighbouring pads too. Anchoring on one fixed index meant a
+    // single cramped spot cost a coin outright - 11 of 12 - and the counter
+    // in the corner would have told players about a twelfth that was never
+    // built. Same failure the lever and the shortcut both had before it.
+    for (const step of [0, 1, -1, 2, -2, 3, -3]) {
+      if (placed) break
+      const index = base + step
+      const anchor = out.pads[index]
+      if (!anchor || anchor.kind === 'finish' || anchor.kind === 'start') continue
+
+      const outward = Math.atan2(anchor.z - CENTER_Z, anchor.x - CENTER_X)
+
+    for (let turn = 0; turn <= 11 && !placed; turn++) {
       for (const sign of [1, -1]) {
-        const away = outward + sign * turn * 0.5
-        // Far enough that taking one is a jump out and a jump back. At 3.4 m
-        // from the pad centre the gap from its edge was 1.2 m of a 3.03 m
-        // budget - close enough to collect without leaving the route, which
-        // makes it scenery rather than a choice.
-        for (const distance of [5.6, 6.4, 4.9]) {
+        const away = outward + sign * turn * 0.32
+
+        for (const distance of [5.6, 6.4, 4.9, 5.2, 4.5, 6.0]) {
           const x = anchor.x + Math.cos(away) * distance
           const z = anchor.z + Math.sin(away) * distance
-          const y = anchor.y + PICKUP_RISE
+          const y = anchor.y
 
           if (!inDetourAir(x, z)) continue
-          // A pickup is a trigger, not a floor, but it must not hang inside a
-          // pad or it cannot be seen or reached.
-          if (!isClear(out, x, y, z, PICKUP_RADIUS * 2, anchor)) continue
+          // The PERCH has to fit, not just the coin. This is the whole change:
+          // a coin hanging in open air is a thing you dive at and miss, and
+          // the reward for a correct dive is a fall to the last checkpoint.
+          // With a ledge under it the detour is a jump out, a landing, and a
+          // jump back - which is a decision, not a gamble.
+          if (!isClear(out, x, y, z, PICKUP_PERCH_SIZE, anchor)) continue
+          // Reachable from the EDGE of the pad you leave, measured the same
+          // way the harness measures it.
+          if (distance - (anchor.size + PICKUP_PERCH_SIZE) / 2 > REACH_BUDGET) continue
 
-          pickups.push({ x, y, z, fromPad: index })
+          // Coins must not bunch. Measured before this: the closest pair sat
+          // 5.81 m apart while others were thirty metres from a neighbour,
+          // and two coins within one jump of each other are one coin that
+          // takes two presses.
+          const crowded = pickups.some(
+            (other) => Math.hypot(other.x - x, other.y - (y + PICKUP_RISE), other.z - z) < COIN_SPACING
+          )
+          if (crowded) continue
+
+          push(out, { x, y, z, angle: 0 }, anchor.section, PICKUP_PERCH_SIZE, false, index)
+          out.pads[out.pads.length - 1].detour = true
+          pickups.push({ x, y: y + PICKUP_RISE, z, fromPad: out.pads.length - 1 })
           placed = true
           break
         }
         if (placed || turn === 0) break
       }
+    }
     }
   }
 
@@ -580,9 +645,28 @@ function buildShortcut(out: Build, c: ReturnType<typeof curve>): Shortcut | null
   }
   if (landings.length < 2) return null
 
-  const fromIndex = landings[Math.min(SHORTCUT_FROM_SECTION - 1, landings.length - 2)]
+  /**
+   * The START of the chord is searched too, not pinned to one landing.
+   *
+   * It was `landings[SHORTCUT_FROM_SECTION - 1]` - one fixed pad - so the
+   * whole mechanic rested on that single pad happening to have a reachable
+   * partner. It stopped having one, and the shortcut silently disappeared.
+   * The lever learned this exact lesson earlier in this file; this function
+   * did not get the message.
+   *
+   * Preference order still starts at the intended section, so the shortcut
+   * keeps its designed place in the climb when that place still works.
+   */
+  const starts: number[] = []
+  const preferred = Math.min(SHORTCUT_FROM_SECTION - 1, landings.length - 2)
+  for (let i = 0; i < landings.length - 1; i++) {
+    starts.push(landings[(preferred + i) % (landings.length - 1)])
+  }
+
+  for (const fromIndex of starts) {
   const from = out.pads[fromIndex]
   const step = c.jumpGap + c.padSize
+  void step
 
   /**
    * Search for a target rather than assuming one.
@@ -601,9 +685,34 @@ function buildShortcut(out: Build, c: ReturnType<typeof curve>): Shortcut | null
     if (climb <= 0) continue
 
     // Enough hops to keep every rise jumpable...
-    const hops = Math.max(SHORTCUT_HOPS, Math.ceil(climb / MAX_SHORTCUT_RISE))
-    // ...but only if that many still fit along the chord without overlapping.
-    if (span / (hops + 1) < step * 0.8) continue
+    /**
+     * How many pads the chord is cut into is SEARCHED, not fixed.
+     *
+     * SHORTCUT_HOPS was a hard minimum of 4, so a 26 m chord was always cut
+     * into five segments of 5.2 m - a 2.3 m gap against a 2.8 m floor - and
+     * every candidate failed. The number of steps has to follow the length of
+     * the thing being stepped along; pinning it meant the mechanic worked
+     * only while the tower happened to be the size it was when the 4 was
+     * written down, and it stopped working the moment the jumps opened out.
+     */
+    let hops = 0
+    let chordGap = 0
+    for (let tryHops = 1; tryHops <= 14; tryHops++) {
+      const gap = span / (tryHops + 1) - c.padSize
+      if (gap > REACH_BUDGET) continue
+      // 1.6 m, not MIN_GAP. The chord is short and climbs hard, so it is a
+      // LADDER, and demanding full-length jumps of it is asking the wrong
+      // thing: it is the reward two players unlock, not the route everyone
+      // walks. Insisting on MIN_GAP here rejected all 95 candidates and
+      // deleted the mechanic - measured, twice, with the counters to prove it.
+      if (gap < 1.6) break
+      if (climb / (tryHops + 1) > MAX_SHORTCUT_RISE) continue
+      hops = tryHops
+      chordGap = gap
+      break
+    }
+    if (hops === 0) continue
+    void chordGap
 
     const route = chordRoute(out, from, to, hops, c.padSize)
     if (!route) continue
@@ -619,6 +728,7 @@ function buildShortcut(out: Build, c: ReturnType<typeof curve>): Shortcut | null
       toIndex
     }
   }
+  }
 
   return null
 }
@@ -627,18 +737,73 @@ function buildShortcut(out: Build, c: ReturnType<typeof curve>): Shortcut | null
 function chordRoute(out: Build, from: Pad, to: Pad, hops: number, size: number): Pad[] | null {
   const route: Pad[] = []
 
+  // Perpendicular to the chord, in plan: the direction a blocked step can
+  // step aside into without changing how far it is along the route.
+  const runX = to.x - from.x
+  const runZ = to.z - from.z
+  const runLength = Math.hypot(runX, runZ) || 1
+  const sideX = -runZ / runLength
+  const sideZ = runX / runLength
+
   for (let i = 1; i <= hops; i++) {
     const t = i / (hops + 1)
-    const x = from.x + (to.x - from.x) * t
-    const z = from.z + (to.z - from.z) * t
+    const x = from.x + runX * t
+    const z = from.z + runZ * t
     const y = from.y + (to.y - from.y) * t
 
-    if (!isClear(out, x, y, z, size)) return null
+    /**
+     * Nudged aside when the straight line is blocked, rather than abandoning
+     * the whole shortcut.
+     *
+     * A chord across a tower runs through the middle of everything already
+     * built, so demanding that all of its pads land on an exact straight line
+     * is demanding luck. It worked while isClear only forbade close
+     * neighbours; the moment a ceiling rule was added - no pad may hang over
+     * another - the line stopped being findable and the mechanic vanished
+     * without a word. Stepping 1.5 m sideways does not change what the
+     * shortcut IS.
+     */
+    // The step must still be JUMPABLE after the nudge.
+    //
+    // Sidestepping to find clear air lengthens the hop, and the first version
+    // of this checked clearance and nothing else: it produced a shortcut with
+    // a 10.09 m step against a 4.79 m budget - a mechanic that existed and
+    // could not be crossed, which is barely better than one that does not
+    // exist. The invariant caught it on its first run.
+    const previous = route.length > 0 ? route[route.length - 1] : from
+    const jumpable = (cx: number, cy: number, cz: number) =>
+      Math.hypot(cx - previous.x, cz - previous.z) - size / 2 - previous.size / 2 <= REACH_BUDGET &&
+      cy - previous.y <= MAX_SHORTCUT_RISE + 0.05
+
+    let px = x
+    let pz = z
+    let py = y
+    let found = isClear(out, px, py, pz, size) && jumpable(px, py, pz)
+    for (let step = 1; step <= 6 && !found; step++) {
+      for (const side of [1, -1]) {
+        for (const lift of [0, 0.8, -0.8]) {
+          const cx = x + sideX * step * 1.4 * side
+          const cz = z + sideZ * step * 1.4 * side
+          const cy = y + lift
+          if (!inShaft(cx, cz, cy)) continue
+          if (!isClear(out, cx, cy, cz, size)) continue
+          if (!jumpable(cx, cy, cz)) continue
+          px = cx
+          pz = cz
+          py = cy
+          found = true
+          break
+        }
+        if (found) break
+      }
+    }
+    if (!found) return null
+
     route.push({
       kind: 'normal',
-      x,
-      y,
-      z,
+      x: px,
+      y: py,
+      z: pz,
       size,
       crumble: false,
       section: from.section,
@@ -669,8 +834,14 @@ const ZONE_ORDER: SectionKind[] = [
   'ring of platforms',//  3  first hazard, on a wide floor
   'the fork',         //  4  first decision, early
   'narrow bridge',    //  5
-  'the lever',        //  6  first co-op: hold it for strangers
-  'crumbling run',    //  7  commit, do not stop
+  // Swapped with the crumbling run, and the reason is geometry, not pedagogy.
+  // Zone 6 lands at radius 15.8 of a 6-17 shaft with the lobby keep-out
+  // cutting the other side; the lever search tried 608 spots there - two
+  // guarded pads, four pad sizes, a full circle of angles, four jump
+  // distances - and every one was outside the shaft or already occupied.
+  // A mechanic that cannot fit is worth moving one zone rather than dropping.
+  'crumbling run',    //  6  commit, do not stop
+  'the lever',        //  7  first co-op: hold it for strangers
   'spinner floor',    //  8
   'the plunge',       //  9  risk against certainty
   'piston hall',      // 10
@@ -758,7 +929,12 @@ function ringOfPlatforms(index: number, cursor: Cursor, c: ReturnType<typeof cur
     x: hubX,
     y: ring[0].y + HAZARD_CLEARANCE,
     z: hubZ,
-    length: reach * 2 + c.spinnerReach,
+    // An arm, not a diameter. reach * 2 spans the whole ring, which is a wall
+    // that happens to rotate: unavoidable by position, only by timing, and it
+    // fills the screen. Half that length sweeps one side at a time, so the far
+    // side of the ring is somewhere to wait - a beam you read rather than a
+    // slab you endure.
+    length: reach + c.spinnerReach,
     speed: (rng.next() < 0.5 ? -1 : 1) * c.spinnerSpeed,
     phase: rng.range(0, 360)
   })
@@ -771,15 +947,29 @@ function spinnerFloor(index: number, cursor: Cursor, c: ReturnType<typeof curve>
   const size = 7 + c.t * 3
   hop(out, cursor, index, c, { size, rise: c.rise })
 
-  const beams = 2 + Math.round(c.t * 2)
-  for (let i = 0; i < beams; i++) {
+  // TWO arms, crossed, on one axle - not a scatter of bars.
+  //
+  // This used to push 2 + round(t*2) beams, each at its own random offset,
+  // length, speed and phase. Four independent sweeps over one pad is not four
+  // times the challenge; it is noise. You cannot read when the next gap
+  // arrives, so you cannot time anything, so you stand there and hope - and
+  // the pad looked like a pile of red sticks, which is what it was.
+  //
+  // A cross has a period you can watch once and then trust. Same centre, same
+  // length, same speed, ninety degrees apart: four quadrants of safety
+  // rotating past you, and the whole thing legible from the pad below it.
+  const spinDirection = rng.next() < 0.5 ? -1 : 1
+  const armLength = size * 0.72
+  const startPhase = rng.range(0, 360)
+
+  for (let arm = 0; arm < 2; arm++) {
     out.spinners.push({
-      x: cursor.x + rng.range(-size * 0.18, size * 0.18),
+      x: cursor.x,
       y: cursor.y + HAZARD_CLEARANCE,
-      z: cursor.z + rng.range(-size * 0.18, size * 0.18),
-      length: size * rng.range(0.55, 0.95),
-      speed: (rng.next() < 0.5 ? -1 : 1) * c.spinnerSpeed * rng.range(0.7, 1.3),
-      phase: rng.range(0, 360)
+      z: cursor.z,
+      length: armLength,
+      speed: spinDirection * c.spinnerSpeed,
+      phase: startPhase + arm * 90
     })
   }
 
@@ -978,6 +1168,68 @@ function thePlunge(index: number, cursor: Cursor, c: ReturnType<typeof curve>, r
 }
 
 /**
+ * Finds a spot for a lever pad beside one of several candidate pads.
+ *
+ * The sweep is a FULL circle in 20 degree steps, over four pad sizes, over
+ * four jump distances, over every candidate pad - 304 spots per pad. It began
+ * as seven angles across 86 degrees at one fixed size beside one fixed pad,
+ * which worked while the tower was loosely packed and produced ZERO levers
+ * the moment it was not, in silence, while the submission advertised the
+ * lever as one of three social mechanics.
+ *
+ * A lever pad holds one standing player and nothing else, so it is allowed to
+ * be small: losing three quarters of a metre of slab is cheaper than losing
+ * the mechanic.
+ */
+function findLeverSpot(
+  out: Build,
+  c: ReturnType<typeof curve>,
+  cursor: Cursor,
+  candidates: Pad[]
+): { guarded: Pad; cursor: Cursor; size: number } | null {
+  const turns: number[] = []
+  for (let step = 0; step <= 9; step++) {
+    turns.push(step * 0.35)
+    if (step > 0) turns.push(-step * 0.35)
+  }
+
+  for (const guarded of candidates) {
+    for (const size of [c.padSize, c.padSize * 0.8, 2.8, 2.4]) {
+      for (const turn of turns) {
+          // Widest first, and never below MIN_GAP. The lever pad is pushed
+        // straight into the build rather than going through hop(), so it
+        // never saw the gap clamp: measured, two lever pads sat 2.15 m and
+        // 2.75 m from the pad they serve while the rest of the tower was at
+        // 4.0. Side pads are still pads, and a cluster is a cluster.
+        for (const reach of [
+          c.jumpGap + size * 1.4,
+          c.jumpGap + size,
+          MIN_GAP + (guarded.size + size) / 2,
+          c.jumpGap + size * 0.75
+        ]) {
+          const side = cursor.angle + Math.PI / 2 + turn
+          const spot: Cursor = {
+            x: guarded.x + Math.cos(side) * reach,
+            y: guarded.y,
+            z: guarded.z + Math.sin(side) * reach,
+            angle: cursor.angle
+          }
+          if (!inShaft(spot.x, spot.z, spot.y)) continue
+          if (!isClear(out, spot.x, spot.y, spot.z, size)) continue
+          // It has to be reachable from the pad it guards, or it is scenery.
+          const gap =
+            Math.hypot(spot.x - guarded.x, spot.z - guarded.z) - (guarded.size + size) / 2
+          if (gap > REACH_BUDGET) continue
+          return { guarded, cursor: spot, size }
+        }
+      }
+    }
+  }
+
+  return null
+}
+
+/**
  * THE LEVER - one player can make it easier for everyone.
  *
  * A beam sweeps the only pad. A lever pad sits off to the side, and while
@@ -986,8 +1238,28 @@ function thePlunge(index: number, cursor: Cursor, c: ReturnType<typeof curve>, r
  * second player - the beam is always beatable solo.
  */
 function theLever(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rng: Rng, out: Build) {
+  // TWO candidate pads, not one.
+  //
+  // The zone used to lay a single pad and demand the lever fit beside THAT
+  // one. Zone 6 lands at radius 15.8 of a 6-17 band with the lobby keep-out
+  // cutting the other side, so its legal air is a sliver - and once the
+  // stacking rule stopped pads overlapping, every one of the 304 candidate
+  // spots beside it was either outside the shaft or already occupied.
+  // Measured: 194 out of the shaft, 110 blocked, 0 out of reach.
+  //
+  // Laying a second pad first and letting the lever choose which one to guard
+  // gives the search two neighbourhoods instead of one, and costs a pad.
   hop(out, cursor, index, c, { size: Math.max(c.padSize, 3.4), rise: c.rise })
-  const guarded = out.pads[out.pads.length - 1]
+  const first = out.pads[out.pads.length - 1]
+  hop(out, cursor, index, c, { size: Math.max(c.padSize, 3.4), rise: c.rise * 0.5 })
+  const second = out.pads[out.pads.length - 1]
+
+  const found = findLeverSpot(out, c, cursor, [second, first])
+  if (!found) {
+    closeSection(index, cursor, c, rng, out, second)
+    return
+  }
+  const guarded = found.guarded
 
   out.spinners.push({
     x: guarded.x,
@@ -1008,34 +1280,8 @@ function theLever(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rn
   // tower shipped with zero levers while the submission described the lever as
   // one of its three social mechanics. The same lesson the coin and the
   // shortcut both learned earlier in this file, which never reached here.
-  let leverCursor: Cursor | null = null
-  for (const turn of [0, 1, -1, 2, -2, 3, -3]) {
-    for (const reach of [c.jumpGap + c.padSize, c.jumpGap + c.padSize * 1.4, c.jumpGap + c.padSize * 0.75]) {
-      const side = cursor.angle + Math.PI / 2 + turn * 0.5
-      const candidate: Cursor = {
-        x: guarded.x + Math.cos(side) * reach,
-        y: guarded.y,
-        z: guarded.z + Math.sin(side) * reach,
-        angle: cursor.angle
-      }
-      if (!inShaft(candidate.x, candidate.z, candidate.y)) continue
-      if (!isClear(out, candidate.x, candidate.y, candidate.z, c.padSize)) continue
-      // It has to be reachable from the pad it guards, or it is scenery.
-      const gap = Math.hypot(candidate.x - guarded.x, candidate.z - guarded.z) -
-        (guarded.size + c.padSize) / 2
-      if (gap > REACH_BUDGET) continue
-      leverCursor = candidate
-      break
-    }
-    if (leverCursor) break
-  }
-
-  if (!leverCursor) {
-    closeSection(index, cursor, c, rng, out, guarded)
-    return
-  }
-  push(out, leverCursor, index, c.padSize, false, out.pads.length - 1)
-  out.levers.push({ x: leverCursor.x, y: leverCursor.y + 0.3, z: leverCursor.z, section: index })
+  push(out, found.cursor, index, found.size, false, out.pads.indexOf(guarded))
+  out.levers.push({ x: found.cursor.x, y: found.cursor.y + 0.3, z: found.cursor.z, section: index })
 
   // From the guarded pad, not the lever off to its side: the cursor stands on
   // the former while the latter is simply the last thing pushed, and measuring
@@ -1111,7 +1357,9 @@ function hop(
   // 3.6 * 1.35 = 4.86 m - the single reason any jump in the game broke the
   // 70% budget. Capping at the source keeps the arm longer than its safe
   // twin (2.88 m) without making it unfair on a thumbstick.
-  const gap = Math.min(c.jumpGap * (opts.gapScale ?? 1), REACH_BUDGET)
+  // Clamped at BOTH ends. The ceiling has been here for a long time; the
+  // floor had not, which is why a section could quietly ask for a 1.76 m hop.
+  const gap = Math.min(Math.max(c.jumpGap * (opts.gapScale ?? 1), MIN_GAP), REACH_BUDGET)
   // Edge to edge is the jump; centre to centre has to include both half-pads.
   const distance = gap + previous.size / 2 + size / 2
 
@@ -1245,9 +1493,22 @@ function inShaft(x: number, z: number, y: number): boolean {
 function isClear(out: Build, x: number, y: number, z: number, size: number, except?: Pad): boolean {
   for (const pad of out.pads) {
     if (pad === except) continue
-    if (Math.abs(pad.y - y) > VERTICAL_CLEARANCE) continue
-    const needed = pad.size / 2 + size / 2 + HORIZONTAL_CLEARANCE
-    if (Math.hypot(pad.x - x, pad.z - z) < needed) return false
+    const dy = Math.abs(pad.y - y)
+
+    if (dy <= VERTICAL_CLEARANCE) {
+      const needed = pad.size / 2 + size / 2 + HORIZONTAL_CLEARANCE
+      if (Math.hypot(pad.x - x, pad.z - z) < needed) return false
+      continue
+    }
+
+    // Far enough apart to share a column of air, but not to stack. Box test,
+    // not radial: two pads may sit close beside each other at different
+    // heights - that is a staircase - but neither may hang over the other.
+    if (dy < CEILING_CLEARANCE) {
+      const overX = pad.size / 2 + size / 2 - Math.abs(pad.x - x)
+      const overZ = pad.size / 2 + size / 2 - Math.abs(pad.z - z)
+      if (overX > 0 && overZ > 0) return false
+    }
   }
   return true
 }
@@ -1326,7 +1587,19 @@ export function backdropRing(): BandPanel[] {
         yaw: side.yaw,
         height,
         length,
-        thickness: 0.4,
+        /**
+         * 1.6 m, not 0.4.
+         *
+         * The wall got colliders earlier today and still leaked: a runner
+         * crossed it and ended up at z = -0.6, outside the parcels. At run
+         * speed 10 m/s a 30 Hz physics step advances 0.33 m, so a 0.4 m slab
+         * is barely one step thick and a fast body can be on both sides of it
+         * between two frames. Thickness is the cheapest defence against
+         * tunnelling - four times the step is comfortable - and it costs
+         * nothing: the panels are already the widest thing in the scene, so
+         * nobody can tell how deep they are.
+         */
+        thickness: 1.6,
         backdrop: band.backdrop
       })
     }
@@ -1350,6 +1623,264 @@ export type TreeDef = { x: number; z: number; yaw: number; scale: number }
  * the index, never of Math.random - because every client grows its own copy
  * of this forest and they have to match.
  */
+/**
+ * One plant on the jungle floor.
+ *
+ * `kind` picks which GLB it is; build.ts owns the paths. Kept as a plain
+ * string so this file stays free of the SDK and can be measured in Node.
+ */
+export type PlantDef = {
+  kind: 'fern' | 'plant'
+  x: number
+  /** Height above the ground. Absent means "on the floor". */
+  y?: number
+  z: number
+  yaw: number
+  scale: number
+}
+
+/**
+ * Scatters undergrowth between the clearing and the treeline.
+ *
+ * Deterministic - a fixed irrational stride rather than RNG - so the jungle is
+ * byte-identical on every machine and the fingerprint check can see it.
+ *
+ * Two rules it must obey, both learned the hard way by the fir ring above:
+ * the lobby deck is a SQUARE, so keeping clear of it is a box test and not a
+ * radius test, or plants grow through its corners; and nothing may stand
+ * inside the shaft the tower climbs, or a fern ends up embedded in a pad.
+ */
+/**
+ * Growth clinging to the tower itself.
+ *
+ * A spiral rather than a ring, because the climb is a spiral: whichever side
+ * of the trunk you are on, there is something growing within sight, and no
+ * two neighbours sit at the same height to read as a stripe.
+ *
+ * The radius follows the cone so the plants sit ON the bark instead of
+ * floating beside it, and the trunk's own taper does the rest - growth thins
+ * out towards the crown the way it does on a real tree.
+ */
+export function trunkGrowth(pads: Pad[]): PlantDef[] {
+  const BASE_RADIUS = 2.5
+  const TOP_RADIUS = 1.4
+  const out: PlantDef[] = []
+
+  /**
+   * "The nearest pad is at radius 6, so the bark is safe" was wrong, and the
+   * harness said so: SHAFT_MIN_RADIUS is where a pad's CENTRE may sit, and a
+   * 4 m pad centred there reaches inward to radius 4. Measured overlap was
+   * 0.36 m. So each plant is searched around the trunk instead of assumed.
+   */
+  const clear = (px: number, py: number, pz: number, spread: number) =>
+    pads.every(
+      (pad) =>
+        Math.abs(py - pad.y) > 3.2 ||
+        Math.hypot(px - pad.x, pz - pad.z) - pad.size / 2 - spread > 0.4
+    )
+
+  for (let i = 0; i < TRUNK_GROWTH_COUNT; i++) {
+    const t = (i + 0.5) / TRUNK_GROWTH_COUNT
+    const y = TRUNK_GROWTH_LOW + t * (TRUNK_GROWTH_HIGH - TRUNK_GROWTH_LOW)
+    const bark = BASE_RADIUS + (TOP_RADIUS - BASE_RADIUS) * (y / 80)
+    // Smaller than the floor growth and shrinking with height: an epiphyte is
+    // not a shrub, and anything large up here would read as a pad.
+    const scale = 2.8 - t * 0.9
+    const spread = scale * 0.7
+
+    // Golden angle for the first try, then walk around the trunk. A plant
+    // that cannot find a gap at its own height is dropped rather than forced.
+    for (let turn = 0; turn <= 11; turn++) {
+      const angle = i * 2.39996 + turn * 0.52
+      const x = CENTER_X + Math.cos(angle) * (bark + 0.35)
+      const z = CENTER_Z + Math.sin(angle) * (bark + 0.35)
+      if (!clear(x, y, z, spread)) continue
+
+      out.push({
+        kind: i % 2 === 0 ? 'plant' : 'fern',
+        x,
+        y,
+        z,
+        yaw: (angle * 180) / Math.PI,
+        scale
+      })
+      break
+    }
+  }
+
+  return out
+}
+
+/**
+ * The things standing on the lobby deck that a plant must not grow into.
+ *
+ * Circles, not boxes, and generous: this is a keep-out, so being a little too
+ * careful costs one plant and being a little too tight costs a fern sticking
+ * out of a noticeboard - which is what shipped, twice, before this existed.
+ */
+export function lobbyFixtures(): { x: number; z: number; radius: number }[] {
+  const sideX = -GATE_DIR_Z
+  const sideZ = GATE_DIR_X
+
+  const boardX = LOBBY_X + GATE_DIR_X * BOARD_FORWARD + sideX * BOARD_LATERAL
+  const boardZ = LOBBY_Z + GATE_DIR_Z * BOARD_FORWARD + sideZ * BOARD_LATERAL
+  const boardYaw = Math.atan2(-(LOBBY_SPAWN_X - boardX), -(LOBBY_SPAWN_Z - boardZ))
+  const acrossX = Math.cos(boardYaw)
+  const acrossZ = -Math.sin(boardYaw)
+
+  const out = [{ x: boardX, z: boardZ, radius: BOARD_W / 2 + 0.9 }]
+
+  // The two torches flanking the leaderboard.
+  for (const side of [1, -1]) {
+    const offset = side * (BOARD_W / 2 + 1.9)
+    out.push({ x: boardX + acrossX * offset, z: boardZ + acrossZ * offset, radius: 1.6 })
+  }
+
+  out.push({
+    x: LOBBY_X + GATE_DIR_X * LEGEND_FORWARD + sideX * LEGEND_LATERAL,
+    z: LOBBY_Z + GATE_DIR_Z * LEGEND_FORWARD + sideZ * LEGEND_LATERAL,
+    radius: BOARD_W / 2 + 0.9
+  })
+
+  return out
+}
+
+export function undergrowth(): PlantDef[] {
+  const plants: PlantDef[] = []
+  const halfLobby = LOBBY_SIZE / 2 + 1.2
+  const clearsLobby = (px: number, pz: number) =>
+    Math.abs(px - LOBBY_X) >= halfLobby || Math.abs(pz - LOBBY_Z) >= halfLobby
+
+  /**
+   * The firs occupy the same radii as the undergrowth, so a plant dropped on
+   * the spiral can land inside a trunk - measured, one did, at 0.68 m where
+   * the trunk needs 1.96. A fern sprouting out of a tree is the same class of
+   * mistake as a pad hanging over another one: nothing errors, it just looks
+   * broken to everybody who walks past it.
+   */
+  const fixtures = lobbyFixtures()
+  const clearsFixtures = (px: number, pz: number, spread: number) =>
+    fixtures.every((f) => Math.hypot(px - f.x, pz - f.z) >= f.radius + spread)
+
+  const trunks = treeLine()
+  const clearsTrunks = (px: number, pz: number) =>
+    trunks.every(
+      (t) =>
+        Math.hypot(px - t.x, pz - t.z) >=
+        TREE_TRUNK_RADIUS * (t.scale / TREE_SCALE) + 0.9
+    )
+
+  /**
+   * No bushes in the scatter, and the reason is measured, not aesthetic.
+   *
+   *   bush-green   2 primitives, 1100 tri  -> 18 of them cost 36 materials
+   *                                           and 19 800 triangles, which was
+   *                                           HALF the geometry in the scene
+   *   fern         1 primitive,   120 tri
+   *   junglePlant  1 primitive,   220 tri
+   *
+   * A fern is ten times cheaper per triangle and half the price in materials,
+   * so the same number of plants costs a third as much - which is how the
+   * jungle got denser and the budget went DOWN. Bushes are kept for the mid
+   * ring only, where their volume is doing a job nothing else can.
+   */
+  const kinds: PlantDef['kind'][] = ['fern', 'plant', 'fern', 'plant']
+
+  for (let i = 0; i < UNDERGROWTH_COUNT; i++) {
+    // Golden-angle spiral: even coverage without clumping, and no RNG.
+    const angle = i * 2.39996
+    const t = (i + 0.5) / UNDERGROWTH_COUNT
+    const radius = UNDERGROWTH_INNER + t * (UNDERGROWTH_OUTER - UNDERGROWTH_INNER)
+    const x = CENTER_X + Math.cos(angle) * radius
+    const z = CENTER_Z + Math.sin(angle) * radius
+
+    // Step outward until clear rather than dropping the plant: skipping left
+    // visible bald patches exactly where the firs are thickest, which is the
+    // one part of the ring a jungle most needs to be dense.
+    let px = x
+    let pz = z
+    let placed = clearsLobby(px, pz) && clearsTrunks(px, pz) && clearsFixtures(px, pz, 1.6)
+    for (let push = 1; push <= 3 && !placed; push++) {
+      px = CENTER_X + Math.cos(angle) * (radius + push * 1.6)
+      pz = CENTER_Z + Math.sin(angle) * (radius + push * 1.6)
+      placed = clearsLobby(px, pz) && clearsTrunks(px, pz) && clearsFixtures(px, pz, 1.6)
+    }
+    if (!placed) continue
+    if (Math.hypot(px - CENTER_X, pz - CENTER_Z) < SHAFT_MAX_RADIUS + 2) continue
+
+    const plantKind = kinds[i % kinds.length]
+    plants.push({
+      kind: plantKind,
+      x: px,
+      z: pz,
+      yaw: (i * 67) % 360,
+      // Big. The first pass used 1.5, which on a 1.4 m fern is knee height -
+      // beside 15 m firs it read as lawn trim, not jungle. These are 3-5 m
+      // across now: undergrowth you would have to push through, which is the
+      // whole idea. Still well under the firs, because the clearing has
+      // exactly one thing worth looking at and it is the tower.
+      scale: 3.4 + Math.sin(i * 1.7) * 0.7
+    })
+  }
+
+  // A ring of bigger bushes between the undergrowth and the firs, so the
+  // treeline has three heights in it instead of one. These were palms until
+  // the thumbnails came back purple - see props.ts.
+  for (let i = 0; i < PALM_COUNT; i++) {
+    const angle = (i / PALM_COUNT) * Math.PI * 2 + 0.6
+    const radius = PALM_RING_RADIUS + Math.sin(i * 2.399) * 2.0
+    const x = CENTER_X + Math.cos(angle) * radius
+    const z = CENTER_Z + Math.sin(angle) * radius
+    if (!clearsLobby(x, z) || !clearsTrunks(x, z) || !clearsFixtures(x, z, 2.2)) continue
+    if (Math.hypot(x - CENTER_X, z - CENTER_Z) < SHAFT_MAX_RADIUS + 2) continue
+    // A big junglePlant rather than a bush.
+    //
+    // Measured in the running client: five bushes cost 10 materials and 5 500
+    // triangles - the same triangles as twenty-five jungle plants - because
+    // bush-green carries two primitives and 1 100 triangles apiece. At the
+    // size this ring is drawn, the silhouette does the work, not the mesh,
+    // and the scene was sitting at exactly 400 of a 400 material soft cap.
+    plants.push({ kind: 'plant', x, z, yaw: (i * 83) % 360, scale: 4.6 })
+  }
+
+
+
+  // The deck fringe: growth pressed right up against the lobby, on the three
+  // sides that are not the gate. The gate corridor stays clear - a plant in
+  // the doorway of a timed run is an obstacle, not decoration.
+  const halfDeck = LOBBY_SIZE / 2 + FRINGE_MARGIN
+  for (let i = 0; i < FRINGE_COUNT; i++) {
+    const t = (i + 0.5) / FRINGE_COUNT
+    const angle = t * Math.PI * 2
+    // Square, not round: the deck is a box, so its fringe has to follow a box
+    // or it bunches at the corners and gaps on the flats.
+    const cos = Math.cos(angle)
+    const sin = Math.sin(angle)
+    const scale = 1 / Math.max(Math.abs(cos), Math.abs(sin))
+    const x = LOBBY_X + cos * scale * halfDeck
+    const z = LOBBY_Z + sin * scale * halfDeck
+
+    // Skip the mouth of the gate.
+    const towardGate = (x - LOBBY_X) * GATE_DIR_X + (z - LOBBY_Z) * GATE_DIR_Z
+    const across = Math.abs((x - LOBBY_X) * -GATE_DIR_Z + (z - LOBBY_Z) * GATE_DIR_X)
+    if (towardGate > 0 && across < GATE_WIDTH) continue
+
+    if (Math.hypot(x - CENTER_X, z - CENTER_Z) < SHAFT_MAX_RADIUS + 1) continue
+    if (!clearsTrunks(x, z)) continue
+    if (!clearsFixtures(x, z, 1.6)) continue
+
+    plants.push({
+      kind: i % 2 === 0 ? 'plant' : 'fern',
+      x,
+      z,
+      yaw: (i * 53) % 360,
+      scale: i % 5 === 0 ? 3.8 : 3.0
+    })
+  }
+
+  return plants
+}
+
 export function treeLine(): TreeDef[] {
   const trees: TreeDef[] = []
   const halfLobby = LOBBY_SIZE / 2 + TREE_TRUNK_RADIUS
