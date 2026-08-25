@@ -25,7 +25,8 @@ prices both arms in seconds on a sign. An **ante**: three crumbling pads out
 into open air to a coin that buys you a whole section, or a fall if you miss.
 A **tandem plate** that does not rise for one person.
 
-Eight coins hang off the route, each a jump out and a jump back from the pad it
+Sixteen coins hang off the route, each on its own 2.6 m ledge - a jump out, a
+landing, and a jump back from the pad it
 belongs to. Nothing needs them. They are kept per wallet for good rather than
 per climb, so a collection you are missing pieces of is a reason to come back
 for the ones you skipped while chasing a time.
@@ -41,7 +42,12 @@ the code rather than in a document.
 `REACH_BUDGET` and `MAX_STEP_RISE` are derived from `DIFFICULTY_BUDGET = 0.55`
 in `config.ts`, the cap is applied inside the placement function so no section
 can opt out of it, and the harness fails the build if a single hop exceeds it.
-Worst horizontal gap: 3.02 m of a 3.03 m budget. Worst rise: 1.10 m of 1.10 m.
+Worst horizontal gap: 4.79 m of a 4.79 m budget. Worst rise: 1.44 m of 1.44 m.
+That budget is a ceiling, not a setting - the curve decides where the tower
+actually reaches for it. The widest gap in the tower needs 0.43 s of the 0.73 s
+a double jump buys at a pessimistic 30 m/s2: 82% of the airtime available. That
+share was 59% and was opened out three times on request; 100% is the point at
+which the jump cannot be made at all.
 It started at 0.7 and came down after the first session on a real handset: a
 virtual joystick is not a keyboard, and the honest way to keep a climb hard is
 wider margins with tighter timing, not gaps that need keyboard precision.
@@ -74,10 +80,10 @@ limits and are the ones that decide whether the scene loads at all:
 | metric | ours | soft | hard |
 |---|---|---|---|
 | triangles | 28,985 | 1,000,000 | 1,200,000 |
-| entities | 400 | 4,800 | 6,000 |
-| meshes | 349 | 2,400 | 3,000 |
-| **materials** | **349** | **400** | **500** |
-| textures | 15 | 400 | 500 |
+| entities | 461 | 4,800 | 6,000 |
+| meshes | 382 | 2,400 | 3,000 |
+| **materials** | **382** | **400** | **500** |
+| textures | 14 | 400 | 500 |
 | colliders | 154 | 1,200 | 1,500 |
 | content size | 4.3 MB | 120 MB | 150 MB |
 
@@ -166,13 +172,13 @@ and what it does not.
 
 | criterion | where it stands |
 |---|---|
-| Mobile-first experience | Jump budget cut to 55% of ability after a handset playtest, four HUD lines and no panels, `screenInset: 'interactable'`, box colliders everywhere because collider-shape parity with the mobile client is an open item in Decentraland's own tracker |
+| Mobile-first experience | Five HUD lines and no panels, `screenInset: 'interactable'`, box colliders everywhere because collider-shape parity with the mobile client is an open item in Decentraland's own tracker. **The jump budget is no longer conservative**: it was cut to 55% of ability after a handset playtest and has since been opened out three times on the designer's instruction, and now sits at 82% of the airtime a double jump buys under a pessimistic 30 m/s2. The widest gap is 4.79 m; the narrowest is 2.68 m and the median 4.00 m, so the climb is uniformly demanding rather than easing in. **This has not been re-tested on a handset since** |
 | Social value | A plate that only rises for two people and a board that records the pair by name; a lever that freezes hazards for everyone while whoever holds it is not climbing; a live height ranking; every summit announced world-wide; the day's fastest run replaying as a ghost |
-| Mobile UX and onboarding | Taught in the world, not in a panel: the gate says what it does, a collar marks every checkpoint height, the plate and the lever say what they are waiting for and what they cost, a coin explains itself when you approach it. Checked line by line against Decentraland's own mobile UI guidance - see below. **Text size on a real handset is unverified** |
-| Performance | 176-180 fps and no hiccup frames on desktop; every budget inside the mobile limits. **No handset has run it** |
+| Mobile UX and onboarding | Taught in the world, not in a panel: the gate says what it does, a collar marks every checkpoint height, the plate and the lever say what they are waiting for and what they cost, a coin explains itself when you approach it, and a board in the lobby shows a live sample of every object beside its name. Checked line by line against Decentraland's own mobile UI guidance - see below. **Text size on a real handset is unverified** |
+| Performance | Every budget inside the mobile limits, measured in the running client rather than estimated: 392 materials of a 400 soft cap, 32 000 triangles of 1 000 000, 483 entities of 4 800, 177 colliders of 1 200. Materials are the tight one at 98%. **No handset has run it** |
 | Creativity | Forks that price both arms in seconds, an ante you can lose, and a pair board - none of which a solo obby can record |
-| Retention | A board that empties at midnight UTC, a ghost to chase, eight coins kept per wallet for good, a lifetime summit count |
-| Overall execution | 43 invariants, every one proved able to fail. **Not yet deployed, and the public repository is not up** - both are hard eligibility requirements |
+| Retention | A board that empties at midnight UTC, a ghost to chase, sixteen coins kept per wallet for good, a lifetime summit count, and a score - 100 a checkpoint, 300 a coin, 500 a summit - so a climber who never reaches the crown still leaves with a number that moved |
+| Overall execution | 70 invariants, every one proved able to fail, and several of them written the day a mechanic was found silently missing. Deployed and live at `imbanana.dcl.eth`. **The public repository is not up** - a hard eligibility requirement, still outstanding |
 
 The page is explicit that "every eligible project is tested directly in the
 Decentraland Mobile App", and that a simple polished mobile experience may
@@ -226,8 +232,8 @@ falling returns you to your last checkpoint       confirmed by accident
 summit claim, board and personal best             "THE CROWN 0:03.44"
 lifetime summit count, per wallet                 "Summit number 9."
 the burst at the crown                            fourteen shards, in frame
-eight optional coins                              COINS 8/8, hidden as taken
-the collection survives a restart                 still 8/8 after a reload
+twelve optional coins                             COINS 12/12, hidden as taken
+the collection survives a restart                 still 12/12 after a reload
 fork choice recorded from where the feet landed   "Zone 3 - took the bold arm -3.7s"
 ante: client claims, server validates, token granted
 ghost accepted, stored and replayed               a mote on the path, in frame
@@ -273,7 +279,7 @@ Still unverified, and honestly so:
 Three times during development a measurement was taken against coordinates
 computed before a layout change, and three times the result looked like a bug
 in the game rather than a stale target — seven checkpoints that appeared to
-have no floor, eight coins that appeared uncollectable. The game was right
+have no floor, coins that appeared uncollectable. The game was right
 every time.
 
 The tower's shape is now pinned by a fingerprint over every pad's position,
