@@ -87,9 +87,6 @@
     "nearbyVoiceChat": "enabled"
   },
   "creator": "",
-  "skyboxConfig": {
-    "fixedTime": 64800
-  },
   "landscapeTerrain": false,
   "source": {
     "origin": "creator-hub",
@@ -99,7 +96,7 @@
   "worldConfiguration": {
     "name": "imbanana.dcl.eth",
     "skyboxConfig": {
-      "fixedTime": 36000
+      "fixedTime": 57600
     }
   },
   "logsPermissions": [

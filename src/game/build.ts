@@ -6,6 +6,8 @@ import {
   Material,
   MeshCollider,
   MeshRenderer,
+  VisibilityComponent,
+  LightSource,
   TextAlignMode,
   TextShape,
   Transform
@@ -22,6 +24,8 @@ import {
   PAD_EMISSIVE,
   SHADOW_MAX_HEIGHT,
   CELEBRATION_SHARDS,
+  SIGN_RANGE,
+  SIGN_RISE,
   CHECKPOINT_EVERY_SECTIONS,
   TOWER_ZONES,
   FINISH_RADIUS,
@@ -37,7 +41,9 @@ import {
   MoverDef,
   Pad,
   SpinnerDef,
-  treeLine
+  treeLine,
+  undergrowth,
+  trunkGrowth
 } from './layout'
 import { accentRgb, BACKDROP_EMISSIVE, bodyRgb, MEANING, zoneRamp } from './palette'
 
@@ -273,12 +279,16 @@ function createPickups(layout: Layout, entities: Entity[]): BuiltPickup[] {
       rotation: Quaternion.fromEulerDegrees(90, 0, 0)
     })
     MeshRenderer.setCylinder(entity)
-    Billboard.create(entity, { billboardMode: BillboardMode.BM_Y })
+    // It used to be a billboard, which held it permanently flat-on to the
+    // camera: a gold circle pasted on the world, dead still, easy to read as
+    // part of the backdrop. A coin that turns is the oldest pickup signal
+    // there is, and the edge-on moment is what makes it a coin and not a dot.
     Material.setPbrMaterial(entity, {
       albedoColor: CP_ALBEDO,
       emissiveColor: Color3.create(CP_ALBEDO.r, CP_ALBEDO.g, CP_ALBEDO.b),
-      emissiveIntensity: PAD_EMISSIVE.goal * 1.4,
-      roughness: 0.3,
+      emissiveIntensity: PAD_EMISSIVE.goal * 2.2,
+      roughness: 0.25,
+      metallic: 0.6,
       castShadows: false
     })
     return { entity, def, taken: false }
@@ -380,16 +390,15 @@ export function buildWorld(layout: Layout): World {
 
     if (pad.kind === 'checkpoint') {
 
-      // A teal crystal on every ring. Cyan already means safe here, and this
-      // is the same statement in an object: 15 triangles, animated, and it
-      // marks the one pad on the climb that gives your progress back.
-      entities.push(
-        placeProp(MODELS.crystalSafe, {
-          position: Vector3.create(pad.x, pad.y + PAD_TOP + 0.1, pad.z),
-          scale: 0.75,
-          clip: CLIPS.crystalSafe
-        })
-      )
+      // No crystal here any more.
+      //
+      // It said "safe" a second time on a pad that is already round, already
+      // cyan, and already wearing a collar - and it said it in the shape of a
+      // small glowing object sitting on the floor, which in every game ever
+      // made means PICK ME UP. Two different players asked what it was for
+      // and one tried to collect it. A decoration that has to be explained on
+      // a signboard has already lost; redundancy that actively misleads is
+      // worse than no decoration at all.
 
       const marker = createCheckpointMarker(pad, checkpoints.length)
       entities.push(marker.ring, marker.column, marker.label)
@@ -461,6 +470,7 @@ export function buildWorld(layout: Layout): World {
   const shortcut = buildShortcut(layout, entities)
   createBands(entities)
   createTreeLine(entities)
+  createUndergrowth(entities, layout.pads)
   const forks = buildForks(layout, entities)
   const plate = buildPlate(layout, entities)
   const coin = buildCoin(layout, entities)
@@ -479,7 +489,14 @@ export function buildWorld(layout: Layout): World {
     plate,
     coin,
     pickups: createPickups(layout, entities),
-    celebration: createCelebration(layout.pads[layout.pads.length - 1], entities),
+    // BY KIND, not by index. The crown is marked before the coin ledges are
+    // appended, so the last pad in the array is now a 2.6 m perch somewhere
+    // in the middle of the climb - and the finish burst was parked on it.
+    // Nothing failed loudly; the fireworks simply went off in the wrong place.
+    celebration: createCelebration(
+      layout.pads.filter((pad) => pad.kind === 'finish')[0] ?? layout.pads[layout.pads.length - 1],
+      entities
+    ),
     entities
   }
 }
@@ -550,18 +567,10 @@ function buildCoin(layout: Layout, entities: Entity[]): BuiltCoin | null {
     if (blob) entities.push(blob)
   }
 
-  // The coin itself stays a primitive - it has to read as gold and nothing
-  // else - but the pads leading to it get an orange crystal apiece, which is
-  // the unstable colour saying the same thing a second way.
-  for (const pad of def.route) {
-    entities.push(
-      placeProp(MODELS.crystalUnstable, {
-        position: Vector3.create(pad.x, pad.y + 0.35, pad.z),
-        scale: 0.55,
-        clip: CLIPS.crystalUnstable
-      })
-    )
-  }
+  // The detour pads used to carry an orange crystal apiece. Same verdict as
+  // the teal ones: the pads are already rust orange, so the crystal repeated
+  // what the pad said while looking like the coin at the end of the detour.
+  // Three fake collectibles guarding one real one.
 
   const entity = engine.addEntity()
   entities.push(entity)
@@ -692,41 +701,144 @@ function createChoiceEdge(pad: Pad): Entity {
 }
 
 /** Two lines over an arm: what it is, and what it costs. */
-function routeSign(pad: Pad, title: string, cost: string, tone: Color3): Entity[] {
+/**
+ * Signs that are only there when the choice is.
+ *
+ * They are billboards, so they turn to face you from anywhere - which meant a
+ * player standing in the lobby read "SAFE / 4 pads no drop" and "BOLD / 2 pads
+ * -3.7s" floating over the treeline fifty metres from the fork they describe.
+ * Out of context that is not information, it is clutter, and the first person
+ * to play the deployed build said exactly that.
+ */
+export const routeSigns: { entity: Entity; x: number; y: number; z: number }[] = []
+
+/**
+ * A sign: a physical plate with words ON it, not words floating in the air.
+ *
+ * Every label in this tower used to be a bare TextShape hanging in space.
+ * Against the near-black backdrop that reads as debug output, not signage -
+ * the first player asked, twice, what the text was even for. Words need a
+ * surface before a brain files them as "a sign somebody put here".
+ *
+ * The plate carries the Billboard and the lines are its children, so the
+ * words turn with it and stay in front. Billboard turns local +Z at the
+ * camera - which is why a bare billboarded TextShape reads correctly in the
+ * first place - so the children sit at positive z.
+ */
+const SIGN_INK = Color4.create(0.09, 0.10, 0.15, 1)
+
+function signPost(
+  at: { x: number; y: number; z: number },
+  lines: { text: string; size: number; colour: Color4 }[],
+  entities: Entity[]
+) {
+  const longest = lines.reduce((n, l) => Math.max(n, l.text.length), 0)
+  // A character sits at roughly half its font size across, and DCL font sizes
+  // are tenths of a metre, so 0.14 per character leaves a margin either side.
+  const width = Math.min(7.0, Math.max(2.2, longest * 0.125 + 0.5))
+  const height = lines.length * 0.72 + 0.28
+
   const made: Entity[] = []
 
-  const head = engine.addEntity()
-  Transform.create(head, { position: Vector3.create(pad.x, pad.y + 3.4, pad.z) })
-  TextShape.create(head, {
-    text: title,
-    fontSize: 2.6,
-    textColor: Color4.create(tone.r, tone.g, tone.b, 1),
-    outlineColor: Color4.Black(),
-    outlineWidth: 0.3,
-    textAlign: TextAlignMode.TAM_MIDDLE_CENTER
+  const plate = engine.addEntity()
+  entities.push(plate)
+  made.push(plate)
+  Transform.create(plate, {
+    position: Vector3.create(at.x, at.y, at.z),
+    scale: Vector3.create(width, height, 0.1)
   })
-  Billboard.create(head, { billboardMode: BillboardMode.BM_Y })
-  made.push(head)
-
-  // The cost line is the half a player is actually deciding on, and it was the
-  // half that could not be read: pale lilac at 1.7 against a near-black wall,
-  // which is the background it hangs in front of for most of the climb. White
-  // on a black outline is the only pairing that survives every background, and
-  // it is bigger, because the number is the point of the sign.
-  const line = engine.addEntity()
-  Transform.create(line, { position: Vector3.create(pad.x, pad.y + 2.4, pad.z) })
-  TextShape.create(line, {
-    text: cost,
-    fontSize: 2.1,
-    textColor: Color4.White(),
-    outlineColor: Color4.Black(),
-    outlineWidth: 0.35,
-    textAlign: TextAlignMode.TAM_MIDDLE_CENTER
+  MeshRenderer.setBox(plate)
+  Material.setPbrMaterial(plate, {
+    albedoColor: SIGN_INK,
+    metallic: 0,
+    roughness: 0.95,
+    castShadows: false
   })
-  Billboard.create(line, { billboardMode: BillboardMode.BM_Y })
-  made.push(line)
+  Billboard.create(plate, { billboardMode: BillboardMode.BM_Y })
 
+  const top = (lines.length - 1) / 2
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const label = engine.addEntity()
+    entities.push(label)
+    made.push(label)
+    Transform.create(label, {
+      parent: plate,
+      // Local units: the parent is scaled, so divide out its scale or the
+      // text inherits the plate's stretch and lands off the board.
+      //
+      // NEGATIVE z. Billboard turns the entity's local -Z towards the camera,
+      // not +Z - established by putting the text at +0.6, then +2.2, and
+      // watching an empty plate render both times. The plate is 0.1 m thick
+      // so its face sits at local 0.5; -2.2 lands the words 0.22 m clear of
+      // it, which is room for their own outline as well.
+      position: Vector3.create(0, (top - i) * (0.78 / height), -2.2),
+      scale: Vector3.create(1 / width, 1 / height, 1)
+    })
+    TextShape.create(label, {
+      text: line.text,
+      fontSize: line.size,
+      textColor: line.colour,
+      outlineColor: Color4.Black(),
+      outlineWidth: 0.3,
+      textAlign: TextAlignMode.TAM_MIDDLE_CENTER
+    })
+  }
+
+  // Every piece gets its OWN VisibilityComponent, and every piece is
+  // registered. propagateToChildren was tried first and does not reach the
+  // TextShape children in this client: the plate vanished and the words kept
+  // hanging in the air, which is precisely the thing this sign exists to
+  // stop. Measured in-world - player 26 m from a lever whose label was still
+  // legible, with no plate behind it.
+  for (const piece of made) {
+    VisibilityComponent.create(piece, { visible: false })
+    routeSigns.push({ entity: piece, x: at.x, y: at.y, z: at.z })
+  }
+}
+
+function routeSign(pad: Pad, title: string, cost: string, tone: Color3): Entity[] {
+  const made: Entity[] = []
+  signPost(
+    { x: pad.x, y: pad.y + 2.9, z: pad.z },
+    [
+      { text: title, size: 2.4, colour: Color4.create(tone.r, tone.g, tone.b, 1) },
+      // The cost line is the half a player is actually deciding on, so it is
+      // white on black: the only pairing that survives every background.
+      { text: cost, size: 1.9, colour: Color4.White() }
+    ],
+    made
+  )
   return made
+}
+
+/**
+ * Shows a route sign only to somebody close enough to be making the choice.
+ *
+ * Distance is the whole mechanism: the sign describes a decision, and a
+ * decision you are not standing in front of is noise.
+ */
+export function showNearbySigns(player: Vector3) {
+  for (const sign of routeSigns) {
+    /**
+     * One WEIGHTED distance, not two independent thresholds.
+     *
+     * Separate horizontal and vertical limits let a sign qualify on a
+     * technicality: the lever's label floats 2.2 m above its pad, so standing
+     * five metres higher and eight metres away still put it inside both
+     * windows and it lit up in the middle of the piston hall. Height counts
+     * SIGN_RISE times harder than width here because the tower is vertical -
+     * a sign one floor up is describing somebody else's problem.
+     */
+    const lift = (player.y - sign.y) * SIGN_RISE
+    const near =
+      Math.sqrt(
+        (player.x - sign.x) ** 2 + (player.z - sign.z) ** 2 + lift ** 2
+      ) < SIGN_RANGE
+
+    const visibility = VisibilityComponent.getMutableOrNull(sign.entity)
+    if (visibility && visibility.visible !== near) visibility.visible = near
+  }
 }
 
 function buildShortcut(layout: Layout, entities: Entity[]): BuiltShortcut | null {
@@ -761,19 +873,7 @@ function buildShortcut(layout: Layout, entities: Entity[]): BuiltShortcut | null
  * standing on it.
  */
 function labelPad(at: { x: number; y: number; z: number }, text: string, entities: Entity[]) {
-  const sign = engine.addEntity()
-  entities.push(sign)
-
-  Transform.create(sign, { position: Vector3.create(at.x, at.y + 2.2, at.z) })
-  TextShape.create(sign, {
-    text,
-    fontSize: 2.6,
-    textColor: CP_ALBEDO,
-    outlineColor: Color4.Black(),
-    outlineWidth: 0.25,
-    textAlign: TextAlignMode.TAM_MIDDLE_CENTER
-  })
-  Billboard.create(sign, { billboardMode: BillboardMode.BM_Y })
+  signPost({ x: at.x, y: at.y + 2.2, z: at.z }, [{ text, size: 2.1, colour: CP_ALBEDO }], entities)
 }
 
 function createPressurePad(at: { x: number; y: number; z: number }, entities: Entity[]): Entity {
@@ -968,6 +1068,14 @@ function createBands(entities: Entity[]) {
       scale: Vector3.create(panel.thickness, panel.height, panel.length)
     })
     MeshRenderer.setBox(entity)
+    // The boundary now BOUNDS.
+    //
+    // These panels had a renderer and nothing else, so the wall around the
+    // whole scene was a painting: measured in-world, a six-second run from
+    // the spawn put the player at x = -3, outside the 0..80 parcel box
+    // entirely. A boundary that does not stop anybody is scenery pretending
+    // to be a rule, and it was the first thing asked for about this scene.
+    MeshCollider.setBox(entity)
     // Self-lit at low intensity. A vertical panel facing inward catches no
     // sky, so an unlit one renders black and the band reads as a hole
     // rather than as distance. The emissive is the band colour itself, so
@@ -998,6 +1106,34 @@ function createBands(entities: Entity[]) {
  * from the index, never from Math.random, or two clients grow different
  * forests.
  */
+/**
+ * The jungle floor.
+ *
+ * Geometry comes from layout.ts so it can be counted in Node; this function
+ * only decides which GLB each kind maps to. Nothing here is solid - a player
+ * who can get stuck on a fern beside a parkour tower has found a bug, not a
+ * plant - and nothing casts, because 30-odd shadow casters ringing a clearing
+ * is what turned the grass black the last time this scene grew a forest.
+ */
+function createUndergrowth(entities: Entity[], pads: Pad[]) {
+  const source = {
+    fern: MODELS.fern,
+    plant: MODELS.junglePlant
+  }
+
+  for (const plant of [...undergrowth(), ...trunkGrowth(pads)]) {
+    entities.push(
+      placeProp(source[plant.kind], {
+        position: Vector3.create(plant.x, plant.y ?? 0.06, plant.z),
+        yaw: plant.yaw,
+        scale: plant.scale,
+        // Only the fern ships a clip, and it is the one that reads as alive.
+        clip: plant.kind === 'fern' ? CLIPS.fern : undefined
+      })
+    )
+  }
+}
+
 function createTreeLine(entities: Entity[]) {
   for (const tree of treeLine()) {
     entities.push(
@@ -1109,17 +1245,25 @@ function createCheckpointMarker(pad: Pad, number: number) {
   // at any real width it renders as a flat grey slab instead of a light shaft.
   const column = engine.addEntity()
   Transform.create(column, {
-    position: Vector3.create(pad.x, pad.y + 3.6, pad.z),
-    scale: Vector3.create(0.4, 6.6, 0.4)
+    position: Vector3.create(pad.x, pad.y + 2.6, pad.z),
+    scale: Vector3.create(1.5, 4.6, 1.5)
   })
-  MeshRenderer.setCylinder(column)
+  // A CONE, wide at the pad and closed at the top, not a stick.
+  //
+  // It was a 0.4 m cylinder 6.6 m tall at 42% alpha, and from any distance
+  // that reads as a pale pole somebody left standing on the checkpoint - the
+  // exact opposite of a shaft of light. A beam of light is widest where it
+  // lands and fades as it rises, so the geometry now says that instead of
+  // relying on the alpha to imply it. Shorter, too: 6.6 m of it was taller
+  // than the gap to the next pad and cluttered the climb above.
+  MeshRenderer.setCylinder(column, 0.06, 0.5)
   // Cyan albedo under a gold emissive at intensity 5 came out white, which is
   // two rule breaks in one material: cyan means safe ground everywhere else in
   // this scene, and white is what everything turns into when the emissive is
   // set by feel. Gold, at the level the collars and the landing use, because
   // all four of them are saying the same word.
   Material.setPbrMaterial(column, {
-    albedoColor: Color4.create(CP_ALBEDO.r, CP_ALBEDO.g, CP_ALBEDO.b, 0.42),
+    albedoColor: Color4.create(CP_ALBEDO.r, CP_ALBEDO.g, CP_ALBEDO.b, 0.24),
     emissiveColor: CP_EMISSIVE,
     emissiveIntensity: PAD_EMISSIVE.goal * 2,
     castShadows: false
@@ -1302,6 +1446,25 @@ export function createCelebration(pad: Pad, entities: Entity[]): Entity[] {
 /** Where a shard waits between summits. Far enough down to never be seen. */
 export const PARKED_Y = -60
 
+/** The turning ring over the crown, driven from the client's frame loop. */
+export let crownHalo: Entity | null = null
+
+/** The greeter's line. Dark until somebody actually finishes. */
+export let greeterLine: Entity | null = null
+
+/**
+ * Shows or hides what the owl says.
+ *
+ * Called on a completed run and on the reset that follows it, so the summit
+ * is silent for everybody who has not earned the line yet - including the
+ * climber standing on it a second time.
+ */
+export function setGreeting(on: boolean) {
+  if (!greeterLine) return
+  const visibility = VisibilityComponent.getMutableOrNull(greeterLine)
+  if (visibility) visibility.visible = on
+}
+
 function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
   const made: Entity[] = []
 
@@ -1317,7 +1480,22 @@ function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
   const rotation = Quaternion.fromEulerDegrees(0, yaw, 0)
   const width = Math.max(pad.size, 3.2)
   const deck = pad.y + PAD_TOP
-  const half = width / 2
+
+  /**
+   * Where the columns stand, measured from the centre.
+   *
+   * It used to be width / 2 - the slab's own radius - which put each plinth's
+   * CENTRE on the rim and left its outer 0.75 m hanging over nothing. On a
+   * square that reads as flush; the crown is a cylinder, so the floor curves
+   * away underneath and the arch appears to float.
+   *
+   * The plinth is 1.5 m across, so its half-width plus a margin comes off the
+   * radius and the whole footing lands on stone.
+   */
+  const PLINTH_HALF = 0.75
+  const half = Math.max(1.6, pad.size / 2 - PLINTH_HALF - 0.3)
+  /** Distance between the two column centres - what the lintel has to span. */
+  const span = half * 2
 
   const STONE = Color4.create(0.6, 0.55, 0.45, 1)
   const STONE_DARK = Color4.create(0.4, 0.36, 0.3, 1)
@@ -1367,16 +1545,89 @@ function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
     gold(at(side - direction * 0.55, 2.7), Vector3.create(0.12, 3.6, 0.45))
   }
 
-  block(at(0, 5.5), Vector3.create(width + 2.4, 0.85, 1.1), STONE)
-  block(at(0, 5), Vector3.create(width + 1.7, 0.2, 0.9), STONE_DARK)
-  gold(at(0, 4.86, 0.45), Vector3.create(width + 1.2, 0.1, 0.12), 4)
+  // The lintel spans the COLUMNS, not the slab. Sized off the slab it
+  // overhung the posts by two metres on each side and read as a shelf.
+  block(at(0, 5.5), Vector3.create(span + 1.7, 0.85, 1.1), STONE)
+  block(at(0, 5), Vector3.create(span + 1.1, 0.2, 0.9), STONE_DARK)
+  gold(at(0, 4.86, 0.45), Vector3.create(span + 0.6, 0.1, 0.12), 4)
+
+  // Two banners off the lintel.
+  //
+  // The crown had the geometry of a monument and none of the ceremony: a
+  // slab, two posts, a beam. Cloth is what tells you a place was DRESSED for
+  // an occasion rather than merely built, and it is two boxes.
+  //
+  // One in each of the two colours a player has been reading for the whole
+  // climb - the cyan that meant safe ground and the gold that meant the goal.
+  // Nothing new to learn at the top.
+  for (const direction of [-1, 1]) {
+    const banner = engine.addEntity()
+    Transform.create(banner, {
+      position: at(direction * (half - 0.55), 3.35, 0.5),
+      rotation,
+      scale: Vector3.create(1.15, 3.5, 0.06)
+    })
+    MeshRenderer.setBox(banner)
+    Material.setPbrMaterial(banner, {
+      albedoColor: direction < 0 ? Color4.fromHexString(MEANING.safe) : FINISH_ALBEDO,
+      emissiveColor: direction < 0 ? Color3.fromHexString(MEANING.safe) : FINISH_EMISSIVE,
+      emissiveIntensity: 0.35,
+      roughness: 0.95,
+      castShadows: false
+    })
+    made.push(banner)
+  }
+
+  // A stepped dais under the slab.
+  //
+  // Seen from below the crown was a disc hanging in the air, identical in
+  // silhouette to every other pad in the tower and merely wider. Two tiers
+  // under it cost two boxes and change what the shape MEANS: a slab you land
+  // on becomes a plinth something stands on, and the thing standing on it is
+  // whoever got there.
+  //
+  // Widths stay inside the arch's own footprint so nothing new overhangs the
+  // climb below.
+  for (const tier of [
+    { radius: pad.size * 1.1, drop: 0.62, colour: STONE },
+    { radius: pad.size * 1.22, drop: 1.18, colour: STONE_DARK }
+  ]) {
+    const step = engine.addEntity()
+    Transform.create(step, {
+      position: Vector3.create(pad.x, pad.y - tier.drop, pad.z),
+      scale: Vector3.create(tier.radius, 0.48, tier.radius)
+    })
+    MeshRenderer.setCylinder(step)
+    Material.setPbrMaterial(step, { albedoColor: tier.colour, roughness: 0.9 })
+    made.push(step)
+  }
+
+  // A warm light under the arch.
+  //
+  // Costs nothing against the material budget - LightSource is not a renderer
+  // - and it is the one place in the scene where light can do a job emissive
+  // cannot: the arch is STONE, so it has no glow of its own, and a lamp under
+  // the lintel is what makes the columns and the dais read as lit rather than
+  // as pale. Absent on mobile, like every dynamic light here, so the crown
+  // still has to work on its gold and its banners alone.
+  const crownLamp = engine.addEntity()
+  Transform.create(crownLamp, { position: at(0, 4.2) })
+  LightSource.create(crownLamp, {
+    type: LightSource.Type.Point({}),
+    color: Color3.create(1, 0.82, 0.5),
+    intensity: 14000,
+    range: 22
+  })
+  made.push(crownLamp)
 
   // The ring above: the one shape here that exists purely to be seen from the
-  // yard, seventy metres down.
+  // yard, seventy metres down. It turns - slowly, and for free, because a
+  // rotation costs no material and a still hoop reads as scaffolding.
   const ring = engine.addEntity()
+  crownHalo = ring
   Transform.create(ring, {
     position: at(0, 6.9),
-    scale: Vector3.create(width + 1.2, 0.28, width + 1.2)
+    scale: Vector3.create(pad.size * 0.92, 0.28, pad.size * 0.92)
   })
   MeshRenderer.setCylinder(ring, 0.5, 0.5)
   Material.setPbrMaterial(ring, {
@@ -1388,7 +1639,12 @@ function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
 
   const label = engine.addEntity()
   made.push(label)
-  Transform.create(label, { position: at(0, 4.4, -0.62), rotation })
+  // Squared to the arch, it read correctly on the approach and MIRRORED from
+  // anywhere else - and the crown is the one pad in the tower where people
+  // stand still and turn around. Billboarded it costs nothing extra and is
+  // never backwards.
+  Transform.create(label, { position: at(0, 4.4, -0.62) })
+  Billboard.create(label, { billboardMode: BillboardMode.BM_Y })
   TextShape.create(label, {
     text: 'THE CROWN',
     fontSize: 2.6,
@@ -1415,14 +1671,44 @@ function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
         pad.z + dirZ * (half - 0.3)
       ),
       yaw: yaw + 180,
-      // 2.36 m of wingspan: at 1.1 and a metre in from the edge it stood
-      // inside the space the climber lands on.
-      scale: 0.85,
+      // 2.36 m of wingspan at scale 1. It was 0.85 - sized down when the crown
+      // was a 5.2 m slab and the bird crowded the space a climber lands in.
+      // The slab is 9 m now, and at 0.85 the greeter read as a sparrow at the
+      // far end of a plaza. 1.5 gives it 3.5 m of wingspan: unmistakably the
+      // thing waiting for you, and still clear of where you touch down.
+      scale: 1.5,
       solid: true,
       hasColliderMeshes: true,
       clip: 'idle'
     })
   )
+
+  // What the greeter says, hanging over its head and dark until you finish.
+  //
+  // A character that congratulates you was asked for and half-built: the bird
+  // arrived, the congratulation never did, so it stood at the summit in
+  // silence like scenery. One TextShape, hidden on the same VisibilityComponent
+  // the route signs use, switched on by the client the moment a run completes.
+  const greeting = engine.addEntity()
+  Transform.create(greeting, {
+    position: Vector3.create(
+      pad.x + dirX * (half - 0.3),
+      deck + 3.5,
+      pad.z + dirZ * (half - 0.3)
+    )
+  })
+  TextShape.create(greeting, {
+    text: 'YOU MADE IT TO THE TOP',
+    fontSize: 3.4,
+    textColor: FINISH_ALBEDO,
+    outlineColor: Color4.Black(),
+    outlineWidth: 0.3,
+    textAlign: TextAlignMode.TAM_MIDDLE_CENTER
+  })
+  Billboard.create(greeting, { billboardMode: BillboardMode.BM_Y })
+  VisibilityComponent.create(greeting, { visible: false })
+  made.push(greeting)
+  greeterLine = greeting
 
   return made
 }
