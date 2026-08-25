@@ -71,9 +71,25 @@ const countdown = (seconds: number) => {
   return Math.floor(whole / 60) + ':' + (rest < 10 ? '0' + rest : rest)
 }
 
+/**
+ * True while the summit panel owns the screen.
+ *
+ * On a phone the status block is top-CENTRE - moved there so it clears the
+ * client's own left-hand controls - and the summit panel is centred too, so
+ * at the one moment that matters they printed straight through each other:
+ * COINS, SCORE and the co-op line all showing through THE CROWN, with the
+ * record announcement laid over the top of both. Desktop never showed it
+ * because the status block lives in the top-left corner there.
+ *
+ * The panel already carries the time, the falls and both scores, so nothing
+ * is lost by giving it the screen alone.
+ */
+const summitShowing = () =>
+  run.phase === Phase.RoundDone || run.phase === Phase.AllDone
+
 const uiRoot = () => (
   <UiEntity uiTransform={{ width: '100%', height: '100%', positionType: 'absolute' }}>
-    {hud()}
+    {!(compact && summitShowing()) && hud()}
     {/*
       The ranking earns its place only when there is somebody to be ranked
       against. Alone it read "HIGHEST NOW / 1. yourname 2m" - a scoreboard
@@ -92,9 +108,9 @@ const uiRoot = () => (
       screen. The same magic-offset mistake as the ranking, in the same file.
     */}
     {!compact && !run.serverAlive && wakingBanner()}
-    {run.announcement !== '' && announcementBanner()}
+    {run.announcement !== '' && !(compact && summitShowing()) && announcementBanner()}
     {run.prompt !== '' && promptBanner()}
-    {(run.phase === Phase.RoundDone || run.phase === Phase.AllDone) && clearedPanel()}
+    {summitShowing() && clearedPanel()}
   </UiEntity>
 )
 
