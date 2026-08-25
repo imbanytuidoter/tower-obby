@@ -789,6 +789,23 @@ export const REACH_BUDGET = REACH_ABILITY * DIFFICULTY_BUDGET
  * Nobody ever measured the narrowest, which is the one you can see.
  */
 export const MIN_GAP = 4.0
+
+/**
+ * The floor at the FOOT of the tower.
+ *
+ * A single flat MIN_GAP fixed the thing it was meant to fix - pads sitting
+ * almost on top of each other - and broke something else on the way: with the
+ * floor at 4.0 and the ceiling at 4.79, the median hop came out at exactly
+ * 4.00 and the first zone became as demanding as the last. A tower that opens
+ * at its own maximum has no ramp, and this is a MOBILE buildathon where a
+ * judge arrives on a phone, alone, with no idea what the controls do.
+ *
+ * So the floor climbs with the curve, the same way everything else here does.
+ * At the bottom it is 2.9 - which is still nearly twice the 1.63 m that
+ * started this, and against 3.3 m pads it reads as a real gap rather than
+ * slabs touching - and by the crown it is the full 4.0.
+ */
+export const MIN_GAP_LOW = 2.9
 /** 70% of doubleJumpHeight. Was 1.6, which is 80% and broke the brief. */
 export const MAX_STEP_RISE = DOUBLE_JUMP_HEIGHT * DIFFICULTY_BUDGET
 
@@ -850,6 +867,8 @@ export function curve(progress: number) {
     // the gaps go while the tower is still a climb rather than a lottery:
     // 1.31x on the widest gap, 1.27x at the bottom, 72% of the airtime.
     jumpGap: lerp(2.2, 4.6),
+    /** The shortest hop allowed at this height. See MIN_GAP_LOW. */
+    minGap: lerp(MIN_GAP_LOW, MIN_GAP),
     rise: lerp(0.75, 1.08),
     // Slowed on request. Every knob in this block is applied AFTER the random
     // draws that place pads, so turning them changes how hard the tower is to

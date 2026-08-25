@@ -1204,7 +1204,7 @@ function findLeverSpot(
         for (const reach of [
           c.jumpGap + size * 1.4,
           c.jumpGap + size,
-          MIN_GAP + (guarded.size + size) / 2,
+          c.minGap + (guarded.size + size) / 2,
           c.jumpGap + size * 0.75
         ]) {
           const side = cursor.angle + Math.PI / 2 + turn
@@ -1359,7 +1359,7 @@ function hop(
   // twin (2.88 m) without making it unfair on a thumbstick.
   // Clamped at BOTH ends. The ceiling has been here for a long time; the
   // floor had not, which is why a section could quietly ask for a 1.76 m hop.
-  const gap = Math.min(Math.max(c.jumpGap * (opts.gapScale ?? 1), MIN_GAP), REACH_BUDGET)
+  const gap = Math.min(Math.max(c.jumpGap * (opts.gapScale ?? 1), c.minGap), REACH_BUDGET)
   // Edge to edge is the jump; centre to centre has to include both half-pads.
   const distance = gap + previous.size / 2 + size / 2
 

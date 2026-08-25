@@ -745,14 +745,45 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   }
   gaps.sort((a, b) => a - b)
   const median = gaps[Math.floor(gaps.length / 2)]
-  const cramped = gaps.filter((g) => g < 3).length
 
-  note(gaps[0] >= 2.5, 'no hop is shorter than a real jump',
+  /**
+   * The RAMP, not a flat floor.
+   *
+   * These three used to assert one number for the whole tower, because the
+   * gap floor was one number. It fixed pads sitting on top of each other and
+   * cost the difficulty curve: floor 4.0 against a 4.79 ceiling put the
+   * median at exactly 4.00 and made the first zone as hard as the last. On a
+   * buildathon judged on phones, where a player arrives alone and unpractised,
+   * a tower that opens at its own maximum is the wrong tower.
+   *
+   * So the floor climbs with the curve and these checks follow it: the bottom
+   * has to be gentler than the top, and both ends have to stay inside the
+   * physical ceiling.
+   */
+  const low = []
+  const high = []
+  for (const pad of tower.pads) {
+    if (pad.detour || pad.kind === 'finish') continue
+    const from = tower.pads[pad.fromIndex]
+    if (!from) continue
+    const gap = Math.hypot(pad.x - from.x, pad.z - from.z) - pad.size / 2 - from.size / 2
+    if (pad.y < 20) low.push(gap)
+    else if (pad.y > 55) high.push(gap)
+  }
+  low.sort((a, b) => a - b)
+  high.sort((a, b) => a - b)
+  const lowMedian = low[Math.floor(low.length / 2)]
+  const highMedian = high[Math.floor(high.length / 2)]
+
+  note(gaps[0] >= cfg.MIN_GAP_LOW - 0.6, 'no hop is absurdly short',
     'narrowest ' + gaps[0].toFixed(2) + ' m')
-  note(cramped <= 3, 'the tower is not a pile of slabs',
-    cramped + ' of ' + gaps.length + ' hops under 3 m')
-  note(median >= cfg.MIN_GAP - 0.05, 'the typical hop is a full jump',
-    'median ' + median.toFixed(2) + ' m against a ' + cfg.MIN_GAP + ' m floor')
+  note(gaps[0] >= 2.0, 'the tower is not a pile of slabs',
+    'narrowest ' + gaps[0].toFixed(2) + ' m, ' +
+    gaps.filter((g) => g < 2.5).length + ' hops under 2.5 m')
+  note(highMedian > lowMedian + 1.0, 'the climb gets harder as it goes up',
+    'bottom median ' + lowMedian.toFixed(2) + ' m, top median ' + highMedian.toFixed(2) + ' m')
+  note(median >= cfg.MIN_GAP_LOW, 'the typical hop is still a jump',
+    'median ' + median.toFixed(2) + ' m against a ' + cfg.MIN_GAP_LOW + ' m opening floor')
 }
 
 // Coins may not bunch.
@@ -1030,7 +1061,10 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   //      which is what a player sees, and what every number reported here
   //      had been quietly ignoring. MIN_GAP 4.0, pads narrowed to 3.3-2.3,
   //      lever pads routed through the same floor, coins spaced 11 m apart.
-  const PINNED = '19fccd58'
+  //  10. the gap floor became a RAMP. A flat 4.0 against a 4.79 ceiling made
+  //      the first zone as hard as the last; it is 2.9 at the foot now and
+  //      4.0 at the crown, so the tower teaches before it tests.
+  const PINNED = 'a9e7fb66'
   note(fingerprint === PINNED, 'the tower is the tower the records were set on',
     'fingerprint ' + fingerprint)
 }
@@ -1045,7 +1079,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 70
+const MIN_CHECKS = 71
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 
