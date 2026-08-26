@@ -229,6 +229,23 @@ const FINISH_ALBEDO = Color4.fromHexString('#FFD23FFF')
 const FINISH_EMISSIVE = Color3.create(1, 0.7, 0.1)
 const CP_ALBEDO = Color4.fromHexString('#FFD23FFF')
 const CP_EMISSIVE = Color3.create(1, 0.72, 0.15)
+/**
+ * The checkpoint ring wears the checkpoint's OWN colour, not the coin's.
+ *
+ * It was CP_ALBEDO - the same gold the pickups are painted with, and the same
+ * gold MEANING.goal reserves for the crown. So every checkpoint in the tower
+ * wore the colour this scene spends seventy metres teaching means "reward",
+ * and the legend board says checkpoints are round and CYAN. A player asked
+ * what the yellow circles were for, which is the only review that matters.
+ *
+ * The two-state signal is worth keeping - gold-until-banked, green-after was
+ * real information - but it cost a third colour nobody was ever told about.
+ * Cyan-until-banked, green-after says the same thing using only colours the
+ * board already explains.
+ */
+const CP_RING_ALBEDO = SAFE_FILL
+const CP_RING_EMISSIVE = Color3.create(SAFE_FILL.r, SAFE_FILL.g, SAFE_FILL.b)
+
 const CP_DONE_ALBEDO = Color4.fromHexString(MEANING.banked + 'FF')
 const CP_DONE_EMISSIVE = Color3.create(0.25, 1, 0.45)
 const START_ALBEDO = Color4.fromHexString('#4EE3F2FF')
@@ -727,11 +744,12 @@ function buildForks(layout: Layout, entities: Entity[]): BuiltFork[] {
 function createChoiceEdge(pad: Pad): Entity {
   const edge = engine.addEntity()
   Transform.create(edge, {
-    // 0.57 - 0.03 of half-thickness = 0.04 clear of a top face at 0.50.
-    // 0.53 would have put the underside exactly ON it, which is the coplanar
-    // case this whole change exists to remove.
-    position: Vector3.create(pad.x, pad.y + 0.57, pad.z),
-    scale: Vector3.create(pad.size * 0.92, 0.06, pad.size * 0.92)
+    // The fork's mark, by the same reasoning as the checkpoint ring: wider
+    // than the pad and sunk to its waist, so only the ring of overhang shows.
+    // An inlay on top would have covered the face - a fill, which this
+    // function's own comment has always forbidden.
+    position: Vector3.create(pad.x, pad.y, pad.z),
+    scale: Vector3.create(pad.size * 1.16, 0.09, pad.size * 1.16)
   })
   MeshRenderer.setCylinder(edge, 0.5, 0.5)
   Material.setPbrMaterial(edge, {
@@ -1135,15 +1153,30 @@ function createCheckpointMarker(pad: Pad, number: number) {
    */
   const ring = engine.addEntity()
   Transform.create(ring, {
-    // 0.62 - 0.06 of half-thickness = 0.06 clear of a top face at 0.50.
-    position: Vector3.create(pad.x, pad.y + 0.62, pad.z),
+    /**
+     * At the pad's WAIST, not above it and not just under its face.
+     *
+     * Three positions, and only the third is right. Buried at +0.37 it sat
+     * 0.07 under the top face: too close for the depth buffer to separate
+     * them, so the seam flickered - the white crescents in the report. Lifted
+     * to +0.62 it stopped flickering and became a LID, a solid disc covering
+     * the landing and overhanging its edges, which is what got asked about
+     * next: "why the yellow circles".
+     *
+     * The original idea was sound and the depth was wrong. A disc wider than
+     * the pad and sunk INSIDE it shows nothing but the ring of overhang -
+     * which is exactly the rim that was wanted. At the waist it is 0.44 m from
+     * either face, so no two surfaces are anywhere near each other, and the
+     * pad's own top is left alone to be the colour it is supposed to be.
+     */
+    position: Vector3.create(pad.x, pad.y, pad.z),
     scale: Vector3.create(pad.size * 1.06, 0.12, pad.size * 1.06)
   })
   MeshRenderer.setCylinder(ring)
   Material.setPbrMaterial(ring, {
-    albedoColor: CP_ALBEDO,
-    emissiveColor: CP_EMISSIVE,
-    emissiveIntensity: PAD_EMISSIVE.goal * 2
+    albedoColor: CP_RING_ALBEDO,
+    emissiveColor: CP_RING_EMISSIVE,
+    emissiveIntensity: PAD_EMISSIVE.safe * 2
   })
 
   // A slim beacon, visible from far below. Kept narrow and very transparent:
