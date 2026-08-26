@@ -1605,8 +1605,18 @@ function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
   // Widths stay inside the arch's own footprint so nothing new overhangs the
   // climb below.
   for (const tier of [
-    { radius: pad.size * 1.1, drop: 0.62, colour: STONE },
-    { radius: pad.size * 1.22, drop: 1.18, colour: STONE_DARK }
+    // Tucked in from 1.1 and 1.22.
+    //
+    // The crown sits 10.34 m from the tower's centre and the trunk is 2.5 m
+    // thick, so a dais reaching 5.49 m left 2.35 m of daylight - which the
+    // arithmetic called clear and a player called the finish growing into the
+    // trunk. It cannot move: pushing it away from the trunk walks it straight
+    // into the lobby keepout, which is the only other thing out there.
+    //
+    // So the dais gives the metres back instead. 0.98 and 1.06 still step and
+    // still read as a plinth, and the gap goes from 2.35 m to 3.1 m.
+    { radius: pad.size * 0.98, drop: 0.62, colour: STONE },
+    { radius: pad.size * 1.06, drop: 1.18, colour: STONE_DARK }
   ]) {
     const step = engine.addEntity()
     Transform.create(step, {
