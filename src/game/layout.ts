@@ -452,7 +452,6 @@ export function buildTower(): Layout {
   const plate = buildPlate(out)
   const coin = buildCoin(out)
   const pickups = buildPickups(out)
-  const shortcut = buildShortcut(out, curve(0.35))
 
   return {
     pads: out.pads,
@@ -460,7 +459,7 @@ export function buildTower(): Layout {
     movers: out.movers,
     levers: out.levers,
     sectionNames,
-    shortcut,
+    shortcut: null,
     forks: out.forks,
     plate,
     coin,
@@ -750,157 +749,6 @@ function buildPlate(out: Build): PlateDef | null {
   return null
 }
 
-/**
- * Builds the co-op bypass: a short chain of pads from one landing straight to
- * a later one, skipping what is between them.
- *
- * Returns null rather than forcing it if the route would sit on top of the
- * climb it is meant to bypass - a shortcut that overlaps the main path is
- * worse than no shortcut.
- */
-function buildShortcut(out: Build, c: ReturnType<typeof curve>): Shortcut | null {
-  const landings: number[] = []
-  for (let i = 0; i < out.pads.length; i++) {
-    if (out.pads[i].kind === 'checkpoint' || out.pads[i].kind === 'start') landings.push(i)
-  }
-  if (landings.length < 2) return null
-
-  /**
-   * The START of the chord is searched too, not pinned to one landing.
-   *
-   * It was `landings[SHORTCUT_FROM_SECTION - 1]` - one fixed pad - so the
-   * whole mechanic rested on that single pad happening to have a reachable
-   * partner. It stopped having one, and the shortcut silently disappeared.
-   * The lever learned this exact lesson earlier in this file; this function
-   * did not get the message.
-   *
-   * Preference order still starts at the intended section, so the shortcut
-   * keeps its designed place in the climb when that place still works.
-   */
-  const starts: number[] = []
-  const preferred = Math.min(SHORTCUT_FROM_SECTION - 1, landings.length - 2)
-  for (let i = 0; i < landings.length - 1; i++) {
-    starts.push(landings[(preferred + i) % (landings.length - 1)])
-  }
-
-  for (const fromIndex of starts) {
-  const from = out.pads[fromIndex]
-  const step = c.jumpGap + c.padSize
-  void step
-
-  /**
-   * Search for a target rather than assuming one.
-   *
-   * Two constraints pull against each other: the bypass has to climb whatever
-   * height it skips, at no more than MAX_SHORTCUT_RISE per hop, and its pads
-   * have to sit at least a jump apart or they overlap. Fixing the target to the
-   * next landing made both unsatisfiable at once - the climb needed ten hops
-   * and the chord only had room for four. So walk the candidates and take the
-   * first pair where the geometry actually works.
-   */
-  for (let toIndex = fromIndex + SHORTCUT_HOPS + 2; toIndex < out.pads.length - 1; toIndex++) {
-    const to = out.pads[toIndex]
-    const span = Math.hypot(to.x - from.x, to.z - from.z)
-    const climb = to.y - from.y
-    if (climb <= 0) continue
-
-    // Enough hops to keep every rise jumpable...
-    /**
-     * How many pads the chord is cut into is SEARCHED, not fixed.
-     *
-     * SHORTCUT_HOPS was a hard minimum of 4, so a 26 m chord was always cut
-     * into five segments of 5.2 m - a 2.3 m gap against a 2.8 m floor - and
-     * every candidate failed. The number of steps has to follow the length of
-     * the thing being stepped along; pinning it meant the mechanic worked
-     * only while the tower happened to be the size it was when the 4 was
-     * written down, and it stopped working the moment the jumps opened out.
-     */
-    let hops = 0
-    let chordGap = 0
-    for (let tryHops = 1; tryHops <= 14; tryHops++) {
-      const gap = span / (tryHops + 1) - c.padSize
-      if (gap > REACH_BUDGET) continue
-      // 1.6 m, not MIN_GAP. The chord is short and climbs hard, so it is a
-      // LADDER, and demanding full-length jumps of it is asking the wrong
-      // thing: it is the reward two players unlock, not the route everyone
-      // walks. Insisting on MIN_GAP here rejected all 95 candidates and
-      // deleted the mechanic - measured, twice, with the counters to prove it.
-      if (gap < 1.6) break
-      if (climb / (tryHops + 1) > MAX_SHORTCUT_RISE) continue
-      hops = tryHops
-      chordGap = gap
-      break
-    }
-    if (hops === 0) continue
-    void chordGap
-
-    const route = chordRoute(out, from, to, hops, c.padSize)
-    if (!route) continue
-
-    /**
-     * The two pads are SEARCHED for, not assumed.
-     *
-     * They used to be dropped either side of the landing at a fixed offset
-     * with no clearance test of any kind - the only objects in the tower
-     * placed without one - and at 4.4 m across they reached straight into
-     * whatever pad happened to be next door. Measured: one of them took an
-     * 11% bite out of a neighbouring slab.
-     *
-     * Turning the axis and pushing the pair further apart costs nothing and
-     * keeps them symmetric about the landing, which is the whole point of the
-     * shape: two people, one either side.
-     */
-    const baseAcross = Math.atan2(from.z - CENTER_Z, from.x - CENTER_X) + Math.PI / 2
-    let pads: { padA: Spot; padB: Spot } | null = null
-
-    for (const spread of [PAD_SEPARATION, PAD_SEPARATION + 1.6, PAD_SEPARATION + 3.2]) {
-      for (let turn = 0; turn <= 6 && !pads; turn++) {
-        for (const sign of turn === 0 ? [1] : [1, -1]) {
-          const across = baseAcross + sign * turn * 0.26
-          const half = spread / 2
-          const y = from.y + 0.3
-          const a = { x: from.x + Math.cos(across) * half, y, z: from.z + Math.sin(across) * half }
-          const b = { x: from.x - Math.cos(across) * half, y, z: from.z - Math.sin(across) * half }
-          if (!inDetourAir(a.x, a.z) || !inDetourAir(b.x, b.z)) continue
-          /**
-           * `from` is NOT excused. It was, on the grounds that these two pads
-           * belong to that landing - but belonging to it is not the same as
-           * being allowed inside it. The disc is 0.2 m thick and sits 0.3 m up,
-           * which puts it INSIDE the body of a 1 m slab rather than on top of
-           * it, so the overlap does not read as a pad on a pad: it reads as a
-           * pale crescent growing out of the slab's side, which is what got
-           * photographed.
-           *
-           * Standing them clear needs more room between them, and the spread
-           * candidates above already reach far enough.
-           */
-          if (!isClear(out, a.x, a.y, a.z, COOP_PAD_SIZE)) continue
-          if (!isClear(out, b.x, b.y, b.z, COOP_PAD_SIZE)) continue
-          if (Math.hypot(a.x - b.x, a.z - b.z) < COOP_PAD_SIZE + 1) continue
-          pads = { padA: a, padB: b }
-          out.extras.push({ x: a.x, y: a.y, z: a.z, size: COOP_PAD_SIZE })
-          out.extras.push({ x: b.x, y: b.y, z: b.z, size: COOP_PAD_SIZE })
-          break
-        }
-      }
-      if (pads) break
-    }
-    if (!pads) continue
-
-    return {
-      padA: pads.padA,
-      padB: pads.padB,
-      route,
-      fromIndex,
-      toIndex
-    }
-  }
-  }
-
-  return null
-}
-
-/** Evenly spaced pads from one landing to another, or null if any is blocked. */
 function chordRoute(out: Build, from: Pad, to: Pad, hops: number, size: number): Pad[] | null {
   const route: Pad[] = []
 

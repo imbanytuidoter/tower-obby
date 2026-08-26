@@ -19,6 +19,8 @@ import {
   GHOST_MAX_SAMPLES,
   GHOST_SAMPLE_SECONDS,
   WALL_SIZE,
+  COIN_POINTS,
+  SUMMIT_POINTS,
   PICKUP_GRACE,
   PICKUP_RADIUS,
   PLATE_RISE_RATE,
@@ -34,6 +36,7 @@ import {
   Ranking,
   Ghost,
   Wall,
+  PointsBoard,
   Haul,
   ServerHeartbeat,
   ShortcutState,
@@ -46,6 +49,9 @@ const PAIRS_KEY = 'obby.pairs.v1'
 const PLAYER_KEY = 'obby.stats.v1'
 const WALL_KEY = 'obby.wall.v1'
 const HAUL_KEY = 'obby.haul.v1'
+const POINTS_KEY = 'obby.points.v1'
+
+type Scorer = { name: string; points: number }
 
 type StoredHaul = { version: 1; day: number; coins: number }
 
@@ -139,6 +145,9 @@ let wall: Entry[] = []
 
 /** Coins given to the grove today, by everybody. Reset with the daily board. */
 let haul = 0
+
+/** Lifetime points, best per player. Coins found once each, plus summits. */
+let scorers: Scorer[] = []
 /**
  * Players whose in-memory stats have run ahead of what is on disk.
  *
@@ -174,6 +183,7 @@ export async function startServer() {
   DailyBoard.create(state, { names: [], seconds: [], day: utcDay(Date.now()) })
   PairBoard.create(state, { names: [], seconds: [] })
   Wall.create(state, { names: [], seconds: [] })
+  PointsBoard.create(state, { names: [], points: [] })
   Haul.create(state, { coins: 0 })
   Ranking.create(state, { names: [], heights: [], climbers: 0 })
   ShortcutState.create(state, { open: false })
@@ -188,6 +198,7 @@ export async function startServer() {
     DailyBoard.componentId,
     PairBoard.componentId,
     Wall.componentId,
+    PointsBoard.componentId,
     Haul.componentId,
     Ranking.componentId,
     ShortcutState.componentId,
@@ -464,6 +475,8 @@ async function handlePickup(index: number, from: string) {
    * (see HAUL_TARGET) rather than a number scaled to a crowd nobody can
    * promise will show up.
    */
+  rankScorer(names.get(address) ?? 'Guest', mine)
+
   haul += 1
   haulDirty = true
   Haul.getMutable(state).coins = haul
@@ -765,6 +778,10 @@ function publishBoard() {
 
   Haul.getMutable(state).coins = haul
 
+  const ranked = PointsBoard.getMutable(state)
+  ranked.names = scorers.map((entry) => entry.name)
+  ranked.points = scorers.map((entry) => entry.points)
+
   const crown = Wall.getMutable(state)
   crown.names = wall.map((entry) => entry.name)
   crown.seconds = wall.map((entry) => entry.seconds)
@@ -831,6 +848,33 @@ async function loadStats(rawAddress: string): Promise<PlayerStats> {
  * A failed write leaves the player marked, so the next flush tries again
  * rather than losing the find silently.
  */
+/**
+ * Recomputes one player's standing on the points board.
+ *
+ * Lifetime, not per run: every coin is worth its price once, every summit
+ * worth its own. Checkpoints are deliberately absent - they are scored inside
+ * a climb and reset with it, so counting them here would pay a player again
+ * for ground they already banked.
+ *
+ * One row per name. A player who climbs twice replaces their own row rather
+ * than filling the board with themselves, which is the same rule the crown's
+ * wall of names uses and for the same reason.
+ */
+function scoreOf(mine: PlayerStats): number {
+  return (mine.found?.length ?? 0) * COIN_POINTS + mine.climbs * SUMMIT_POINTS
+}
+
+function rankScorer(name: string, mine: PlayerStats) {
+  const points = scoreOf(mine)
+  if (points <= 0) return
+  const label = name.slice(0, 24) || 'Guest'
+  scorers = [{ name: label, points }, ...scorers.filter((s) => s.name !== label)]
+    .sort((a, b) => b.points - a.points)
+    .slice(0, BOARD_SIZE)
+  publishBoard()
+  void Storage.set<{ version: 1; board: Scorer[] }>(POINTS_KEY, { version: 1, board: scorers })
+}
+
 async function flushStats() {
   if (haulDirty) {
     haulDirty = false
@@ -868,6 +912,7 @@ async function recordClimb(address: string, seconds: number) {
 
   mine.climbs += 1
   if (mine.bestSeconds === 0 || seconds < mine.bestSeconds) mine.bestSeconds = seconds
+  rankScorer(names.get(address) ?? 'Guest', mine)
 
   const ok = await Storage.player.set<PlayerStats>(address, PLAYER_KEY, mine)
   if (!ok) console.log('[SERVER] stats did not persist for ' + address)
@@ -946,6 +991,18 @@ async function restoreBoard() {
     }
   } catch (error) {
     console.log('[SERVER] stored pair board unreadable: ' + error)
+  }
+
+  try {
+    const stored = await Storage.get<{ version: number; board: Scorer[] }>(POINTS_KEY)
+    if (stored && stored.version === 1 && Array.isArray(stored.board)) {
+      scorers = stored.board
+        .filter((e) => typeof e?.name === 'string' && typeof e?.points === 'number')
+        .slice(0, BOARD_SIZE)
+      console.log('[SERVER] restored ' + scorers.length + ' on the points board')
+    }
+  } catch (error) {
+    console.log('[SERVER] stored points board unreadable: ' + error)
   }
 
   try {

@@ -28,7 +28,7 @@ import { room } from './shared/messages'
 import {
   Board,
   DailyBoard,
-  PairBoard,
+  PointsBoard,
   Ghost,
   Wall,
   Haul,
@@ -329,12 +329,13 @@ function sharedRoundSystem(dt: number) {
     const today = DailyBoard.getOrNull(entity)
     const allTime = Board.getOrNull(entity)
     if (today) {
-      const pairView = PairBoard.getOrNull(entity)
+      // The second half of the monument ranks lifetime points now, not pairs.
+      const ranked = PointsBoard.getOrNull(entity)
       showBoard(
         today.names.map((name, index) => ({ name, seconds: today.seconds[index] ?? 0 })),
-        (pairView?.names ?? []).map((name, index) => ({
+        (ranked?.names ?? []).map((name, index) => ({
           name,
-          seconds: pairView?.seconds[index] ?? 0
+          points: ranked?.points[index] ?? 0
         }))
       )
       run.dailyBest = today.seconds[0] ?? 0

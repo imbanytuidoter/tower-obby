@@ -848,7 +848,7 @@ export type BoardRow = { name: string; seconds: number }
 /** Rows given to the solo half of the board before the pair half starts. */
 const SOLO_ROWS = 5
 
-export function showBoard(solo: BoardRow[], together: BoardRow[]) {
+export function showBoard(solo: BoardRow[], scorers: { name: string; points: number }[]) {
   if (rowEntities.length === 0) return
 
   for (let i = 0; i < rowEntities.length; i++) {
@@ -864,29 +864,43 @@ export function showBoard(solo: BoardRow[], together: BoardRow[]) {
       // The hint goes in the VALUE column, which this row leaves empty, rather
       // than on the end of the label. Appended it overran both edges of a
       // 5.6 m board - the label is left-aligned to the row and nothing wraps.
-      label.text = 'CLIMBED TOGETHER'
+      /**
+       * The second half of the board ranks POINTS, not pairs.
+       *
+       * It used to advertise the co-op time, and that half stayed empty: a
+       * pair board needs two people in the world at once, which is the one
+       * thing this scene cannot arrange for itself. Meanwhile coins and
+       * checkpoints had prices and no ladder - the collecting half of the game
+       * kept no score past the run that earned it.
+       *
+       * Points are lifetime and solo, so the row fills for everybody who plays,
+       * and a patient explorer can top it without ever being fast.
+       */
+      label.text = 'MOST POINTS EVER'
       label.textColor = GOLD4
-      value.text = together.length > 0 ? '' : 'NEEDS TWO'
+      value.text = scorers.length > 0 ? '' : 'NOBODY YET'
       value.textColor = GOLD4
       continue
     }
 
-    const pair = i > SOLO_ROWS
-    const rank = pair ? i - SOLO_ROWS : i + 1
-    const entry = pair ? together[rank - 1] : solo[i]
+    const scored = i > SOLO_ROWS
+    const rank = scored ? i - SOLO_ROWS : i + 1
+    const entry = scored ? scorers[rank - 1] : solo[i]
 
     if (!entry) {
       label.text = ''
       label.textColor = DIM
-      value.text = '- - : - -'
+      value.text = scored ? '- - -' : '- - : - -'
       value.textColor = DIM
       continue
     }
 
     label.text = String(rank) + '.  ' + entry.name
-    label.textColor = pair ? GOLD4 : DIM
-    value.text = formatTime(entry.seconds)
-    value.textColor = pair ? GOLD4 : Color4.White()
+    label.textColor = scored ? GOLD4 : DIM
+    value.text = scored
+      ? String((entry as { points: number }).points)
+      : formatTime((entry as BoardRow).seconds)
+    value.textColor = scored ? GOLD4 : Color4.White()
   }
 }
 

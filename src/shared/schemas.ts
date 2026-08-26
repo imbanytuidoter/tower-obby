@@ -93,6 +93,22 @@ export const Haul = engine.defineComponent('obby::haul', {
   coins: Schemas.Int
 })
 
+/**
+ * Who has earned the most points, ever.
+ *
+ * The tower had one board and it ranked speed, which rewards exactly one way
+ * to play: run it, run it faster. Coins and checkpoints were given prices and
+ * then nothing kept score of them past the run that earned them - so the
+ * collecting half of the game had no memory and no ladder.
+ *
+ * Points are lifetime: every coin found once, every summit reached. A player
+ * who explores slowly can top this board without ever troubling the other one.
+ */
+export const PointsBoard = engine.defineComponent('obby::points', {
+  names: Schemas.Array(Schemas.String),
+  points: Schemas.Array(Schemas.Int)
+})
+
 /** Sections whose beam is currently held still by somebody on a lever pad. */
 export const LeverState = engine.defineComponent('obby::levers', {
   halted: Schemas.Array(Schemas.Int)
@@ -153,5 +169,6 @@ export function protectServerState() {
   DailyBoard.validateBeforeChange(serverOnly)
   PairBoard.validateBeforeChange(serverOnly)
   Wall.validateBeforeChange(serverOnly)
+  PointsBoard.validateBeforeChange(serverOnly)
   Haul.validateBeforeChange(serverOnly)
 }

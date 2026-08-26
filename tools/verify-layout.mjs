@@ -671,12 +671,7 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     const t = buildTower()
     const discs = [
       ...t.levers.map((l) => ({ what: 'lever', ...l })),
-      ...(t.shortcut
-        ? [
-            { what: 'shortcut A', ...t.shortcut.padA },
-            { what: 'shortcut B', ...t.shortcut.padB }
-          ]
-        : [])
+
     ]
     const radius = cfg.COOP_PAD_SIZE / 2
     let worstBite = 0
@@ -782,10 +777,6 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     if (t.plate) solids.push({ what: 'the tandem plate', x: t.plate.x, y: t.plate.y, z: t.plate.z, size: 3.6 })
     if (t.coin) t.coin.route.forEach((r, i) =>
       solids.push({ what: 'ante slab ' + (i + 1), x: r.x, y: r.y, z: r.z, size: 2.1 }))
-    if (t.shortcut) {
-      solids.push({ what: 'shortcut pad A', ...t.shortcut.padA, size: cfg.COOP_PAD_SIZE })
-      solids.push({ what: 'shortcut pad B', ...t.shortcut.padB, size: cfg.COOP_PAD_SIZE })
-    }
     t.levers.forEach((l, i) =>
       solids.push({ what: 'lever ' + (i + 1), x: l.x, y: l.y, z: l.z, size: cfg.COOP_PAD_SIZE }))
 
@@ -1053,26 +1044,6 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
 //
 // Both are the same shape of mistake: a rule expressed in terms of something
 // else that later moved.
-{
-  const tower = buildTower()
-  const cut = tower.shortcut
-  note(cut !== null && cut !== undefined, 'the shortcut exists',
-    cut ? cut.route.length + ' pads across the chord' : 'NOT BUILT - the labels promise it anyway')
-
-  if (cut) {
-    let worst = 0
-    const chain = [tower.pads[cut.fromIndex], ...cut.route, tower.pads[cut.toIndex]]
-    for (let i = 1; i < chain.length; i++) {
-      const gap =
-        Math.hypot(chain[i].x - chain[i - 1].x, chain[i].z - chain[i - 1].z) -
-        chain[i].size / 2 - chain[i - 1].size / 2
-      worst = Math.max(worst, gap)
-    }
-    note(worst <= MAX_REACH, 'every step of the shortcut is jumpable',
-      'longest ' + worst.toFixed(2) + ' m of a ' + MAX_REACH.toFixed(2) + ' m budget')
-  }
-}
-
 // EVERY zone delivers its mechanic - checked as a table, not one at a time.
 //
 // Two mechanics have now vanished silently in this project. The lever was
@@ -1345,7 +1316,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 76
+const MIN_CHECKS = 73
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 
