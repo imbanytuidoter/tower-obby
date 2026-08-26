@@ -197,8 +197,6 @@ export function assertDecorIsQuiet() {
 
 export const SAFE_FILL = Color4.fromHexString('#4EE3F2FF')
 
-export const CHOICE_EDGE = Color4.fromHexString('#CFC6FFFF')
-export const CHOICE_EDGE_3 = Color3.create(0.81, 0.78, 1)
 
 /**
  * Surfaces, generated rather than downloaded.
@@ -707,7 +705,16 @@ function buildForks(layout: Layout, entities: Entity[]): BuiltFork[] {
     // the prompt line - the place Decentraland's mobile guidance reserves for
     // contextual hints, and where every other choice in this tower already
     // explains itself. See forkPrompt in index.ts.
-    entities.push(createChoiceEdge(junction))
+    // No mark on the fork's junction pad any more.
+    //
+    // It was a ring of choice colour, and it answered a question nobody asks:
+    // a fork announces itself by the route splitting in two, which is visible
+    // from the pad you are standing on. What the ring actually did was raise a
+    // question of its own - "what are these circles for" - and the honest
+    // answer was "nothing you cannot already see". The checkpoint ring stays,
+    // because THAT one means something: this landing keeps your progress.
+    //
+    // Three materials back, and one fewer thing to explain.
 
     const range = (start: number, count: number) =>
       Array.from({ length: count }, (unused, i) => start + i)
@@ -724,40 +731,6 @@ function buildForks(layout: Layout, entities: Entity[]): BuiltFork[] {
   }
 
   return built
-}
-
-/**
- * The mark that says a pad belongs to the fork.
- *
- * It used to be a disc 16% WIDER than the pad, sunk to pad.y + 0.3 - which is
- * 0.2 m below the top face of a slab that is one metre tall and centred on
- * pad.y. So the only part of it anybody could see was the rim protruding
- * through the pad's sides, and where the two surfaces ran close the depth
- * buffer could not choose between them: a fan of white crescents and torn
- * edges, photographed four times and reported as a texture bug.
- *
- * The intent was a ring around the lip, and the arithmetic never matched it.
- * An inlay does the same job with nothing to clip: 8% inside the pad's own
- * edge so no part of it can ever protrude, and 0.03 m clear of the top face so
- * no two surfaces are ever close enough to fight.
- */
-function createChoiceEdge(pad: Pad): Entity {
-  const edge = engine.addEntity()
-  Transform.create(edge, {
-    // The fork's mark, by the same reasoning as the checkpoint ring: wider
-    // than the pad and sunk to its waist, so only the ring of overhang shows.
-    // An inlay on top would have covered the face - a fill, which this
-    // function's own comment has always forbidden.
-    position: Vector3.create(pad.x, pad.y, pad.z),
-    scale: Vector3.create(pad.size * 1.16, 0.09, pad.size * 1.16)
-  })
-  MeshRenderer.setCylinder(edge, 0.5, 0.5)
-  Material.setPbrMaterial(edge, {
-    albedoColor: CHOICE_EDGE,
-    emissiveColor: CHOICE_EDGE_3,
-    emissiveIntensity: 2
-  })
-  return edge
 }
 
 /** Two lines over an arm: what it is, and what it costs. */

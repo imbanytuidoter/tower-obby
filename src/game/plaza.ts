@@ -13,7 +13,7 @@ import {
   LightSource
 } from '@dcl/sdk/ecs'
 import { Color3, Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
-import { CHOICE_EDGE, CHOICE_EDGE_3, SAFE_FILL } from './build'
+import { SAFE_FILL } from './build'
 import { createLegend } from './legend'
 import {
   CENTER_X,
