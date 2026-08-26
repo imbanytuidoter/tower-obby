@@ -191,6 +191,26 @@ const progressBar = () => {
 const hud = () => {
   const s = style()
 
+  /**
+   * Nothing at all on a phone.
+   *
+   * This block is the clock, the band, the falls, the coins, the score, the
+   * climber count and the live ranking - seven lines of chrome. On a handset
+   * that is half the screen, and the screen IS the game: every line of it is a
+   * line of tower nobody can see, and a player has to look past it to judge
+   * the jump they are about to make.
+   *
+   * Asked for twice - "top right, smaller, or just remove it" - and both times
+   * I fixed the overlaps inside it instead and left it where it was. Fixing
+   * how a thing is arranged is not the same as removing it, and the request
+   * was the second one.
+   *
+   * Desktop keeps it: there is room, and nothing is competing for the corner.
+   * What survives on mobile is the prompt line and the summit panel, which are
+   * the two things that speak only when they have something to say.
+   */
+  if (compact) return null
+
   return (
     <UiEntity
       uiTransform={{
