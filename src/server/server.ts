@@ -17,6 +17,7 @@ import {
   STATS_FLUSH_SECONDS,
   COIN_RADIUS,
   GHOST_MAX_SAMPLES,
+  GHOST_SAMPLE_SECONDS,
   PICKUP_GRACE,
   PICKUP_RADIUS,
   PLATE_RISE_RATE,
@@ -40,6 +41,24 @@ const STORAGE_KEY = 'obby.board.v2'
 const DAILY_KEY = 'obby.daily.v1'
 const PAIRS_KEY = 'obby.pairs.v1'
 const PLAYER_KEY = 'obby.stats.v1'
+
+/**
+ * The recorded climb, kept in its own key.
+ *
+ * Everything else on this server was persisted and the ghost was not, which
+ * meant the feature did not exist for the one player who matters most: the
+ * server sleeps two minutes after the last person leaves, and the path lives
+ * only in a synced component, so the FIRST visitor of the day - somebody
+ * arriving at an empty world, exactly the case the ghost was built for - was
+ * always the one person guaranteed to climb alone.
+ *
+ * Same class of bug as the coins that vanished on every sleep, and found the
+ * same way: by asking what survives a restart instead of what works while the
+ * server happens to be up.
+ */
+const GHOST_KEY = 'obby.ghost.v1'
+
+type StoredGhost = { version: 1; name: string; seconds: number; path: number[] }
 
 type Entry = { name: string; seconds: number }
 
@@ -191,11 +210,46 @@ export async function startServer() {
     if (!Array.isArray(data.path) || data.path.length < 12 || data.path.length % 3 !== 0) return
     if (data.path.length > GHOST_MAX_SAMPLES * 3) return
 
+    /**
+     * Keep only the tail that the clock on THIS side actually timed.
+     *
+     * There are two independent clocks. The server times from the gate
+     * crossing it saw itself, which is the number that reaches the board. The
+     * client fills the path for as long as its own run phase lasts, and a
+     * climber who crosses the gate, wanders, falls and finishes leaves those
+     * two disagreeing - measured here at 349 samples, 174 seconds of path,
+     * carrying a 6.2 second label. The mote then crawls the tower for three
+     * minutes while the HUD advertises a six-second run.
+     *
+     * The last samples ARE the timed segment, so the tail is the honest part
+     * of the recording and the rest is whatever happened before the stopwatch
+     * started. Trimming it here is the one place both numbers exist together;
+     * the client cannot do it, because the client does not know the time the
+     * server recorded. Two samples of slack for the boundary.
+     */
+    const want = Math.ceil(pending.seconds / GHOST_SAMPLE_SECONDS) + 2
+    const path = data.path.slice(Math.max(0, data.path.length - want * 3))
+    if (path.length < 12 || path.length % 3 !== 0) return
+    if (path.length < data.path.length) {
+      console.log(
+        '[SERVER] trimmed ghost path ' + data.path.length / 3 + ' -> ' + path.length / 3 +
+          ' samples to match ' + pending.seconds.toFixed(1) + 's'
+      )
+    }
+
     const view = Ghost.getMutable(state)
     view.name = pending.name
     view.seconds = pending.seconds
-    view.path = data.path
+    view.path = path
     console.log('[SERVER] ghost replaced by ' + pending.name + ' (' + pending.seconds.toFixed(1) + 's)')
+
+    // Centimetres are all a translucent mote needs, and rounding here roughly
+    // halves what goes into Storage.
+    void saveGhost(
+      pending.name,
+      pending.seconds,
+      path.map((v: number) => Math.round(v * 100) / 100)
+    )
   })
 
   room.onMessage('takePickup', (data, context) => {
@@ -795,7 +849,49 @@ async function restoreBoard() {
     console.log('[SERVER] stored pair board unreadable: ' + error)
   }
 
+  await restoreGhost()
+
   const view = DailyBoard.getOrNull(state)
   if (view) DailyBoard.getMutable(state).day = utcDay(Date.now())
   publishBoard()
+}
+
+async function saveGhost(name: string, seconds: number, path: number[]) {
+  const ok = await Storage.set<StoredGhost>(GHOST_KEY, { version: 1, name, seconds, path })
+  if (!ok) console.log('[SERVER] ghost path did not persist')
+}
+
+/**
+ * The stored ghost is NOT re-checked against today's board.
+ *
+ * It is invited from whoever takes the top of the day, so while the server is
+ * up it does track today's leader - but a restored one may well be from
+ * yesterday, and dropping it for that reason would put us straight back to an
+ * empty world for the first arrival. So nothing here claims which board it
+ * topped: the client shows the name and the time, which are true whenever the
+ * run happened, and a climber gets somebody to chase either way.
+ */
+async function restoreGhost() {
+  try {
+    const stored = await Storage.get<StoredGhost>(GHOST_KEY)
+    if (!stored || stored.version !== 1) return
+    if (typeof stored.name !== 'string' || typeof stored.seconds !== 'number') return
+    if (!Array.isArray(stored.path)) return
+
+    const path = stored.path.filter((v) => typeof v === 'number' && isFinite(v))
+    if (path.length !== stored.path.length) return
+    if (path.length < 12 || path.length % 3 !== 0) return
+    if (path.length > GHOST_MAX_SAMPLES * 3) return
+
+    const view = Ghost.getMutable(state)
+    view.name = stored.name
+    view.seconds = stored.seconds
+    view.path = path
+    console.log(
+      '[SERVER] restored ghost: ' + stored.name + ' (' + stored.seconds.toFixed(1) + 's, ' +
+        path.length / 3 + ' samples)'
+    )
+  } catch (error) {
+    console.log('[SERVER] stored ghost unreadable: ' + error)
+  }
 }

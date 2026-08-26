@@ -1,4 +1,6 @@
 import {
+  Billboard,
+  BillboardMode,
   engine,
   Entity,
   InputAction,
@@ -7,6 +9,7 @@ import {
   MeshCollider,
   MeshRenderer,
   PointerEventType,
+  TextShape,
   Transform
 } from '@dcl/sdk/ecs'
 import { Color3, Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -104,6 +107,7 @@ let world: World | null = null
 /** The replayed path and the mote that walks it. Empty until a record exists. */
 let ghostPath: number[] = []
 let ghostMote: Entity | null = null
+let ghostLabel: Entity | null = null
 
 export function main() {
   protectServerState()
@@ -252,13 +256,30 @@ function sharedRoundSystem(dt: number) {
       run.plateLift = tandem.lift
     }
 
+    /**
+     * Sample COUNT was the only thing compared here, and it is not an identity.
+     * The path is sampled on a fixed clock, so two climbs that take the same
+     * time produce exactly the same number of samples - and a new record that
+     * ties the old one to within half a second would be received by the server,
+     * stored, synced, and then silently ignored by every client. The runner's
+     * name and time are what actually changed; compare those.
+     */
     const ghost = Ghost.getOrNull(entity)
-    if (ghost && ghost.path.length !== ghostPath.length) {
+    if (
+      ghost &&
+      (ghost.path.length !== ghostPath.length ||
+        ghost.name !== run.ghostName ||
+        ghost.seconds !== run.ghostSeconds)
+    ) {
       ghostPath = [...ghost.path]
       ghostClock = 0
       run.ghostName = ghost.name
       run.ghostSeconds = ghost.seconds
       if (!ghostMote && ghostPath.length >= 6) ghostMote = createGhostMote()
+      if (ghostLabel) {
+        TextShape.getMutable(ghostLabel).text =
+          ghost.name + '  ' + ghost.seconds.toFixed(1) + 's'
+      }
     }
 
     const ranking = Ranking.getOrNull(entity)
@@ -573,6 +594,35 @@ function createGhostMote(): Entity {
     emissiveColor: Color3.create(1, 0.78, 0.2),
     emissiveIntensity: 5
   })
+
+  /**
+   * The mote gets a name, because an anonymous light is scenery.
+   *
+   * A gold dot drifting up the tower reads as a decoration - which is what
+   * every other floating light in this scene IS - and a player has no way to
+   * learn otherwise. The HUD says who is being chased, but only if you look
+   * away from the thing you are chasing. Put the name on the runner and the
+   * mote stops being an effect and becomes a person who was here before you.
+   *
+   * The scale is the parent's inverse: the mote is 0.55, so the label would
+   * inherit that shrink and be unreadable at the distance it matters.
+   */
+  const label = engine.addEntity()
+  Transform.create(label, {
+    parent: mote,
+    position: Vector3.create(0, 1.5, 0),
+    scale: Vector3.create(1 / 0.55, 1 / 0.55, 1 / 0.55)
+  })
+  Billboard.create(label, { billboardMode: BillboardMode.BM_Y })
+  TextShape.create(label, {
+    text: run.ghostName + '  ' + run.ghostSeconds.toFixed(1) + 's',
+    fontSize: 1.1,
+    textColor: Color4.create(1, 0.85, 0.4, 0.95),
+    outlineColor: Color4.Black(),
+    outlineWidth: 0.3
+  })
+  ghostLabel = label
+
   return mote
 }
 
