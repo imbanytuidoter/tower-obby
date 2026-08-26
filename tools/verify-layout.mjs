@@ -1330,7 +1330,7 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   //      per mesh and every pad is a mesh. Vegetation cut hard - undergrowth
   //      32 -> 12, fringe 18 -> 6, trunk growth 14 -> 5, palms 5 -> 2 - and
   //      the zone count trimmed until it fit. 137 -> 189 pads, 76.3 -> 82 m.
-  const PINNED = 'e234b50a'
+  const PINNED = 'dfcc46ee'
   note(fingerprint === PINNED, 'the tower is the tower the records were set on',
     'fingerprint ' + fingerprint)
 }

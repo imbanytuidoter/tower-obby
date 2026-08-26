@@ -572,7 +572,7 @@ export const LOBBY_Y = 0.4
  * changing the game; tools/verify-layout.mjs will refuse the build until the
  * fingerprint below is updated on purpose.
  */
-export const LOBBY_KEEPOUT_RADIUS = 14
+export const LOBBY_KEEPOUT_RADIUS = 15
 
 /** How wide a checkpoint landing wants to be, if its neighbours allow it. */
 export const LANDING_SIZE = 4.6

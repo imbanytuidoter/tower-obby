@@ -1696,7 +1696,27 @@ function inShaft(x: number, z: number, y: number): boolean {
   const radius = Math.hypot(x - CENTER_X, z - CENTER_Z)
   if (radius < SHAFT_MIN_RADIUS || radius > SHAFT_MAX_RADIUS) return false
 
-  if (y < 6) return true
+  /**
+   * Low ground was exempt from the lobby keepout ENTIRELY, and that is how
+   * pads came to stand on the deck and 1.2 m from the start pad.
+   *
+   * The exemption exists so the climb can begin near the gate rather than
+   * fourteen metres out in the trees. But "below 6 m" is the whole yard, so
+   * the first sections were free to lay slabs across the lobby floor, beside
+   * the noticeboards, and hard against the start - which is what a player
+   * photographed: pads spilling over the boundary line.
+   *
+   * The corridor is what needed exempting, not the altitude. Beyond the gate,
+   * within its width, the climb may start close. Everywhere else the lobby is
+   * off limits at every height.
+   */
+  if (y < 6) {
+    const dx = x - GATE_X
+    const dz = z - GATE_Z
+    const along = dx * GATE_DIR_X + dz * GATE_DIR_Z
+    const across = Math.abs(dx * -GATE_DIR_Z + dz * GATE_DIR_X)
+    if (along >= 0 && across <= GATE_WIDTH) return true
+  }
   if (Math.hypot(x - LOBBY_X, z - LOBBY_Z) < LOBBY_KEEPOUT_RADIUS) return false
   return Math.hypot(x - GATE_X, z - GATE_Z) >= 5
 }
