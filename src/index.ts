@@ -454,6 +454,30 @@ function moverHits(position: Vector3, sizeX: number, sizeZ: number, player: Vect
   return Math.abs(player.x - position.x) < sizeX / 2 + 0.35 && Math.abs(player.z - position.z) < sizeZ / 2 + 0.35
 }
 
+/**
+ * Puts every crumbling pad back, now, whatever state it was left in.
+ *
+ * The per-frame timer restores them four seconds after they drop, and a
+ * player reported them gone for good - which means the state machine can get
+ * stuck somewhere I have not found. A pad that never comes back is not a
+ * difficulty spike, it is a wall: nobody behind you can pass, and neither can
+ * you on your next attempt.
+ *
+ * So this does not try to be clever. Every respawn, every pad, back to solid.
+ * If the timer works this changes nothing; if it stalls, the tower repairs
+ * itself the moment anybody falls.
+ */
+export function restoreCrumblingPads() {
+  if (!world) return
+  for (const built of world.pads) {
+    if (!built.pad.crumble || built.state === 'solid') continue
+    MeshCollider.setBox(built.entity)
+    paintPad(built.entity, built.pad)
+    built.state = 'solid'
+    built.timer = 0
+  }
+}
+
 function updateCrumblingPads(dt: number, player: Vector3 | null) {
   if (!world) return
 
@@ -1130,6 +1154,9 @@ function die() {
   play('fall')
   freezeAfterFall()
   sendToCheckpoint()
+  // Every fall repairs the tower. A crumbling pad that stays down is a wall
+  // for everybody behind you, and for you on the next attempt.
+  restoreCrumblingPads()
 }
 
 /** Drops the player back in the lobby, looking at the leaderboard. */

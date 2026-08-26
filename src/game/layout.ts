@@ -1487,7 +1487,25 @@ function hop(
   // twin (2.88 m) without making it unfair on a thumbstick.
   // Clamped at BOTH ends. The ceiling has been here for a long time; the
   // floor had not, which is why a section could quietly ask for a 1.76 m hop.
-  const gap = Math.min(Math.max(c.jumpGap * (opts.gapScale ?? 1), c.minGap), REACH_BUDGET)
+  /**
+   * A jump that is long AND high is not the sum of two jumps you can make.
+   *
+   * The two budgets were checked separately - 4.79 m across, 1.74 m up - so a
+   * hop was allowed to spend BOTH in full. Measured across the tower: eleven
+   * hops spending over 1.6 of the two together, the worst at 1.96, which is
+   * very nearly two full jumps asked for at once. On a keyboard that is hard.
+   * On a phone, with a thumb on a virtual stick and a jump button, a player
+   * reported it as impossible, and they are the only measurement that counts.
+   *
+   * Height is the expensive axis: every metre climbed is airtime that is not
+   * carrying you forward. So the rise buys down the reach - a flat hop keeps
+   * the whole budget, a full-height one keeps under half of it, and nothing
+   * can ask for both.
+   */
+  const rise = Math.max(0, opts.rise)
+  const spent = Math.min(1, rise / MAX_STEP_RISE)
+  const reach = REACH_BUDGET * (1 - 0.55 * spent)
+  const gap = Math.min(Math.max(c.jumpGap * (opts.gapScale ?? 1), c.minGap), reach)
   // Edge to edge is the jump; centre to centre has to include both half-pads.
   const distance = gap + previous.size / 2 + size / 2
 

@@ -611,7 +611,16 @@ export const LOBBY_SPAWN_Z = LOBBY_Z - GATE_DIR_Z * LOBBY_SPAWN_BACK
  */
 export const BOARD_W = 5.6
 export const LEGEND_FORWARD = -4.0
-export const LEGEND_LATERAL = 8.2
+/**
+ * Pulled in from 8.2 when the board was squared to the lobby axis.
+ *
+ * Turned square, its 5.6 m width runs ALONG the lateral axis instead of across
+ * it, so at 8.2 its far corner reached 11.1 m on a deck whose half-width is
+ * 10. At 6.9 it spans 4.0 to 9.8 - fully on the stone, and still clear of the
+ * leaderboard's rails, which reach 6.2 m to either side of an installation
+ * standing 3.5 m further back.
+ */
+export const LEGEND_LATERAL = 6.9
 
 export const BOARD_FORWARD = -7.5
 export const BOARD_LATERAL = 0

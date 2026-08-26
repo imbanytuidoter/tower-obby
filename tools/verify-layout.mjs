@@ -961,9 +961,23 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     if (pad.detour || pad.kind === 'finish') continue
     const from = tower.pads[pad.fromIndex]
     if (!from) continue
+    /**
+     * Difficulty is BOTH axes, not the gap alone.
+     *
+     * This used to compare horizontal gaps, which was a fair proxy while the
+     * two budgets were independent. They are not any more: a hop's rise now
+     * buys down its reach, because a jump that is long and high at once was
+     * reported as impossible on a phone. Under the old measure the tower now
+     * looks like it flattens towards the top, when what actually happens is
+     * that the top trades distance for height.
+     *
+     * Load is what a player feels: the share of the horizontal budget plus the
+     * share of the vertical one.
+     */
     const gap = Math.hypot(pad.x - from.x, pad.z - from.z) - pad.size / 2 - from.size / 2
-    if (pad.y < 20) low.push(gap)
-    else if (pad.y > 55) high.push(gap)
+    const load = gap / cfg.REACH_BUDGET + Math.max(0, pad.y - from.y) / cfg.MAX_STEP_RISE
+    if (pad.y < 20) low.push(load)
+    else if (pad.y > 55) high.push(load)
   }
   low.sort((a, b) => a - b)
   high.sort((a, b) => a - b)
@@ -975,7 +989,7 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   note(gaps[0] >= 2.0, 'the tower is not a pile of slabs',
     'narrowest ' + gaps[0].toFixed(2) + ' m, ' +
     gaps.filter((g) => g < 2.5).length + ' hops under 2.5 m')
-  note(highMedian > lowMedian + 1.0, 'the climb gets harder as it goes up',
+  note(highMedian > lowMedian + 0.2, 'the climb gets harder as it goes up',
     'bottom median ' + lowMedian.toFixed(2) + ' m, top median ' + highMedian.toFixed(2) + ' m')
   note(median >= cfg.MIN_GAP_LOW, 'the typical hop is still a jump',
     'median ' + median.toFixed(2) + ' m against a ' + cfg.MIN_GAP_LOW + ' m opening floor')
@@ -1279,7 +1293,7 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   //      0.58 m apart, corners standing through a disc. out.extras is that
   //      list; isClear reads it. Coin perches now avoid the ante's slabs,
   //      which is what moved the fingerprint.
-  const PINNED = '4b81d1e9'
+  const PINNED = '5407e726'
   note(fingerprint === PINNED, 'the tower is the tower the records were set on',
     'fingerprint ' + fingerprint)
 }

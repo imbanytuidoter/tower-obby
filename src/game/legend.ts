@@ -100,8 +100,22 @@ const LEGEND_Z = LOBBY_Z + GATE_DIR_Z * LEGEND_FORWARD + SIDE_OF_GATE_Z * LEGEND
  * every line of text INSIDE the slab - and a blank dark wall is precisely
  * what shipped. plaza.ts has always had it right; this file did not copy it.
  */
-const LEGEND_YAW =
-  (Math.atan2(-(LOBBY_SPAWN_X - LEGEND_X), -(LOBBY_SPAWN_Z - LEGEND_Z)) * 180) / Math.PI
+/**
+ * SQUARE with the lobby, not aimed at the spawn.
+ *
+ * It used to turn to face whoever stands at the spawn, which put it 73 degrees
+ * off the axis every other thing in this lobby is built on - the leaderboard,
+ * the deck, the gate. From the one spot it was aimed at, it looked correct.
+ * From everywhere else, including the place people actually walk up to it, it
+ * stood at an angle to all its neighbours and read as knocked crooked.
+ *
+ * Reported twice. I answered both times with an explanation of why it was not
+ * crooked, which was true about the geometry and useless about the complaint:
+ * a board that looks wrong IS wrong. Parallel to the leaderboard it can only
+ * ever look square, from any angle, because everything around it shares that
+ * angle.
+ */
+const LEGEND_YAW = (Math.atan2(-GATE_DIR_X, -GATE_DIR_Z) * 180) / Math.PI
 
 const FRONT_X = -Math.sin((LEGEND_YAW * Math.PI) / 180)
 const FRONT_Z = -Math.cos((LEGEND_YAW * Math.PI) / 180)

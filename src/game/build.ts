@@ -63,7 +63,6 @@ export type BuiltMover = { entity: Entity; def: MoverDef; clock: number }
 
 export type Checkpoint = {
   top: Vector3
-  ring: Entity | null
   column: Entity | null
   label: Entity | null
   number: number
@@ -415,7 +414,6 @@ export function buildWorld(layout: Layout): World {
     if (pad.kind === 'start') {
       checkpoints.push({
         top,
-        ring: null,
         column: null,
         label: null,
         number: 0,
@@ -437,11 +435,10 @@ export function buildWorld(layout: Layout): World {
       // worse than no decoration at all.
 
       const marker = createCheckpointMarker(pad, checkpoints.length)
-      entities.push(marker.ring, marker.column, marker.label)
+      entities.push(marker.column, marker.label)
 
       checkpoints.push({
         top,
-        ring: marker.ring,
         column: marker.column,
         label: marker.label,
         number: checkpoints.length,
@@ -765,7 +762,10 @@ function createPressurePad(at: { x: number; y: number; z: number }, entities: En
     // One number, shared with the search that reserved room for it.
     scale: Vector3.create(COOP_PAD_SIZE, 0.2, COOP_PAD_SIZE)
   })
-  MeshRenderer.setCylinder(pad)
+  // A slab, like every other thing you stand on in this tower. It was a gold
+  // disc, which matched nothing else and meant nothing to anybody looking at
+  // it - and gold in this scene already means a coin.
+  MeshRenderer.setBox(pad)
   MeshCollider.setBox(pad)
   paintPressurePad(pad, false)
 
@@ -787,14 +787,15 @@ function createPressurePad(at: { x: number; y: number; z: number }, entities: En
 }
 
 function paintPressurePad(pad: Entity, pressed: boolean) {
-  // Gold waiting, green held: the same pair the checkpoints use, because it
-  // means the same thing - here is a thing to do, and now it is done. The
-  // change of state is carried by the colour AND by brightness, which is what
-  // a momentary state wants; a permanent identity would use only hue.
+  // Reads as a landing until somebody is on it, then goes green like a banked
+  // checkpoint. No gold: gold is the coin, and a gold disc on a co-op pad was
+  // an object that matched nothing and explained nothing.
   Material.setPbrMaterial(pad, {
-    albedoColor: pressed ? CP_DONE_ALBEDO : CP_ALBEDO,
-    emissiveColor: pressed ? CP_DONE_EMISSIVE : CP_EMISSIVE,
-    emissiveIntensity: pressed ? PAD_EMISSIVE.goal * 2 : PAD_EMISSIVE.goal
+    albedoColor: pressed ? CP_DONE_ALBEDO : SAFE_FILL,
+    emissiveColor: pressed
+      ? CP_DONE_EMISSIVE
+      : Color3.create(SAFE_FILL.r, SAFE_FILL.g, SAFE_FILL.b),
+    emissiveIntensity: pressed ? PAD_EMISSIVE.safe * 2 : PAD_EMISSIVE.safe
   })
 }
 
@@ -1088,13 +1089,6 @@ function createSpine(height: number, checkpointYs: number[]): Entity[] {
 
 /** Turns a checkpoint green once the player has banked it. */
 export function activateCheckpoint(checkpoint: Checkpoint) {
-  if (checkpoint.ring) {
-    Material.setPbrMaterial(checkpoint.ring, {
-      albedoColor: CP_DONE_ALBEDO,
-      emissiveColor: CP_DONE_EMISSIVE,
-      emissiveIntensity: PAD_EMISSIVE.goal
-    })
-  }
   if (checkpoint.column) {
     Material.setPbrMaterial(checkpoint.column, {
       albedoColor: Color4.create(CP_DONE_ALBEDO.r, CP_DONE_ALBEDO.g, CP_DONE_ALBEDO.b, 0.42),
@@ -1110,49 +1104,7 @@ export function activateCheckpoint(checkpoint: Checkpoint) {
 }
 
 function createCheckpointMarker(pad: Pad, number: number) {
-  /**
-   * The ring sits ON the checkpoint, not INSIDE it.
-   *
-   * It was 6% wider than the slab and centred at pad.y + 0.37 - a slab that is
-   * one metre tall and centred on pad.y, so the ring was buried 0.07 m under
-   * its own top face. Only the protruding rim was visible, and where the two
-   * surfaces ran that close the depth buffer had no way to choose between
-   * them: white crescents chewed out of the pad's top and sides. Six of these,
-   * one on every checkpoint, and the same mistake in the fork's choice edge.
-   *
-   * Lifted so its underside rests on the top face, the rim reads the way it
-   * was always meant to - a lip of cyan standing proud of the landing - and
-   * nothing is ever within a hair's breadth of anything else.
-   */
-  const ring = engine.addEntity()
-  Transform.create(ring, {
-    /**
-     * At the pad's WAIST, not above it and not just under its face.
-     *
-     * Three positions, and only the third is right. Buried at +0.37 it sat
-     * 0.07 under the top face: too close for the depth buffer to separate
-     * them, so the seam flickered - the white crescents in the report. Lifted
-     * to +0.62 it stopped flickering and became a LID, a solid disc covering
-     * the landing and overhanging its edges, which is what got asked about
-     * next: "why the yellow circles".
-     *
-     * The original idea was sound and the depth was wrong. A disc wider than
-     * the pad and sunk INSIDE it shows nothing but the ring of overhang -
-     * which is exactly the rim that was wanted. At the waist it is 0.44 m from
-     * either face, so no two surfaces are anywhere near each other, and the
-     * pad's own top is left alone to be the colour it is supposed to be.
-     */
-    position: Vector3.create(pad.x, pad.y, pad.z),
-    scale: Vector3.create(pad.size * 1.06, 0.12, pad.size * 1.06)
-  })
-  MeshRenderer.setCylinder(ring)
-  Material.setPbrMaterial(ring, {
-    albedoColor: CP_RING_ALBEDO,
-    emissiveColor: CP_RING_EMISSIVE,
-    emissiveIntensity: PAD_EMISSIVE.safe * 2
-  })
-
-  // A slim beacon, visible from far below. Kept narrow and very transparent:
+    // A slim beacon, visible from far below. Kept narrow and very transparent:
   // at any real width it renders as a flat grey slab instead of a light shaft.
   const column = engine.addEntity()
   Transform.create(column, {
@@ -1191,8 +1143,7 @@ function createCheckpointMarker(pad: Pad, number: number) {
     textAlign: TextAlignMode.TAM_MIDDLE_CENTER
   })
   Billboard.create(label, { billboardMode: BillboardMode.BM_Y })
-
-  return { ring, column, label }
+  return { column, label }
 }
 
 function paintHazard(entity: Entity) {
@@ -1760,11 +1711,19 @@ function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
   // arrived, the congratulation never did, so it stood at the summit in
   // silence like scenery. One TextShape, hidden on the same VisibilityComponent
   // the route signs use, switched on by the client the moment a run completes.
+  /**
+   * Above the banners, not behind them.
+   *
+   * The roll of names went onto the two banners and they were widened to
+   * carry it - so they now hang between the arrival and the greeter, and at
+   * deck + 3.5 the congratulation sat squarely behind cloth that reaches 5.1.
+   * The bird was left mouthing at the back of a curtain. 5.6 clears them.
+   */
   const greeting = engine.addEntity()
   Transform.create(greeting, {
     position: Vector3.create(
       pad.x + dirX * (half - 0.3),
-      deck + 3.5,
+      deck + 5.6,
       pad.z + dirZ * (half - 0.3)
     )
   })
