@@ -657,20 +657,14 @@ function buildPlate(layout: Layout, entities: Entity[]): BuiltPlate | null {
     roughness: 0.6
   })
 
-  // The line it is trying to reach, drawn in gold at the top of its travel so
-  // the point of standing on it is visible from the ground.
-  const mark = engine.addEntity()
-  entities.push(mark)
-  Transform.create(mark, {
-    position: Vector3.create(def.x, def.y + def.rise + 0.9, def.z),
-    scale: Vector3.create(def.size * 1.25, 0.12, def.size * 1.25)
-  })
-  MeshRenderer.setCylinder(mark, 0.5, 0.5)
-  Material.setPbrMaterial(mark, {
-    albedoColor: FINISH_ALBEDO,
-    emissiveColor: FINISH_EMISSIVE,
-    emissiveIntensity: PAD_EMISSIVE.goal * 2
-  })
+  // No gold ring hanging over the plate any more.
+  //
+  // It marked the height the plate rises to, 25% wider than the plate itself,
+  // floating in open air. With the explanatory boards gone there is nothing
+  // that could tell anyone what it meant, and a glowing disc in the sky with
+  // no reading is just a question - which is exactly how it was reported.
+  //
+  // The plate explains itself by moving. Two people stand on it, it goes up.
 
   return {
     entity,
