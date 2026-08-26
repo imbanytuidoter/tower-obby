@@ -1379,7 +1379,11 @@ function theLever(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rn
   // a pad any smaller leaves a gold rim hanging over open air and reaching into
   // whatever stands next door - which is exactly what four screenshots showed.
   push(out, found.cursor, index, COOP_PAD_SIZE, false, out.pads.indexOf(guarded))
-  out.levers.push({ x: found.cursor.x, y: found.cursor.y + 0.3, z: found.cursor.z, section: index })
+  // 0.64: the pad's top face is 0.5 above its centre, the disc is 0.2 thick,
+  // so its underside clears the face by 0.04. At 0.3 the disc sat INSIDE the
+  // slab it marks, with its rim exactly flush against the slab's sides -
+  // coplanar, and therefore flickering.
+  out.levers.push({ x: found.cursor.x, y: found.cursor.y + 0.64, z: found.cursor.z, section: index })
 
   // From the guarded pad, not the lever off to its side: the cursor stands on
   // the former while the latter is simply the last thing pushed, and measuring

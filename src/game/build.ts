@@ -310,8 +310,23 @@ function createPickups(layout: Layout, entities: Entity[]): BuiltPickup[] {
 /** Landmarks are round, plain pads are square: readable at a glance. */
 const isLandmark = (pad: Pad) => pad.kind === 'checkpoint' || pad.kind === 'finish'
 
-/** Half the pad thickness: the height of a pad's walking surface. */
-export const PAD_TOP = 0.25
+/**
+ * Half the pad thickness: the height of a pad's walking surface.
+ *
+ * It said 0.25 while a pad is drawn at scale (size, 1, size) - a one-metre
+ * cube, centred on pad.y, whose top face is therefore at 0.5. The constant's
+ * own description is the specification and the value did not meet it, so
+ * everything placed "on" a pad through it was a quarter of a metre INSIDE the
+ * pad: the arch's plinths, the lever's disc, and the respawn point a climber
+ * is put back on after a fall.
+ *
+ * Sunk decoration is what the player sees. Two solids overlapping by a few
+ * centimetres give the depth buffer no way to choose between them, and the
+ * seam tears into flickering shards - the artefact reported four times in a
+ * row and chased through three wrong diagnoses before anyone questioned this
+ * number.
+ */
+export const PAD_TOP = 0.5
 
 /**
  * Height fade is quantised into a few steps on purpose. A smooth fade gives
