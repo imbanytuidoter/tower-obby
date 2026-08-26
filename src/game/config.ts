@@ -9,7 +9,21 @@
  * ranking and every reason two players would speak to each other. Difficulty
  * now ramps with altitude, which is what the ramp was always for.
  */
-export const TOWER_ZONES = 34
+/**
+ * The climb that was, plus four zones on top of it.
+ *
+ * Doubling this to 34 regenerated every zone at a new point on the curve, so
+ * the whole tower changed at once: 221 pads packed into the same narrow shaft
+ * read as noise, and slabs crowded the start gate. More sections is not more
+ * game if they all have to fit in the same column of air.
+ *
+ * BASE_ZONES is what the curve is measured against, so zones 1-20 are exactly
+ * the tower that was there before. The zones past that run off the end of the
+ * curve - harder than anything below them - and they climb into the headroom
+ * between the old 76 m and the engine's 94.
+ */
+export const BASE_ZONES = 20
+export const TOWER_ZONES = 30
 
 /** Kept only so the tower is reproducible; the seed never changes. */
 export const TOWER_SEED = 20260904
@@ -866,7 +880,7 @@ export const CHECKPOINT_EVERY_SECTIONS = 3
 
 /** How far pads sit from the tower axis. Sections are built inside this band. */
 export const SHAFT_MIN_RADIUS = 6
-export const SHAFT_MAX_RADIUS = 17
+export const SHAFT_MAX_RADIUS = 21
 
 /**
  * Difficulty at a point on the climb. `progress` is 0 at the gate and 1 at
@@ -886,7 +900,7 @@ export function curve(progress: number) {
     // Narrower than they were (3.9 -> 3.3 at the foot). A pad's width and the
     // gap beside it are read together: at 3.9 m wide with a 2 m gap the slabs
     // touch to the eye no matter what the number says.
-    padSize: lerp(3.4, 2.0),
+    padSize: lerp(3.3, 2.3),
     /**
      * The gap between pad EDGES - this is the distance actually jumped.
      * Centre-to-centre was the wrong thing to tune: with 3.2m pads a 4.2m
@@ -902,20 +916,20 @@ export function curve(progress: number) {
     // stops being a test of nerve and becomes a coin toss. This is as far as
     // the gaps go while the tower is still a climb rather than a lottery:
     // 1.31x on the widest gap, 1.27x at the bottom, 72% of the airtime.
-    jumpGap: lerp(1.9, 4.7),
+    jumpGap: lerp(2.2, 4.6),
     /** The shortest hop allowed at this height. See MIN_GAP_LOW. */
     minGap: lerp(MIN_GAP_LOW, MIN_GAP),
-    rise: lerp(0.28, 0.58),
+    rise: lerp(0.42, 0.66),
     // Slowed on request. Every knob in this block is applied AFTER the random
     // draws that place pads, so turning them changes how hard the tower is to
     // survive without changing its shape - the fingerprint check proves it.
-    spinnerSpeed: 34 + t * 74,
+    spinnerSpeed: 34 + t * 56,
     // Shorter overhang past the ring it guards, so the ends of a beam stop
     // reaching over ground a climber has no business defending.
     spinnerReach: lerp(1.4, 2.4),
     moverSpeed: 0.9 + t * 1.5,
     moverReach: lerp(2, 3.4),
     /** Share of sections that get a hazard on top of their own shape. */
-    hazardChance: lerp(0, 1)
+    hazardChance: lerp(0, 0.85)
   }
 }

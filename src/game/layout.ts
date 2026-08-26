@@ -51,6 +51,7 @@ import {
   START_Z,
   TOWER_SEED,
   TOWER_ZONES,
+  BASE_ZONES,
   TREE_COUNT,
   TREE_RING_OUTER,
   TREE_RING_RADIUS,
@@ -334,7 +335,11 @@ export function buildTower(): Layout {
   for (let index = 1; index <= TOWER_ZONES; index++) {
     // Progress up the tower, not through a round. This is the whole point of
     // the change: altitude decides how hard a zone is.
-    const zone = curve((index - 1) / (TOWER_ZONES - 1))
+    // Measured against BASE_ZONES, not TOWER_ZONES: the first twenty zones
+    // then land on exactly the points of the curve they always did, and the
+    // zones above them run past its end instead of squeezing everything below
+    // into a smaller share of it.
+    const zone = curve((index - 1) / (BASE_ZONES - 1))
     const kind = pickKind(index)
     sectionNames.push(kind)
     buildSection(kind, index, cursor, zone, rng, out)

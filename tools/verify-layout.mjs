@@ -1306,14 +1306,18 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   //      0.58 m apart, corners standing through a disc. out.extras is that
   //      list; isClear reads it. Coin perches now avoid the ante's slabs,
   //      which is what moved the fingerprint.
-  //  13. TWICE THE CLIMB. Zones 20 -> 34, ceiling 85 -> 92 of an engine limit
-  //      of 94 for 25 parcels, and the rise per hop cut to 0.28-0.58 so the
-  //      extra sections spread over the height instead of piling into a
-  //      plateau - 55 pads were pinned at the ceiling on the first attempt.
-  //      Pads 137 -> 221. Harder with height, as asked: every top section now
-  //      carries a hazard where it used to be 85% of them, beams turn at 108
-  //      instead of 90, and landings narrow to 2.0 m instead of 2.3.
-  const PINNED = '54930c1b'
+  //  13. a WIDER tower, not a denser one. The first attempt doubled the zones
+  //      alone: 221 pads squeezed into a shaft 17 m across read as noise and
+  //      crowded the start gate. The scene is 80 m wide with its walls at 38
+  //      and the climb was using a ring 6-17, so the room was sideways, not
+  //      upward - the engine caps height at log2(26)*20 = 94 m and the old
+  //      climb already stood at 76.
+  //      Ring 6-21 (trees sit at 23.7, which is the ceiling on that), zones
+  //      20 -> 30, rise cut to 0.42-0.66 so the extra sections spread instead
+  //      of piling at the top. 137 -> 205 pads, 76.3 -> 84.1 m, checkpoints
+  //      6 -> 9, hazards 20. Median gap to the nearest pad at the same height
+  //      is 3.13 m, which is what stops it reading as a heap.
+  const PINNED = 'cf1ede11'
   note(fingerprint === PINNED, 'the tower is the tower the records were set on',
     'fingerprint ' + fingerprint)
 }
