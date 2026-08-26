@@ -358,6 +358,35 @@ export function buildTower(): Layout {
   // INSIDE the disc and the whole gateway looked like it was floating.
   last.size = Math.max(last.size, 9.0)
 
+  /**
+   * Widening the crown ate the jump onto it.
+   *
+   * The last hop was placed against a normal-sized pad and then the crown grew
+   * to nine metres, which is measured edge to edge - so a perfectly good jump
+   * collapsed to 0.80 m and the two slabs read as touching. The pad did not
+   * move; the thing it was measured against did.
+   *
+   * Push the crown out along the line it is approached from until the gap is a
+   * jump again. It is the last pad, nothing is placed after it, and the shaft
+   * check keeps it honest.
+   */
+  const approach = out.pads[out.pads.length - 2]
+  if (approach) {
+    let dx = last.x - approach.x
+    let dz = last.z - approach.z
+    const span = Math.hypot(dx, dz) || 1
+    dx /= span
+    dz /= span
+    const want = MIN_GAP + (last.size + approach.size) / 2
+    for (let push = span; push < want; push += 0.2) {
+      const x = approach.x + dx * push
+      const z = approach.z + dz * push
+      if (!inShaft(x, z, last.y)) break
+      last.x = x
+      last.z = z
+    }
+  }
+
   widenLandings(out)
 
   relaxSightLines(out)
@@ -379,6 +408,42 @@ export function buildTower(): Layout {
    * Last is the right place for the shortcut: its own pressure pads are not
    * pushed into out.pads, so nothing built afterwards can see them either.
    */
+  /**
+   * Clamp every sweep AGAIN, now that all the pads exist.
+   *
+   * clampSweep runs when a bar is created, against the pads standing at that
+   * moment - and the tower keeps growing afterwards. A pad laid later can come
+   * to rest inside a circle that was clear when it was measured. Doubling the
+   * sections made that certain rather than merely possible: measured, a bar
+   * cutting 0.30 m into a 2.8 m slab seven metres up.
+   *
+   * The same shape as the shortcut choosing its pads before the coin perches
+   * existed. Anything measured against a list that is still being written has
+   * to be measured once more when the writing stops.
+   */
+  for (const bar of out.spinners) {
+    bar.length = clampSweep(out, bar.x, bar.y, bar.z, bar.length)
+  }
+
+  /**
+   * A bar whose hub stands INSIDE a pad cannot be saved by shortening it, so
+   * clampSweep leaves it alone and it keeps cutting. That happens at the very
+   * top: the last section hangs its hazard, and then the crown is widened to
+   * 9 m and swallows the hub whole. Measured, it took 0.22 m out of the crown.
+   *
+   * There is no length that fixes it and no height that keeps the hazard
+   * meaningful, so the bar goes. A summit with a beam through its floor is
+   * worse than a summit with no beam.
+   */
+  const hubBuried = (bar: { x: number; y: number; z: number }) => {
+    for (const pad of out.pads) {
+      if (Math.abs(pad.y - bar.y) >= 0.5 + HAZARD_THICKNESS / 2) continue
+      if (Math.hypot(pad.x - bar.x, pad.z - bar.z) < pad.size * 0.7072 + 0.15) return true
+    }
+    return false
+  }
+  out.spinners = out.spinners.filter((bar) => !hubBuried(bar))
+
   const plate = buildPlate(out)
   const coin = buildCoin(out)
   const pickups = buildPickups(out)
@@ -657,7 +722,10 @@ function buildPlate(out: Build): PlateDef | null {
         const x = start.pad.x + Math.cos(away) * reach
         const z = start.pad.z + Math.sin(away) * reach
         if (!inDetourAir(x, z)) continue
-        if (!isClear(out, x, start.pad.y, z, size, start.pad)) continue
+        // start.pad is NOT excused. Belonging to a landing is not permission
+        // to stand inside it: measured, the plate took 0.20 m out of a 4.6 m
+        // checkpoint, and what shows is a disc growing out of the slab side.
+        if (!isClear(out, x, start.pad.y, z, size)) continue
 
         out.extras.push({ x, y: start.pad.y + 0.4, z, size })
         return {

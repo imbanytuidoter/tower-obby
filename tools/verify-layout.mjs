@@ -728,7 +728,20 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     let worst = 0
     let where = 'no bar reaches a pad at its own height'
 
-    for (const bar of [...t.spinners, ...t.movers]) {
+    /**
+     * Movers are not bars.
+     *
+     * They were folded into this check with `bar.length ?? 6`, which invents a
+     * six-metre rotating stick for an object that is a box sliding along one
+     * axis. So the check reported a mover "cutting" the crown when nothing of
+     * the sort was happening, and no clamp could ever have satisfied it - the
+     * shape it was measuring did not exist.
+     *
+     * A rule applied to the wrong model is worse than no rule: it fails
+     * honestly-looking failures that cannot be fixed, which is how an hour
+     * gets spent shortening something that was never too long.
+     */
+    for (const bar of t.spinners) {
       const reach = (bar.length ?? 6) / 2
       const lo = bar.y - cfg.HAZARD_THICKNESS / 2
       const hi = bar.y + cfg.HAZARD_THICKNESS / 2
@@ -1293,7 +1306,14 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   //      0.58 m apart, corners standing through a disc. out.extras is that
   //      list; isClear reads it. Coin perches now avoid the ante's slabs,
   //      which is what moved the fingerprint.
-  const PINNED = '5407e726'
+  //  13. TWICE THE CLIMB. Zones 20 -> 34, ceiling 85 -> 92 of an engine limit
+  //      of 94 for 25 parcels, and the rise per hop cut to 0.28-0.58 so the
+  //      extra sections spread over the height instead of piling into a
+  //      plateau - 55 pads were pinned at the ceiling on the first attempt.
+  //      Pads 137 -> 221. Harder with height, as asked: every top section now
+  //      carries a hazard where it used to be 85% of them, beams turn at 108
+  //      instead of 90, and landings narrow to 2.0 m instead of 2.3.
+  const PINNED = '54930c1b'
   note(fingerprint === PINNED, 'the tower is the tower the records were set on',
     'fingerprint ' + fingerprint)
 }

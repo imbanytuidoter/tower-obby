@@ -9,7 +9,7 @@
  * ranking and every reason two players would speak to each other. Difficulty
  * now ramps with altitude, which is what the ramp was always for.
  */
-export const TOWER_ZONES = 20
+export const TOWER_ZONES = 34
 
 /** Kept only so the tower is reproducible; the seed never changes. */
 export const TOWER_SEED = 20260904
@@ -484,7 +484,7 @@ export const RANKING_SIZE = 3
 export const RANKING_SECONDS = 1
 
 /** Hard ceiling for pad height. The 3x3 parcel scene allows about 66m. */
-export const MAX_PAD_HEIGHT = 85
+export const MAX_PAD_HEIGHT = 92
 
 /**
  * A new pad must keep this much clear air from any other pad within
@@ -886,7 +886,7 @@ export function curve(progress: number) {
     // Narrower than they were (3.9 -> 3.3 at the foot). A pad's width and the
     // gap beside it are read together: at 3.9 m wide with a 2 m gap the slabs
     // touch to the eye no matter what the number says.
-    padSize: lerp(3.3, 2.3),
+    padSize: lerp(3.4, 2.0),
     /**
      * The gap between pad EDGES - this is the distance actually jumped.
      * Centre-to-centre was the wrong thing to tune: with 3.2m pads a 4.2m
@@ -902,20 +902,20 @@ export function curve(progress: number) {
     // stops being a test of nerve and becomes a coin toss. This is as far as
     // the gaps go while the tower is still a climb rather than a lottery:
     // 1.31x on the widest gap, 1.27x at the bottom, 72% of the airtime.
-    jumpGap: lerp(2.2, 4.6),
+    jumpGap: lerp(1.9, 4.7),
     /** The shortest hop allowed at this height. See MIN_GAP_LOW. */
     minGap: lerp(MIN_GAP_LOW, MIN_GAP),
-    rise: lerp(0.75, 1.08),
+    rise: lerp(0.28, 0.58),
     // Slowed on request. Every knob in this block is applied AFTER the random
     // draws that place pads, so turning them changes how hard the tower is to
     // survive without changing its shape - the fingerprint check proves it.
-    spinnerSpeed: 34 + t * 56,
+    spinnerSpeed: 34 + t * 74,
     // Shorter overhang past the ring it guards, so the ends of a beam stop
     // reaching over ground a climber has no business defending.
     spinnerReach: lerp(1.4, 2.4),
     moverSpeed: 0.9 + t * 1.5,
     moverReach: lerp(2, 3.4),
     /** Share of sections that get a hazard on top of their own shape. */
-    hazardChance: lerp(0, 0.85)
+    hazardChance: lerp(0, 1)
   }
 }
