@@ -707,6 +707,47 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     note(worstBite === 0, 'no co-op pad cuts into a pad it is not standing on', where)
   }
 
+  /**
+   * No sweeping bar may slice a pad.
+   *
+   * Every bar hangs HAZARD_CLEARANCE above the pad it guards, which clears
+   * THAT pad and says nothing about the neighbours - and its length came from
+   * its own pad's size. A twelve-metre arm turning at one height meets
+   * whatever else stands at that height: measured, one cut 6 cm into a 2.45 m
+   * slab six metres away.
+   *
+   * Six centimetres is nothing to walk into and everything to look at. At that
+   * separation the depth buffer cannot choose between the two surfaces, so the
+   * overlap tears into a fan of flickering shards - photographed twice and
+   * reported as a texture bug, and invisible to every check here because a
+   * bar is not a pad and nothing compared the two.
+   */
+  {
+    const t = buildTower()
+    const half = 0.5 + cfg.HAZARD_THICKNESS / 2
+    let worst = 0
+    let where = 'no bar reaches a pad at its own height'
+
+    for (const bar of [...t.spinners, ...t.movers]) {
+      const reach = (bar.length ?? 6) / 2
+      const lo = bar.y - cfg.HAZARD_THICKNESS / 2
+      const hi = bar.y + cfg.HAZARD_THICKNESS / 2
+      for (const pad of t.pads) {
+        if (Math.abs(pad.y - bar.y) >= half) continue
+        // Corner distance: a square's corner is what a turning bar meets first.
+        if (Math.hypot(pad.x - bar.x, pad.z - bar.z) - pad.size * 0.7072 > reach) continue
+        const cut = Math.min(hi, pad.y + 0.5) - Math.max(lo, pad.y - 0.5)
+        if (cut > worst) {
+          worst = cut
+          where = 'a bar cuts ' + cut.toFixed(2) + ' m of a ' + pad.size.toFixed(1) +
+            ' m pad at ' + pad.y.toFixed(1) + ' m'
+        }
+      }
+    }
+
+    note(worst === 0, 'no sweeping bar slices a pad', where)
+  }
+
   note(rollWidth >= 1.4,
     'the crown banners are wide enough to carry a name',
     rollWidth.toFixed(2) + ' m of cloth per banner, 1.40 m of text')
@@ -1191,7 +1232,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 74
+const MIN_CHECKS = 75
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 

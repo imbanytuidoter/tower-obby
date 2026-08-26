@@ -1018,7 +1018,7 @@ function ringOfPlatforms(index: number, cursor: Cursor, c: ReturnType<typeof cur
     // fills the screen. Half that length sweeps one side at a time, so the far
     // side of the ring is somewhere to wait - a beam you read rather than a
     // slab you endure.
-    length: reach + c.spinnerReach,
+    length: clampSweep(out, hubX, ring[0].y + HAZARD_CLEARANCE, hubZ, reach + c.spinnerReach),
     speed: (rng.next() < 0.5 ? -1 : 1) * c.spinnerSpeed,
     phase: rng.range(0, 360)
   })
@@ -1051,7 +1051,7 @@ function spinnerFloor(index: number, cursor: Cursor, c: ReturnType<typeof curve>
       x: cursor.x,
       y: cursor.y + HAZARD_CLEARANCE,
       z: cursor.z,
-      length: armLength,
+      length: clampSweep(out, cursor.x, cursor.y + HAZARD_CLEARANCE, cursor.z, armLength),
       speed: spinDirection * c.spinnerSpeed,
       phase: startPhase + arm * 90
     })
@@ -1360,7 +1360,7 @@ function theLever(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rn
     x: guarded.x,
     y: guarded.y + HAZARD_CLEARANCE,
     z: guarded.z,
-    length: guarded.size + c.spinnerReach,
+    length: clampSweep(out, guarded.x, guarded.y + HAZARD_CLEARANCE, guarded.z, guarded.size + c.spinnerReach),
     speed: (rng.next() < 0.5 ? -1 : 1) * c.spinnerSpeed,
     phase: rng.range(0, 360),
     leverSection: index
@@ -1588,6 +1588,38 @@ function inShaft(x: number, z: number, y: number): boolean {
  * ante detours were rejected 0.05 m short, by the very landing they hang off.
  * A normal hop never hits this because it measures edge to edge.
  */
+/**
+ * Shortens a sweeping bar until it stops slicing pads it does not belong to.
+ *
+ * Every bar is hung HAZARD_CLEARANCE above the pad it guards, which leaves it
+ * exactly clear of THAT pad - and its length is chosen from that pad's size
+ * with no regard for what else is within reach. A bar 12 m long sweeping a
+ * circle at one height will meet any neighbour standing at the same height,
+ * and it does: measured, one arm cut 6 cm into a 2.45 m slab six metres away.
+ *
+ * Six centimetres is nothing to walk into and everything to look at. Two
+ * surfaces that close are coplanar as far as the depth buffer is concerned,
+ * so the overlap tears into a fan of flickering shards - which is what a
+ * player photographed twice and called a texture bug.
+ *
+ * The bar is shortened rather than raised: lifting it would change what the
+ * jump underneath it demands, and the reach is decoration where the timing is
+ * the mechanic.
+ */
+function clampSweep(out: Build, x: number, y: number, z: number, length: number): number {
+  let limit = length
+  for (const pad of out.pads) {
+    // Vertical bands overlap? Pads are 1 m tall, so half of one plus half the
+    // bar is the distance at which they can still meet.
+    if (Math.abs(pad.y - y) >= 0.5 + HAZARD_THICKNESS / 2) continue
+    // Corner distance, not edge: a square's corner is what a circle meets first.
+    const clearOf = Math.hypot(pad.x - x, pad.z - z) - pad.size * 0.7072 - 0.15
+    if (clearOf <= 0) continue
+    limit = Math.min(limit, clearOf * 2)
+  }
+  return Math.max(1.2, limit)
+}
+
 function isClear(out: Build, x: number, y: number, z: number, size: number, except?: Pad): boolean {
   for (const pad of out.pads) {
     if (pad === except) continue
