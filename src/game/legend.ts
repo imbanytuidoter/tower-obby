@@ -409,30 +409,16 @@ export function createLegend() {
   const sampleAcross = -(LEGEND_W / 2 - 0.75)
   const textAcross = -(LEGEND_W / 2 - 1.55)
 
-  /**
-   * A recessed lane for the sample column.
-   *
-   * The samples were floating against the same flat panel as the text, at the
-   * very edge of it, and the beam - the widest of them - looked like it was
-   * hanging off the board. A darker inset behind them costs one material and
-   * does two jobs: it gives the column a defined left margin, and it separates
-   * the objects from the words so the eye reads two columns instead of one
-   * ragged one.
-   */
-  const lanePos = onFace(0.05, sampleAcross)
-  const lane = engine.addEntity()
-  Transform.create(lane, {
-    position: Vector3.create(lanePos.x, firstRowY - (ROWS.length - 1) * ROW_H / 2, lanePos.z),
-    rotation,
-    scale: Vector3.create(1.34, ROWS.length * ROW_H + 0.24, 0.04)
-  })
-  MeshRenderer.setBox(lane)
-  Material.setPbrMaterial(lane, {
-    albedoColor: Color4.create(0.07, 0.09, 0.14, 1),
-    metallic: 0,
-    roughness: 1,
-    castShadows: false
-  })
+    // No inset behind the sample column any more.
+  //
+  // It was a darker box meant to give the icons a lane of their own, and its
+  // front face sat at exactly 0.07 - the same plane as the panel's own front
+  // face. Two coplanar surfaces give the depth buffer nothing to choose
+  // between, so it flickered and tore a ragged diagonal across the board,
+  // which is what got photographed and called crooked text.
+  //
+  // Deleted rather than nudged forward: it was decoration that explained
+  // nothing, and the icons read perfectly well against the panel itself.
 
   for (let i = 0; i < ROWS.length; i++) {
     const row = ROWS[i]
