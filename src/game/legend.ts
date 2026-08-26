@@ -115,7 +115,19 @@ const LEGEND_Z = LOBBY_Z + GATE_DIR_Z * LEGEND_FORWARD + SIDE_OF_GATE_Z * LEGEND
  * ever look square, from any angle, because everything around it shares that
  * angle.
  */
-const LEGEND_YAW = (Math.atan2(-GATE_DIR_X, -GATE_DIR_Z) * 180) / Math.PI
+/**
+ * Turned a quarter turn: it faces ACROSS the lobby, not down it.
+ *
+ * Square to the gate axis it stood facing the spawn, which meant walking up
+ * and standing in front of it to read it. Standing off to one side and turned
+ * inward, its face is what you see from the path you are already walking, and
+ * the board is beside you rather than in your way.
+ *
+ * The direction is derived, not typed: it faces back along the side axis it
+ * was pushed out on, so the board always looks at the middle of the lobby
+ * whichever side that turns out to be.
+ */
+const LEGEND_YAW = (Math.atan2(-SIDE_OF_GATE_X, -SIDE_OF_GATE_Z) * 180) / Math.PI + 180
 
 const FRONT_X = -Math.sin((LEGEND_YAW * Math.PI) / 180)
 const FRONT_Z = -Math.cos((LEGEND_YAW * Math.PI) / 180)
