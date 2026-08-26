@@ -243,12 +243,26 @@ export function createLegend() {
 
   // Every layer is pushed clear of the one behind it, for the same reason the
   // leaderboard is: two surfaces sharing a plane z-fight and flicker.
+  /**
+   * The frame sits in the panel's OWN depth, not behind it.
+   *
+   * It used to be a slab centred 0.07 back, whose visible border ring was
+   * therefore 0.11 m behind the face it framed. Head-on that is invisible.
+   * Walk up to the board from the side - which is how everybody reaches it,
+   * because it is turned to face the spawn - and the two layers slide apart:
+   * the border goes fat on one edge and vanishes on the other, and the whole
+   * thing reads as a sign someone knocked crooked. That is what a player
+   * photographed and called crooked, and they were right about the symptom.
+   *
+   * Centred on the panel and made thicker instead, the border ring lands 0.02
+   * behind the face rather than 0.11 - the same 5x cut in apparent shift, for
+   * no extra material and no z-fighting.
+   */
   const backing = engine.addEntity()
-  const back = onFace(-0.07, 0)
   Transform.create(backing, {
-    position: Vector3.create(back.x, LEGEND_Y, back.z),
+    position: Vector3.create(LEGEND_X, LEGEND_Y, LEGEND_Z),
     rotation,
-    scale: Vector3.create(LEGEND_W + 0.22, LEGEND_H + 0.22, 0.06)
+    scale: Vector3.create(LEGEND_W + 0.22, LEGEND_H + 0.22, 0.10)
   })
   MeshRenderer.setBox(backing)
   Material.setPbrMaterial(backing, {
@@ -351,10 +365,19 @@ export function createLegend() {
     const row = ROWS[i]
     const y = firstRowY - i * ROW_H
 
-    // The sample stands well proud of the face. Flush against it, the disc
-    // read as a painted dot - which is the exact failure this board exists
-    // to fix, reproduced on the board itself.
-    const at = onFace(0.55, sampleAcross)
+    // Proud of the face, but not so proud it leaves the board.
+    //
+    // Flush against the panel the disc read as a painted dot - the exact
+    // failure this board exists to fix, reproduced on the board itself - so it
+    // was pushed out to 0.55. That overshot. The sample column sits at the far
+    // left margin, and 0.55 of relief seen from 55 degrees off-axis throws it
+    // 0.79 m sideways: past the panel edge at 2.8, hanging in open air. Every
+    // approach to this board is off-axis, because it is turned towards the
+    // spawn and reached from the lobby.
+    //
+    // 0.32 keeps the relief that makes a solid read solid and holds the swing
+    // to 0.46 m, which stays on the panel from any angle a player can stand at.
+    const at = onFace(0.32, sampleAcross)
     row.sample(Vector3.create(at.x, y, at.z), rotation)
 
     const textPos = onFace(0.17, textAcross)

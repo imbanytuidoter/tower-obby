@@ -570,12 +570,26 @@ function createBoard() {
 
   // Every layer is pushed clear of the one behind it. Two surfaces sharing a
   // plane z-fight and flicker, which is what made the old board look broken.
+  /**
+   * The frame sits in the panel's OWN depth, not behind it.
+   *
+   * It used to be a slab centred 0.07 back, whose visible border ring was
+   * therefore 0.11 m behind the face it framed. Head-on that is invisible.
+   * Walk up to the board from the side - which is how everybody reaches it,
+   * because it is turned to face the spawn - and the two layers slide apart:
+   * the border goes fat on one edge and vanishes on the other, and the whole
+   * thing reads as a sign someone knocked crooked. That is what a player
+   * photographed and called crooked, and they were right about the symptom.
+   *
+   * Centred on the panel and made thicker instead, the border ring lands 0.02
+   * behind the face rather than 0.11 - the same 5x cut in apparent shift, for
+   * no extra material and no z-fighting.
+   */
   const backing = engine.addEntity()
-  const back = front(-0.07)
   Transform.create(backing, {
-    position: Vector3.create(back.x, BOARD_Y, back.z),
+    position: Vector3.create(BOARD_X, BOARD_Y, BOARD_Z),
     rotation,
-    scale: Vector3.create(BOARD_W + 0.22, BOARD_H + 0.22, 0.06)
+    scale: Vector3.create(BOARD_W + 0.22, BOARD_H + 0.22, 0.10)
   })
   MeshRenderer.setBox(backing)
   // A carved frame, not a lit screen. The neon outline made this read as a
