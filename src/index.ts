@@ -30,6 +30,7 @@ import {
   DailyBoard,
   PairBoard,
   Ghost,
+  Wall,
   protectServerState,
   LeverState,
   Ranking,
@@ -84,7 +85,7 @@ import {
   World
 } from './game/build'
 import { legendCoin } from './game/legend'
-import { crownHalo, setGreeting } from './game/build'
+import { crownHalo, setCrownRoll, setGreeting } from './game/build'
 import { applyFairness, freezeAfterFall } from './game/fairness'
 import { formatTime } from './game/format'
 import { buildTower } from './game/layout'
@@ -108,6 +109,7 @@ let world: World | null = null
 let ghostPath: number[] = []
 let ghostMote: Entity | null = null
 let ghostLabel: Entity | null = null
+let wallStamp = ''
 
 export function main() {
   protectServerState()
@@ -279,6 +281,19 @@ function sharedRoundSystem(dt: number) {
       if (ghostLabel) {
         TextShape.getMutable(ghostLabel).text =
           ghost.name + '  ' + ghost.seconds.toFixed(1) + 's'
+      }
+    }
+
+    // The crown's roll. Compared by content, not by length: the same ten
+    // names in a new order is a real change - somebody climbed again - and
+    // comparing counts would miss every one of those, which is the mistake
+    // the ghost carried until it was measured.
+    const crown = Wall.getOrNull(entity)
+    if (crown) {
+      const stamp = crown.names.join('') + '' + crown.seconds.join('')
+      if (stamp !== wallStamp) {
+        wallStamp = stamp
+        setCrownRoll([...crown.names], [...crown.seconds])
       }
     }
 

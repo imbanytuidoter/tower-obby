@@ -610,6 +610,33 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   note(finishes.length === 1 && finishes[0].size >= 9,
     'the crown is wide enough to stand and look around',
     finishes.length === 1 ? finishes[0].size.toFixed(1) + ' m across' : 'n/a')
+
+  /**
+   * The roll of names hangs on the two banners, and their width is DERIVED
+   * from the crown: outer edge just inside the column shafts, inner edge
+   * leaving a 2 m gap so the greeter behind them is not walled off.
+   *
+   * Narrow the crown and that derivation quietly collapses - the banners
+   * shrink towards nothing and the names hang off cloth too small to hold
+   * them, which is precisely how the tandem plate once vanished when the pads
+   * were widened for mobile. Nothing renders an error for it; the wall would
+   * simply stop being readable, and only on the one pad nobody tests.
+   *
+   * Reproduced here from build.ts rather than imported, because build.ts
+   * imports the SDK and will not compile standalone. If the two ever disagree
+   * this check is worthless, so it asserts the INPUT the derivation needs -
+   * the width - and not the arithmetic itself.
+   */
+  const ROLL_GAP = 1.0
+  const PLINTH_HALF = 0.75
+  const half = finishes.length === 1
+    ? Math.max(1.6, finishes[0].size / 2 - PLINTH_HALF - 0.3)
+    : 0
+  const rollWidth = half - 0.55 - ROLL_GAP
+  // Ten characters and a time at fontSize 1.5 measure about 1.4 m of text.
+  note(rollWidth >= 1.4,
+    'the crown banners are wide enough to carry a name',
+    rollWidth.toFixed(2) + ' m of cloth per banner, 1.40 m of text')
 }
 
 // The jungle floor exists, stays out of the way, and stays affordable.
@@ -1079,7 +1106,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 71
+const MIN_CHECKS = 72
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 

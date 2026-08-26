@@ -69,6 +69,19 @@ export const Ghost = engine.defineComponent('obby::ghost', {
   path: Schemas.Array(Schemas.Float)
 })
 
+/**
+ * The last climbers to reach the crown, newest first.
+ *
+ * Not the fastest - that is what the two boards in the lobby are for. This is
+ * who was HERE, which is the only list a slow player can ever appear on, and
+ * the whole point of carrying it to the top is that you read it standing where
+ * they stood.
+ */
+export const Wall = engine.defineComponent('obby::wall', {
+  names: Schemas.Array(Schemas.String),
+  seconds: Schemas.Array(Schemas.Float)
+})
+
 /** Sections whose beam is currently held still by somebody on a lever pad. */
 export const LeverState = engine.defineComponent('obby::levers', {
   halted: Schemas.Array(Schemas.Int)
@@ -128,4 +141,5 @@ export function protectServerState() {
   Board.validateBeforeChange(serverOnly)
   DailyBoard.validateBeforeChange(serverOnly)
   PairBoard.validateBeforeChange(serverOnly)
+  Wall.validateBeforeChange(serverOnly)
 }

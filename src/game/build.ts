@@ -24,14 +24,13 @@ import {
   PAD_EMISSIVE,
   SHADOW_MAX_HEIGHT,
   CELEBRATION_SHARDS,
-  SIGN_RANGE,
-  SIGN_RISE,
   CHECKPOINT_EVERY_SECTIONS,
   TOWER_ZONES,
   FINISH_RADIUS,
   FINISH_TOUCH_MARGIN,
   HAZARD_THICKNESS,
-  PAD_RADIUS
+  PAD_RADIUS,
+  WALL_SIZE
 } from './config'
 import {
   backdropRing,
@@ -1309,6 +1308,46 @@ export let crownHalo: Entity | null = null
 export let greeterLine: Entity | null = null
 
 /**
+ * The crown's roll of names, in display order: newest first.
+ *
+ * Filled by the client whenever the server publishes a new Wall, which is the
+ * only place the list exists - the crown builds the empty rows and never
+ * invents a name for one.
+ */
+export const crownRoll: (Entity | null)[] = []
+
+export function setCrownRoll(names: string[], seconds: number[]) {
+  for (let i = 0; i < crownRoll.length; i++) {
+    const line = crownRoll[i]
+    if (!line) continue
+    const shape = TextShape.getMutableOrNull(line)
+    if (!shape) continue
+
+    if (i >= names.length) {
+      // An empty world says so on the first row rather than hanging a heading
+      // over ten blank slots. Nobody has climbed it yet is a fact worth
+      // reading, and it is the only invitation this scene can honestly make.
+      shape.text = i === 0 && names.length === 0 ? 'BE THE FIRST' : ''
+      continue
+    }
+
+    /**
+     * Nine characters is what fits the cloth, measured rather than guessed.
+     *
+     * At fontSize 1.5 a character is about 0.105 m wide on this banner - taken
+     * off a screenshot, by counting pixels across the heading and dividing by
+     * the banner's known 1.9 m - so a nine-character name plus '  12.4s' comes
+     * to 1.58 m and leaves a margin at each edge. The first build put a
+     * twenty-five character line on it and the words hung past both sides of
+     * the cloth into open air, which is the same failure the legend's samples
+     * had and is worse than a name that is simply cut.
+     */
+    const name = names[i].length > 9 ? names[i].slice(0, 8) + '.' : names[i]
+    shape.text = name + '  ' + (seconds[i] ?? 0).toFixed(1) + 's'
+  }
+}
+
+/**
  * Shows or hides what the owl says.
  *
  * Called on a completed run and on the reset that follows it, so the summit
@@ -1407,7 +1446,7 @@ function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
   block(at(0, 5), Vector3.create(span + 1.1, 0.2, 0.9), STONE_DARK)
   gold(at(0, 4.86, 0.45), Vector3.create(span + 0.6, 0.1, 0.12), 4)
 
-  // Two banners off the lintel.
+  // Two banners off the lintel, and they carry the roll of names.
   //
   // The crown had the geometry of a monument and none of the ceremony: a
   // slab, two posts, a beam. Cloth is what tells you a place was DRESSED for
@@ -1416,12 +1455,31 @@ function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
   // One in each of the two colours a player has been reading for the whole
   // climb - the cyan that meant safe ground and the gold that meant the goal.
   // Nothing new to learn at the top.
+  //
+  // They were pure decoration until now, and the crown had no room left for a
+  // monument of its own: the far edge is the greeter's, the centre is where
+  // you land, and a stele anywhere on the near half is something to walk into.
+  // The banners were already hanging at reading height, already facing the
+  // arrival, already meaning ceremony - and text costs no material at all, so
+  // the roll goes on the thing that was built to carry it.
+  //
+  // WIDTH is derived, not chosen. The outer edge stops just inside the column
+  // shaft (half - 0.5 is its inner face) and the inner edge leaves a 2 m gap
+  // down the middle, because the greeter stands dead centre behind them and a
+  // pair of banners that meet in the middle is a pair of banners that hide it.
+  const ROLL_GAP = 1.0
+  const rollOuter = half - 0.55
+  const rollWidth = Math.max(0.9, rollOuter - ROLL_GAP)
+  const rollSide = ROLL_GAP + rollWidth / 2
+  // Clear of the shafts, which reach out to 0.5 either side of the columns.
+  const rollOut = 0.75
+
   for (const direction of [-1, 1]) {
     const banner = engine.addEntity()
     Transform.create(banner, {
-      position: at(direction * (half - 0.55), 3.35, 0.5),
+      position: at(direction * rollSide, 3.35, rollOut),
       rotation,
-      scale: Vector3.create(1.15, 3.5, 0.06)
+      scale: Vector3.create(rollWidth, 3.5, 0.06)
     })
     MeshRenderer.setBox(banner)
     Material.setPbrMaterial(banner, {
@@ -1433,6 +1491,77 @@ function createGoal(pad: Pad, fromX: number, fromZ: number): Entity[] {
     })
     made.push(banner)
   }
+
+  /**
+   * The roll itself: WALL_SIZE rows, split evenly down the two banners.
+   *
+   * Row count comes from config, never from a number typed here - the legend
+   * board shipped the wrong number of coins twice for exactly that reason.
+   *
+   * Two sign conventions, and both were got wrong on the first build here.
+   *
+   * `out` runs along the approach direction, and a climber arrives from the
+   * far side of it - so anything meant to be read on arrival sits at a
+   * SMALLER out than the thing it labels, never a larger one. The heading went
+   * on at +0.62 against a lintel that only reaches 0.55, which put it behind
+   * the beam it was carved into, invisible from the only place it is read.
+   *
+   * And the rotation is plain `yaw`, NOT yaw + 180. A TextShape in this client
+   * reads from its local -Z - the same fact that makes Billboard BM_Y turn -Z
+   * at the camera - so aligning local +Z with the approach direction is what
+   * turns the words towards the person walking in. Turned the other way it
+   * renders mirrored, which is what shipped: NOBODY YET - BE THE FIRST,
+   * backwards, on the cloth. The greeter beside it does use yaw + 180, and
+   * that is not a contradiction: it is a model, and a model faces along its
+   * own forward axis.
+   */
+  const rows = Math.max(1, Math.floor(WALL_SIZE / 2))
+  const ROW_STEP = 3.5 / (rows + 1)
+  const rollRotation = rotation
+
+  for (const direction of [-1, 1]) {
+    for (let row = 0; row < rows; row++) {
+      const line = engine.addEntity()
+      Transform.create(line, {
+        position: at(direction * rollSide, 3.35 + 1.75 - ROW_STEP * (row + 1), rollOut - 0.08),
+        rotation: rollRotation
+      })
+      TextShape.create(line, {
+        text: '',
+        fontSize: 1.5,
+        textColor: Color4.create(0.12, 0.14, 0.18, 1),
+        outlineColor: Color4.create(1, 1, 1, 0.55),
+        outlineWidth: 0.12,
+        textAlign: TextAlignMode.TAM_MIDDLE_CENTER
+      })
+      made.push(line)
+      /**
+       * Newest names on the reader's LEFT, because a list that starts on the
+       * right reads backwards - which is how it first shipped.
+       *
+       * Which side that is falls out of the axes rather than out of taste. A
+       * viewer on the deck looks along `dir`; in this left-handed, Y-up space
+       * their right hand is up x forward = (dirZ, -dirX), which is exactly
+       * -across. So `across` points to their left, and the +1 banner - the
+       * gold one - is the one they read first. Confirmed against a screenshot
+       * before it was written down.
+       */
+      crownRoll[(direction > 0 ? 0 : rows) + row] = line
+    }
+  }
+
+  // The heading goes on the lintel, which is span + 1.7 across and was blank.
+  const frieze = engine.addEntity()
+  Transform.create(frieze, { position: at(0, 5.5, -0.62), rotation: rollRotation })
+  TextShape.create(frieze, {
+    text: 'WHO STOOD HERE BEFORE YOU',
+    fontSize: 2.1,
+    textColor: FINISH_ALBEDO,
+    outlineColor: Color4.Black(),
+    outlineWidth: 0.25,
+    textAlign: TextAlignMode.TAM_MIDDLE_CENTER
+  })
+  made.push(frieze)
 
   // A stepped dais under the slab.
   //

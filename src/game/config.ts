@@ -85,6 +85,17 @@ export const SKYBOX_TIME = 57600
  * Ghost sampling. Two a second for at most five minutes: 600 samples, 1800
  * floats, about 7 KB - inside the 13 KB the transport will carry.
  */
+/**
+ * How many climbers the crown remembers.
+ *
+ * Five to a banner, and there are two banners - so this number is not free to
+ * drift. It lives here because the server slices the list to it and the crown
+ * builds exactly that many rows from it, and a hand-written count in either
+ * place is a promise to forget: the legend board has already shipped the wrong
+ * number of coins twice for precisely that reason.
+ */
+export const WALL_SIZE = 10
+
 export const GHOST_SAMPLE_SECONDS = 0.5
 export const GHOST_MAX_SAMPLES = 600
 
@@ -575,27 +586,6 @@ export const PROMPT_RANGE = 11
 /** How close to a junction the fork's price appears. Tighter than the general
  *  prompt range: three metres away it is not your decision yet. */
 export const FORK_PROMPT_RANGE = 5
-
-/**
- * How close you must be for a route sign to appear.
- *
- * They are billboards and were always on, so the fork's price tags hung over
- * the treeline and were read from the lobby, fifty metres from the choice.
- * A decision you are not standing in front of is not information.
- */
-export const SIGN_RANGE = 9
-
-/**
- * How much harder height counts than width when deciding if a sign is yours.
- *
- * The tower is vertical, so metres up are worth far more than metres across:
- * a sign one floor above is describing somebody else's problem. Used as a
- * multiplier inside a single distance rather than as a separate threshold -
- * two independent windows let the lever's label qualify on a technicality
- * from five metres higher and eight metres away, and it lit up in the middle
- * of the piston hall.
- */
-export const SIGN_RISE = 2.5
 
 /** Pads are kept inside these bounds so nothing hangs over the parcel edge. */
 export const MIN_XZ = 5

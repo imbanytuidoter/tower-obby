@@ -18,6 +18,7 @@ import {
   COIN_RADIUS,
   GHOST_MAX_SAMPLES,
   GHOST_SAMPLE_SECONDS,
+  WALL_SIZE,
   PICKUP_GRACE,
   PICKUP_RADIUS,
   PLATE_RISE_RATE,
@@ -32,6 +33,7 @@ import {
   PairBoard,
   Ranking,
   Ghost,
+  Wall,
   ServerHeartbeat,
   ShortcutState,
   TandemState
@@ -41,6 +43,7 @@ const STORAGE_KEY = 'obby.board.v2'
 const DAILY_KEY = 'obby.daily.v1'
 const PAIRS_KEY = 'obby.pairs.v1'
 const PLAYER_KEY = 'obby.stats.v1'
+const WALL_KEY = 'obby.wall.v1'
 
 /**
  * The recorded climb, kept in its own key.
@@ -126,6 +129,9 @@ const tookCoin = new Set<string>()
 
 /** Climbers the server has invited to upload a path, because they lead today. */
 const pendingGhost = new Map<string, { name: string; seconds: number }>()
+
+/** Who last stood on the crown, newest first. Not sorted by time - see Wall. */
+let wall: Entry[] = []
 /**
  * Players whose in-memory stats have run ahead of what is on disk.
  *
@@ -147,6 +153,7 @@ export async function startServer() {
   Board.create(state, { names: [], seconds: [] })
   DailyBoard.create(state, { names: [], seconds: [], day: utcDay(Date.now()) })
   PairBoard.create(state, { names: [], seconds: [] })
+  Wall.create(state, { names: [], seconds: [] })
   Ranking.create(state, { names: [], heights: [], climbers: 0 })
   ShortcutState.create(state, { open: false })
   LeverState.create(state, { halted: [] })
@@ -159,6 +166,7 @@ export async function startServer() {
     Board.componentId,
     DailyBoard.componentId,
     PairBoard.componentId,
+    Wall.componentId,
     Ranking.componentId,
     ShortcutState.componentId,
     LeverState.componentId,
@@ -352,6 +360,12 @@ function handleClaim(name: string, from: string) {
   const record = board.length === 0 || seconds < board[0].seconds
   board = [...board, entry].sort((a, b) => a.seconds - b.seconds).slice(0, BOARD_SIZE)
   daily = [...daily, entry].sort((a, b) => a.seconds - b.seconds).slice(0, BOARD_SIZE)
+
+  // The crown's list is the one place a slow climber can appear, so it is
+  // ordered by WHEN and not by how fast. One row per person: without the
+  // filter a single player practising fills all ten and the wall stops being
+  // a record of anybody having been here but them.
+  wall = [entry, ...wall.filter((seen) => seen.name !== entry.name)].slice(0, WALL_SIZE)
   publishBoard()
 
   // A pair time is the point of the whole game, so it gets its own board.
@@ -687,6 +701,10 @@ function publishBoard() {
   const today = DailyBoard.getMutable(state)
   today.names = daily.map((entry) => entry.name)
   today.seconds = daily.map((entry) => entry.seconds)
+
+  const crown = Wall.getMutable(state)
+  crown.names = wall.map((entry) => entry.name)
+  crown.seconds = wall.map((entry) => entry.seconds)
 }
 
 /**
@@ -800,6 +818,9 @@ async function persistBoard() {
   })
   if (!okDaily) console.log('[SERVER] daily board did not persist')
 
+  const okWall = await Storage.set<Stored>(WALL_KEY, { version: 1, board: wall })
+  if (!okWall) console.log('[SERVER] crown wall did not persist')
+
   const okPairs = await Storage.set<Stored>(PAIRS_KEY, { version: 1, board: pairs })
   if (!okPairs) console.log('[SERVER] pair board did not persist')
 }
@@ -847,6 +868,18 @@ async function restoreBoard() {
     }
   } catch (error) {
     console.log('[SERVER] stored pair board unreadable: ' + error)
+  }
+
+  try {
+    const stored = await Storage.get<Stored>(WALL_KEY)
+    if (stored && stored.version === 1 && Array.isArray(stored.board)) {
+      wall = stored.board
+        .filter((entry) => typeof entry?.name === 'string' && typeof entry?.seconds === 'number')
+        .slice(0, WALL_SIZE)
+      console.log('[SERVER] restored ' + wall.length + ' names on the crown')
+    }
+  } catch (error) {
+    console.log('[SERVER] stored crown wall unreadable: ' + error)
   }
 
   await restoreGhost()
