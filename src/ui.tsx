@@ -240,7 +240,18 @@ const hud = () => {
       />
       {run.pickupsTotal > 0 && (
         <Label
-          value={'COINS ' + run.pickupsFound + '/' + run.pickupsTotal}
+          /*
+            The words change when it is finished, and nothing else does.
+            A second line would be the thing this HUD has twice been told to
+            stop doing on a phone, and the line is already gold, so colour has
+            nothing left to say. ALL 16 COINS is the same width as COINS 16/16
+            and reads as a thing earned rather than a bar still filling.
+          */
+          value={
+            run.pickupsFound >= run.pickupsTotal
+              ? 'ALL ' + run.pickupsTotal + ' COINS'
+              : 'COINS ' + run.pickupsFound + '/' + run.pickupsTotal
+          }
           fontSize={s.line}
           /* Gold, because the coins are gold. Hue carries identity here. */
           color={GOLD}

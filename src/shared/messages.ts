@@ -17,6 +17,17 @@ export const room = registerMessages({
     /** Cosmetic only - it labels a row on the board, it never sets a score. */
     name: Schemas.String
   }),
+  /**
+   * Somebody has found every coin in the tower. Announced to everyone.
+   *
+   * A summit is the loud event; this is the quiet one, and it is the only
+   * thing here that rewards exploring rather than climbing fast. Fires at
+   * most once per player - by the time the count is reached every coin is
+   * already spent for them, so no later claim gets far enough to send it.
+   */
+  collected: Schemas.Map({
+    name: Schemas.String
+  }),
   /** Somebody reached the crown. Announced to everyone, wherever they are. */
   summit: Schemas.Map({
     name: Schemas.String,

@@ -166,6 +166,14 @@ function startClient() {
     celebrate()
   })
 
+  // Somebody emptied the tower. Announced with the summit's sound, because it
+  // is the only note in this scene's vocabulary that means an achievement -
+  // the sixteenth coin used to play the same blip as a checkpoint.
+  room.onMessage('collected', (data) => {
+    announce(data.name + ' has found every coin in the tower', 6)
+    play('finish')
+  })
+
   // The server verified the player actually reached the coin. Nothing is
   // spent yet - the token is held until they decide it is worth using.
   room.onMessage('token', (data) => {

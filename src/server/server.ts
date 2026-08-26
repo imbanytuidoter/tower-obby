@@ -468,6 +468,24 @@ async function handlePickup(index: number, from: string) {
   haulDirty = true
   Haul.getMutable(state).coins = haul
 
+  /**
+   * A collection you can finish, and nothing happened when you finished it.
+   *
+   * Sixteen coins, a counter in the corner, and the sixteenth played the same
+   * blip as the first. The tower asked for a thing and never acknowledged
+   * being given it.
+   *
+   * Broadcast rather than answered privately, for the same reason a summit is:
+   * it is one of the very few things one player can learn about another in a
+   * world they are probably alone in. It can fire at most once per player -
+   * every coin is already found by the time the count is reached, so no
+   * further claim from them gets this far.
+   */
+  if (found.length >= tower.pickups.length) {
+    room.send('collected', { name: names.get(address) ?? 'Guest' })
+    console.log('[SERVER] ' + address + ' has found every coin')
+  }
+
   // Answered BEFORE the write. A storage call that stalls must not hold up
   // the one piece of feedback the player is waiting for; the find is already
   // true in memory, and the write is what makes it survive a restart.
