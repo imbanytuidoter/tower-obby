@@ -652,6 +652,61 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     : 0
   const rollWidth = half - 0.55 - ROLL_GAP
   // Ten characters and a time at fontSize 1.5 measure about 1.4 m of text.
+  /**
+   * The co-op discs, checked at the size the RENDERER draws them.
+   *
+   * This is the check that was missing for the whole life of the scene, and
+   * its absence is not an oversight about one object - it is the shape of the
+   * whole harness. Everything here compiles layout.ts, where a lever is a
+   * position and a number; the 4.4 m gold disc that appears in the world is
+   * created in build.ts, which imports the SDK and cannot be compiled here.
+   * So the model said 2.4 m and fitted, the world drew 4.4 m and did not, and
+   * seventy-three passing invariants had nothing to say about it.
+   *
+   * COOP_PAD_SIZE is now one constant read by the search, by createPressurePad
+   * and by this check, so the three cannot drift apart again without this
+   * failing. Circle against box, because that is what these two things are.
+   */
+  {
+    const t = buildTower()
+    const discs = [
+      ...t.levers.map((l) => ({ what: 'lever', ...l })),
+      ...(t.shortcut
+        ? [
+            { what: 'shortcut A', ...t.shortcut.padA },
+            { what: 'shortcut B', ...t.shortcut.padB }
+          ]
+        : [])
+    ]
+    const radius = cfg.COOP_PAD_SIZE / 2
+    let worstBite = 0
+    let where = 'nothing within reach of a pad'
+
+    for (const disc of discs) {
+      for (const pad of t.pads) {
+        if (Math.abs(pad.y - disc.y) > 1.0) continue
+        const half = pad.size / 2
+        // Nearest point on the square pad to the centre of the round disc.
+        const nx = Math.max(pad.x - half, Math.min(disc.x, pad.x + half))
+        const nz = Math.max(pad.z - half, Math.min(disc.z, pad.z + half))
+        const bite = radius - Math.hypot(disc.x - nx, disc.z - nz)
+        // A disc sitting ON its own pad is the point; it is the same size, so
+        // its centre is inside and the bite is the full radius. Anything that
+        // reaches into a pad it is NOT standing on is the defect.
+        const ownPad = Math.abs(pad.size - cfg.COOP_PAD_SIZE) < 0.01 &&
+          Math.hypot(pad.x - disc.x, pad.z - disc.z) < 0.01
+        if (ownPad || bite <= 0) continue
+        if (bite > worstBite) {
+          worstBite = bite
+          where = disc.what + ' cuts ' + bite.toFixed(2) + ' m into a ' +
+            pad.size.toFixed(1) + ' m ' + pad.kind
+        }
+      }
+    }
+
+    note(worstBite === 0, 'no co-op pad cuts into a pad it is not standing on', where)
+  }
+
   note(rollWidth >= 1.4,
     'the crown banners are wide enough to carry a name',
     rollWidth.toFixed(2) + ' m of cloth per banner, 1.40 m of text')
@@ -1109,7 +1164,19 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   //  10. the gap floor became a RAMP. A flat 4.0 against a 4.79 ceiling made
   //      the first zone as hard as the last; it is 2.9 at the foot now and
   //      4.0 at the crown, so the tower teaches before it tests.
-  const PINNED = 'a9e7fb66'
+  //  11. the CLEARANCE test stopped being radial. In the same-height band it
+  //      compared centre distance against half-and-half plus a margin, which
+  //      is right for two discs and wrong for two squares: a square's corner
+  //      stands at 0.707 of its width from the centre, not 0.5, so objects
+  //      could satisfy it and still overlap along the diagonal. The error
+  //      scales with size, so it bit hardest on the widest things in the
+  //      tower - the 4.4 m co-op discs - and a player photographed four of
+  //      them cutting through pads. Separating axis now. Side effects, all
+  //      measured: the climb stands 82.0 m instead of 74.6 m of an 85 m
+  //      ceiling, because pads that used to clip corners are now genuinely
+  //      apart, and the lever's own pad is COOP_PAD_SIZE so the disc drawn on
+  //      it covers it exactly. Same 137 pads.
+  const PINNED = '7d6e8fbf'
   note(fingerprint === PINNED, 'the tower is the tower the records were set on',
     'fingerprint ' + fingerprint)
 }
@@ -1124,7 +1191,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 73
+const MIN_CHECKS = 74
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 

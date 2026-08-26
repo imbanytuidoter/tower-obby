@@ -446,6 +446,26 @@ export const BOARD_SIZE = 10
  * broken to them.
  */
 export const PAD_RADIUS = 2.2
+
+/**
+ * How wide a pressure pad actually is in the world.
+ *
+ * This constant exists because the renderer and the layout disagreed about it
+ * for the entire life of the scene, and nothing could see the disagreement.
+ * createPressurePad has always drawn PAD_RADIUS * 2 - a 4.4 m disc - while
+ * findLeverSpot searched for a clear spot using a size between 2.4 and 3.4,
+ * and buildShortcut placed its two pads with no clearance test at all. So the
+ * model reserved 2.4 m and the world painted 4.4 m on top of it, and the
+ * harness could not possibly notice: it only ever compiles layout.ts, where
+ * the object really is 2.4 m and really does fit.
+ *
+ * What that looks like from inside the game is a wide pale disc with the
+ * corner of a pad emerging through it. It was reported with four screenshots.
+ *
+ * One number now, read by the search, by the renderer and by the invariant
+ * that checks them against each other.
+ */
+export const COOP_PAD_SIZE = PAD_RADIUS * 2
 /** How far apart the two pads sit: far enough that one person cannot hold both. */
 export const PAD_SEPARATION = 9
 /** Which section boundary the shortcut starts from. */

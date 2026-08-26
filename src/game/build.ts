@@ -30,6 +30,7 @@ import {
   FINISH_TOUCH_MARGIN,
   HAZARD_THICKNESS,
   PAD_RADIUS,
+  COOP_PAD_SIZE,
   WALL_SIZE,
   HAUL_TARGET
 } from './config'
@@ -738,7 +739,8 @@ function createPressurePad(at: { x: number; y: number; z: number }, entities: En
 
   Transform.create(pad, {
     position: Vector3.create(at.x, at.y, at.z),
-    scale: Vector3.create(PAD_RADIUS * 2, 0.2, PAD_RADIUS * 2)
+    // One number, shared with the search that reserved room for it.
+    scale: Vector3.create(COOP_PAD_SIZE, 0.2, COOP_PAD_SIZE)
   })
   MeshRenderer.setCylinder(pad)
   MeshCollider.setBox(pad)

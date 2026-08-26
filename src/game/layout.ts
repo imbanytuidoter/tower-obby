@@ -33,6 +33,7 @@ import {
   MAX_STEP_RISE,
   MIN_GAP,
   PAD_SEPARATION,
+  COOP_PAD_SIZE,
   PALM_COUNT,
   PALM_RING_RADIUS,
   PICKUP_COUNT,
@@ -231,6 +232,8 @@ export type ForkDef = {
  * same time by two different people, so one player cannot hold both - they are
  * placed PAD_SEPARATION apart for exactly that reason.
  */
+type Spot = { x: number; y: number; z: number }
+
 export type Shortcut = {
   padA: { x: number; y: number; z: number }
   padB: { x: number; y: number; z: number }
@@ -339,6 +342,26 @@ export function buildTower(): Layout {
 
   relaxSightLines(out)
 
+  /**
+   * Order matters here, and it was wrong.
+   *
+   * These four all APPEND to out.pads - the plate, the ante, and one detour
+   * pad under every coin - and every one of them checks clearance against the
+   * pads that exist when it runs. The shortcut used to be built first, inside
+   * an object literal that then created sixteen coin perches; so it chose its
+   * two pressure pads in a tower that was missing eighteen slabs, and one of
+   * them came to rest 1.90 m inside a perch that did not exist yet.
+   *
+   * Nothing could catch that by looking at either piece. The shortcut was
+   * clear when it was placed, the perch was clear when it was placed, and the
+   * two were never in the same room.
+   *
+   * Last is the right place for the shortcut: its own pressure pads are not
+   * pushed into out.pads, so nothing built afterwards can see them either.
+   */
+  const plate = buildPlate(out)
+  const coin = buildCoin(out)
+  const pickups = buildPickups(out)
   const shortcut = buildShortcut(out, curve(0.35))
 
   return {
@@ -349,9 +372,9 @@ export function buildTower(): Layout {
     sectionNames,
     shortcut,
     forks: out.forks,
-    plate: buildPlate(out),
-    coin: buildCoin(out),
-    pickups: buildPickups(out)
+    plate,
+    coin,
+    pickups
   }
 }
 
@@ -717,12 +740,57 @@ function buildShortcut(out: Build, c: ReturnType<typeof curve>): Shortcut | null
     const route = chordRoute(out, from, to, hops, c.padSize)
     if (!route) continue
 
-    const across = Math.atan2(from.z - CENTER_Z, from.x - CENTER_X) + Math.PI / 2
-    const half = PAD_SEPARATION / 2
+    /**
+     * The two pads are SEARCHED for, not assumed.
+     *
+     * They used to be dropped either side of the landing at a fixed offset
+     * with no clearance test of any kind - the only objects in the tower
+     * placed without one - and at 4.4 m across they reached straight into
+     * whatever pad happened to be next door. Measured: one of them took an
+     * 11% bite out of a neighbouring slab.
+     *
+     * Turning the axis and pushing the pair further apart costs nothing and
+     * keeps them symmetric about the landing, which is the whole point of the
+     * shape: two people, one either side.
+     */
+    const baseAcross = Math.atan2(from.z - CENTER_Z, from.x - CENTER_X) + Math.PI / 2
+    let pads: { padA: Spot; padB: Spot } | null = null
+
+    for (const spread of [PAD_SEPARATION, PAD_SEPARATION + 1.6, PAD_SEPARATION + 3.2]) {
+      for (let turn = 0; turn <= 6 && !pads; turn++) {
+        for (const sign of turn === 0 ? [1] : [1, -1]) {
+          const across = baseAcross + sign * turn * 0.26
+          const half = spread / 2
+          const y = from.y + 0.3
+          const a = { x: from.x + Math.cos(across) * half, y, z: from.z + Math.sin(across) * half }
+          const b = { x: from.x - Math.cos(across) * half, y, z: from.z - Math.sin(across) * half }
+          if (!inDetourAir(a.x, a.z) || !inDetourAir(b.x, b.z)) continue
+          /**
+           * `from` is NOT excused. It was, on the grounds that these two pads
+           * belong to that landing - but belonging to it is not the same as
+           * being allowed inside it. The disc is 0.2 m thick and sits 0.3 m up,
+           * which puts it INSIDE the body of a 1 m slab rather than on top of
+           * it, so the overlap does not read as a pad on a pad: it reads as a
+           * pale crescent growing out of the slab's side, which is what got
+           * photographed.
+           *
+           * Standing them clear needs more room between them, and the spread
+           * candidates above already reach far enough.
+           */
+          if (!isClear(out, a.x, a.y, a.z, COOP_PAD_SIZE)) continue
+          if (!isClear(out, b.x, b.y, b.z, COOP_PAD_SIZE)) continue
+          if (Math.hypot(a.x - b.x, a.z - b.z) < COOP_PAD_SIZE + 1) continue
+          pads = { padA: a, padB: b }
+          break
+        }
+      }
+      if (pads) break
+    }
+    if (!pads) continue
 
     return {
-      padA: { x: from.x + Math.cos(across) * half, y: from.y + 0.3, z: from.z + Math.sin(across) * half },
-      padB: { x: from.x - Math.cos(across) * half, y: from.y + 0.3, z: from.z - Math.sin(across) * half },
+      padA: pads.padA,
+      padB: pads.padB,
       route,
       fromIndex,
       toIndex
@@ -810,6 +878,22 @@ function chordRoute(out: Build, from: Pad, to: Pad, hops: number, size: number):
       fromIndex: -1
     })
   }
+
+  /**
+   * The LAST step was never checked.
+   *
+   * Every hop onto a route pad is measured against the one before it, and
+   * then the climber steps off the final route pad onto `to` - a jump this
+   * function created and nobody looked at. It came out at 4.81 m against a
+   * 4.79 m budget: two centimetres, invisible in play, and still a step the
+   * tower promises is jumpable and is not. Rejecting the route here sends the
+   * search back for a different hop count or a different landing, which is
+   * what it is built to do.
+   */
+  const last = route.length > 0 ? route[route.length - 1] : from
+  const closing = Math.hypot(to.x - last.x, to.z - last.z) - to.size / 2 - last.size / 2
+  if (closing > REACH_BUDGET) return null
+  if (to.y - last.y > MAX_SHORTCUT_RISE + 0.05) return null
 
   return route
 }
@@ -1215,10 +1299,21 @@ function findLeverSpot(
             angle: cursor.angle
           }
           if (!inShaft(spot.x, spot.z, spot.y)) continue
-          if (!isClear(out, spot.x, spot.y, spot.z, size)) continue
+          /**
+           * Cleared at the size it is DRAWN, not the size being searched for.
+           *
+           * `size` here only chooses how far out to push the pad; the disc
+           * that appears in the world is always COOP_PAD_SIZE, because
+           * createPressurePad has never been told any other number. Testing
+           * clearance against `size` reserved as little as 2.4 m for a 4.4 m
+           * object, and the two levers ended up taking 46% and 37% bites out
+           * of the pads beside them.
+           */
+          if (!isClear(out, spot.x, spot.y, spot.z, COOP_PAD_SIZE)) continue
           // It has to be reachable from the pad it guards, or it is scenery.
           const gap =
-            Math.hypot(spot.x - guarded.x, spot.z - guarded.z) - (guarded.size + size) / 2
+            Math.hypot(spot.x - guarded.x, spot.z - guarded.z) -
+            (guarded.size + COOP_PAD_SIZE) / 2
           if (gap > REACH_BUDGET) continue
           return { guarded, cursor: spot, size }
         }
@@ -1280,7 +1375,10 @@ function theLever(index: number, cursor: Cursor, c: ReturnType<typeof curve>, rn
   // tower shipped with zero levers while the submission described the lever as
   // one of its three social mechanics. The same lesson the coin and the
   // shortcut both learned earlier in this file, which never reached here.
-  push(out, found.cursor, index, found.size, false, out.pads.indexOf(guarded))
+  // The pad IS the disc. createPressurePad draws COOP_PAD_SIZE on this spot, so
+  // a pad any smaller leaves a gold rim hanging over open air and reaching into
+  // whatever stands next door - which is exactly what four screenshots showed.
+  push(out, found.cursor, index, COOP_PAD_SIZE, false, out.pads.indexOf(guarded))
   out.levers.push({ x: found.cursor.x, y: found.cursor.y + 0.3, z: found.cursor.z, section: index })
 
   // From the guarded pad, not the lever off to its side: the cursor stands on
@@ -1496,8 +1594,24 @@ function isClear(out: Build, x: number, y: number, z: number, size: number, exce
     const dy = Math.abs(pad.y - y)
 
     if (dy <= VERTICAL_CLEARANCE) {
-      const needed = pad.size / 2 + size / 2 + HORIZONTAL_CLEARANCE
-      if (Math.hypot(pad.x - x, pad.z - z) < needed) return false
+      /**
+       * A box test, because these things are boxes.
+       *
+       * This was a radial one: centres at least half-and-half plus a margin
+       * apart. That is the right rule for two discs and the wrong one for two
+       * squares, because a square's corner stands at 0.707 of its width from
+       * the centre and not 0.5 - so two objects could satisfy it and still
+       * overlap along their diagonal. The error grows with size, which is why
+       * it went unnoticed for so long and then bit hardest on the widest
+       * things in the tower: the 4.4 m co-op discs, taking 46% and 37% out of
+       * the pads beside them.
+       *
+       * Separating axis instead: a real gap on X or on Z is enough to be
+       * clear, and no arrangement that passes can overlap.
+       */
+      const gapX = Math.abs(pad.x - x) - (pad.size / 2 + size / 2)
+      const gapZ = Math.abs(pad.z - z) - (pad.size / 2 + size / 2)
+      if (Math.max(gapX, gapZ) < HORIZONTAL_CLEARANCE) return false
       continue
     }
 
