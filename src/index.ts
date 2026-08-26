@@ -70,7 +70,6 @@ import {
   assertDecorIsQuiet,
   bandFor,
   PARKED_Y,
-  showNearbySigns,
   buildWorld,
   clearWorld,
   paintCrumbled,
@@ -450,7 +449,6 @@ function runSystem(dt: number) {
   if (run.respawnCooldown > 0) run.respawnCooldown -= dt
 
   updatePrompt(player)
-  showNearbySigns(player)
   spinPickups(dt)
   turnCrown(dt)
   fadeForest(player.y)
@@ -979,29 +977,6 @@ function noteForkChoice(player: Vector3) {
 }
 
 /** Approach hints: what happens next, shown just before it happens. */
-/**
- * Prices both arms of a fork while you are standing at the junction.
- *
- * Only at the junction: three metres away it is not your decision yet, and a
- * hint that fires early is a hint that is on screen when something else needs
- * the line.
- */
-function forkPrompt(player: Vector3): string {
-  if (!world) return ''
-
-  for (const fork of world.forks) {
-    const at = fork.junction
-    if (Math.abs(player.y - at.y) > 3) continue
-    if (Math.hypot(player.x - at.x, player.z - at.z) > FORK_PROMPT_RANGE) continue
-    return (
-      'SAFE ' + fork.safePads + ' PADS  -  BOLD ' + fork.boldPads +
-      ' PADS, ' + fork.savesSeconds.toFixed(1) + 'S FASTER'
-    )
-  }
-
-  return ''
-}
-
 function updatePrompt(player: Vector3) {
   if (!world) {
     run.prompt = ''
@@ -1038,25 +1013,6 @@ function updatePrompt(player: Vector3) {
     const coop = shortcutPrompt(player)
     if (coop !== '') {
       run.prompt = coop
-      return
-    }
-
-    /**
-     * The fork's price, in the prompt line instead of on a board in the sky.
-     *
-     * It used to be two signs floating at the junction. On a phone, standing
-     * where you have to stand to make the choice, they filled the screen -
-     * "SAFE" and "4 pads no drop" in letters taller than the avatar, with the
-     * plate behind them clipped away by the near plane. The information was
-     * right and the delivery was wrong.
-     *
-     * The prompt line is where Decentraland's own mobile guidance puts
-     * contextual hints, it is inside the safe area, and it is already how
-     * every other choice in this tower explains itself.
-     */
-    const fork = forkPrompt(player)
-    if (fork !== '') {
-      run.prompt = fork
       return
     }
 

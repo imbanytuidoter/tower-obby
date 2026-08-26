@@ -468,7 +468,6 @@ export function buildWorld(layout: Layout): World {
     // The point of the lever is that it is a favour. 'STOPS THE BEAM' reads
     // as something you do for yourself, and you cannot: holding it means you
     // are standing still while other people climb through.
-    labelPad(lever, 'STAND HERE - STOPS THE BEAM FOR EVERYONE ELSE', entities)
     return { pad, section: lever.section }
   })
 
@@ -591,7 +590,9 @@ function buildCoin(layout: Layout, entities: Entity[]): BuiltCoin | null {
   })
 
   const anchor = def.route[def.route.length - 1]
-  entities.push(...routeSign(anchor, 'THE ANTE', 'TAKE THE COIN, SKIP A SECTION', FINISH_EMISSIVE))
+  // No board. The gold coin on a rust-orange detour says "optional reward off
+  // the route" in colour and shape, and the prompt line names the deal when
+  // you are close enough to take it.
 
   return {
     entity,
@@ -642,13 +643,6 @@ function buildPlate(layout: Layout, entities: Entity[]): BuiltPlate | null {
     emissiveColor: FINISH_EMISSIVE,
     emissiveIntensity: PAD_EMISSIVE.goal * 2
   })
-
-  entities.push(...routeSign(
-    { ...def, kind: 'normal', crumble: false, section: 0, fromIndex: -1 } as Pad,
-    'TANDEM PLATE',
-    'IT ONLY RISES WITH TWO',
-    CHOICE_EDGE_3
-  ))
 
   return {
     entity,
@@ -716,145 +710,6 @@ function createChoiceEdge(pad: Pad): Entity {
 }
 
 /** Two lines over an arm: what it is, and what it costs. */
-/**
- * Signs that are only there when the choice is.
- *
- * They are billboards, so they turn to face you from anywhere - which meant a
- * player standing in the lobby read "SAFE / 4 pads no drop" and "BOLD / 2 pads
- * -3.7s" floating over the treeline fifty metres from the fork they describe.
- * Out of context that is not information, it is clutter, and the first person
- * to play the deployed build said exactly that.
- */
-export const routeSigns: { entity: Entity; x: number; y: number; z: number }[] = []
-
-/**
- * A sign: a physical plate with words ON it, not words floating in the air.
- *
- * Every label in this tower used to be a bare TextShape hanging in space.
- * Against the near-black backdrop that reads as debug output, not signage -
- * the first player asked, twice, what the text was even for. Words need a
- * surface before a brain files them as "a sign somebody put here".
- *
- * The plate carries the Billboard and the lines are its children, so the
- * words turn with it and stay in front. Billboard turns local +Z at the
- * camera - which is why a bare billboarded TextShape reads correctly in the
- * first place - so the children sit at positive z.
- */
-const SIGN_INK = Color4.create(0.09, 0.10, 0.15, 1)
-
-function signPost(
-  at: { x: number; y: number; z: number },
-  lines: { text: string; size: number; colour: Color4 }[],
-  entities: Entity[]
-) {
-  const longest = lines.reduce((n, l) => Math.max(n, l.text.length), 0)
-  // A character sits at roughly half its font size across, and DCL font sizes
-  // are tenths of a metre, so 0.14 per character leaves a margin either side.
-  const width = Math.min(7.0, Math.max(2.2, longest * 0.125 + 0.5))
-  const height = lines.length * 0.72 + 0.28
-
-  const made: Entity[] = []
-
-  const plate = engine.addEntity()
-  entities.push(plate)
-  made.push(plate)
-  Transform.create(plate, {
-    position: Vector3.create(at.x, at.y, at.z),
-    scale: Vector3.create(width, height, 0.1)
-  })
-  MeshRenderer.setBox(plate)
-  Material.setPbrMaterial(plate, {
-    albedoColor: SIGN_INK,
-    metallic: 0,
-    roughness: 0.95,
-    castShadows: false
-  })
-  Billboard.create(plate, { billboardMode: BillboardMode.BM_Y })
-
-  const top = (lines.length - 1) / 2
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    const label = engine.addEntity()
-    entities.push(label)
-    made.push(label)
-    Transform.create(label, {
-      parent: plate,
-      // Local units: the parent is scaled, so divide out its scale or the
-      // text inherits the plate's stretch and lands off the board.
-      //
-      // NEGATIVE z. Billboard turns the entity's local -Z towards the camera,
-      // not +Z - established by putting the text at +0.6, then +2.2, and
-      // watching an empty plate render both times. The plate is 0.1 m thick
-      // so its face sits at local 0.5; -2.2 lands the words 0.22 m clear of
-      // it, which is room for their own outline as well.
-      position: Vector3.create(0, (top - i) * (0.78 / height), -2.2),
-      scale: Vector3.create(1 / width, 1 / height, 1)
-    })
-    TextShape.create(label, {
-      text: line.text,
-      fontSize: line.size,
-      textColor: line.colour,
-      outlineColor: Color4.Black(),
-      outlineWidth: 0.3,
-      textAlign: TextAlignMode.TAM_MIDDLE_CENTER
-    })
-  }
-
-  // Every piece gets its OWN VisibilityComponent, and every piece is
-  // registered. propagateToChildren was tried first and does not reach the
-  // TextShape children in this client: the plate vanished and the words kept
-  // hanging in the air, which is precisely the thing this sign exists to
-  // stop. Measured in-world - player 26 m from a lever whose label was still
-  // legible, with no plate behind it.
-  for (const piece of made) {
-    VisibilityComponent.create(piece, { visible: false })
-    routeSigns.push({ entity: piece, x: at.x, y: at.y, z: at.z })
-  }
-}
-
-function routeSign(pad: Pad, title: string, cost: string, tone: Color3): Entity[] {
-  const made: Entity[] = []
-  signPost(
-    { x: pad.x, y: pad.y + 2.9, z: pad.z },
-    [
-      { text: title, size: 2.4, colour: Color4.create(tone.r, tone.g, tone.b, 1) },
-      // The cost line is the half a player is actually deciding on, so it is
-      // white on black: the only pairing that survives every background.
-      { text: cost, size: 1.9, colour: Color4.White() }
-    ],
-    made
-  )
-  return made
-}
-
-/**
- * Shows a route sign only to somebody close enough to be making the choice.
- *
- * Distance is the whole mechanism: the sign describes a decision, and a
- * decision you are not standing in front of is noise.
- */
-export function showNearbySigns(player: Vector3) {
-  for (const sign of routeSigns) {
-    /**
-     * One WEIGHTED distance, not two independent thresholds.
-     *
-     * Separate horizontal and vertical limits let a sign qualify on a
-     * technicality: the lever's label floats 2.2 m above its pad, so standing
-     * five metres higher and eight metres away still put it inside both
-     * windows and it lit up in the middle of the piston hall. Height counts
-     * SIGN_RISE times harder than width here because the tower is vertical -
-     * a sign one floor up is describing somebody else's problem.
-     */
-    const lift = (player.y - sign.y) * SIGN_RISE
-    const near =
-      Math.sqrt(
-        (player.x - sign.x) ** 2 + (player.z - sign.z) ** 2 + lift ** 2
-      ) < SIGN_RANGE
-
-    const visibility = VisibilityComponent.getMutableOrNull(sign.entity)
-    if (visibility && visibility.visible !== near) visibility.visible = near
-  }
-}
 
 function buildShortcut(layout: Layout, entities: Entity[]): BuiltShortcut | null {
   if (!layout.shortcut) return null
@@ -873,22 +728,8 @@ function buildShortcut(layout: Layout, entities: Entity[]): BuiltShortcut | null
 
   const padA = createPressurePad(layout.shortcut.padA, entities)
   const padB = createPressurePad(layout.shortcut.padB, entities)
-  labelPad(layout.shortcut.padA, 'BOTH PADS - OPENS A SHORTCUT', entities)
-  labelPad(layout.shortcut.padB, 'BOTH PADS - OPENS A SHORTCUT', entities)
 
   return { route, padA, padB, open: false }
-}
-
-/**
- * A word floating over a pad, billboarded so it reads from anywhere.
- *
- * This is the only place the co-op mechanics are explained. A phone screen has
- * no room for a rules panel, and a player who has to read one has already left
- * - so the pad says what it wants in one word, in the world, where they are
- * standing on it.
- */
-function labelPad(at: { x: number; y: number; z: number }, text: string, entities: Entity[]) {
-  signPost({ x: at.x, y: at.y + 2.2, z: at.z }, [{ text, size: 2.1, colour: CP_ALBEDO }], entities)
 }
 
 function createPressurePad(at: { x: number; y: number; z: number }, entities: Entity[]): Entity {
