@@ -19,6 +19,7 @@ import {
   GHOST_MAX_SAMPLES,
   GHOST_SAMPLE_SECONDS,
   WALL_SIZE,
+  CHECKPOINT_POINTS,
   COIN_POINTS,
   SUMMIT_POINTS,
   PICKUP_GRACE,
@@ -26,7 +27,7 @@ import {
   PLATE_RISE_RATE,
   PLATE_FALL_RATE
 } from '../game/config'
-import { buildTower } from '../game/layout'
+import { buildTower, checkpointAltitudes } from '../game/layout'
 import { room } from '../shared/messages'
 import {
   Board,
@@ -85,6 +86,20 @@ type PlayerStats = {
   version: number
   bestSeconds: number
   climbs: number
+  /**
+   * The highest this player has ever stood, in metres.
+   *
+   * Points used to come only from coins and summits, so a climber who fought
+   * two thirds of the way up and never topped out scored nothing for it -
+   * "points should count even if you do not reach the finish", and they are
+   * right: the tower asks for a climb and then paid only for finishing it.
+   *
+   * A high-water mark rather than a tally of checkpoints banked. Counting
+   * every banking would pay again for the same first ledge on every attempt;
+   * counting the highest point ever reached pays once for ground genuinely
+   * gained, and cannot be farmed by falling off on purpose.
+   */
+  bestHeight?: number
   /**
    * Indices of the optional pickups this player has ever found.
    *
@@ -536,6 +551,17 @@ function publishRanking() {
       name: names.get(address) ?? 'Guest',
       height: transform.position.y
     })
+
+    // The ranking already reads every player's height every tick, so the
+    // high-water mark costs nothing extra. Re-ranked only when a new
+    // checkpoint altitude is actually cleared, not on every centimetre.
+    const mine = stats.get(address)
+    if (mine && transform.position.y > (mine.bestHeight ?? 0)) {
+      const before = scoreOf(mine)
+      mine.bestHeight = transform.position.y
+      dirtyStats.add(address)
+      if (scoreOf(mine) !== before) rankScorer(names.get(address) ?? 'Guest', mine)
+    }
   }
 
   // This server stays up as long as anyone is in the World, so anything keyed
@@ -861,7 +887,14 @@ async function loadStats(rawAddress: string): Promise<PlayerStats> {
  * wall of names uses and for the same reason.
  */
 function scoreOf(mine: PlayerStats): number {
-  return (mine.found?.length ?? 0) * COIN_POINTS + mine.climbs * SUMMIT_POINTS
+  const reached = checkpointAltitudes(tower).filter(
+    (altitude) => (mine.bestHeight ?? 0) >= altitude - 1
+  ).length
+  return (
+    (mine.found?.length ?? 0) * COIN_POINTS +
+    mine.climbs * SUMMIT_POINTS +
+    reached * CHECKPOINT_POINTS
+  )
 }
 
 function rankScorer(name: string, mine: PlayerStats) {
