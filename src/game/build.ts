@@ -694,12 +694,29 @@ function buildForks(layout: Layout, entities: Entity[]): BuiltFork[] {
   return built
 }
 
-/** A ring of choice colour around a pad's lip. Line only - never a fill. */
+/**
+ * The mark that says a pad belongs to the fork.
+ *
+ * It used to be a disc 16% WIDER than the pad, sunk to pad.y + 0.3 - which is
+ * 0.2 m below the top face of a slab that is one metre tall and centred on
+ * pad.y. So the only part of it anybody could see was the rim protruding
+ * through the pad's sides, and where the two surfaces ran close the depth
+ * buffer could not choose between them: a fan of white crescents and torn
+ * edges, photographed four times and reported as a texture bug.
+ *
+ * The intent was a ring around the lip, and the arithmetic never matched it.
+ * An inlay does the same job with nothing to clip: 8% inside the pad's own
+ * edge so no part of it can ever protrude, and 0.03 m clear of the top face so
+ * no two surfaces are ever close enough to fight.
+ */
 function createChoiceEdge(pad: Pad): Entity {
   const edge = engine.addEntity()
   Transform.create(edge, {
-    position: Vector3.create(pad.x, pad.y + 0.3, pad.z),
-    scale: Vector3.create(pad.size * 1.16, 0.09, pad.size * 1.16)
+    // 0.57 - 0.03 of half-thickness = 0.04 clear of a top face at 0.50.
+    // 0.53 would have put the underside exactly ON it, which is the coplanar
+    // case this whole change exists to remove.
+    position: Vector3.create(pad.x, pad.y + 0.57, pad.z),
+    scale: Vector3.create(pad.size * 0.92, 0.06, pad.size * 0.92)
   })
   MeshRenderer.setCylinder(edge, 0.5, 0.5)
   Material.setPbrMaterial(edge, {
@@ -1087,9 +1104,24 @@ export function activateCheckpoint(checkpoint: Checkpoint) {
 }
 
 function createCheckpointMarker(pad: Pad, number: number) {
+  /**
+   * The ring sits ON the checkpoint, not INSIDE it.
+   *
+   * It was 6% wider than the slab and centred at pad.y + 0.37 - a slab that is
+   * one metre tall and centred on pad.y, so the ring was buried 0.07 m under
+   * its own top face. Only the protruding rim was visible, and where the two
+   * surfaces ran that close the depth buffer had no way to choose between
+   * them: white crescents chewed out of the pad's top and sides. Six of these,
+   * one on every checkpoint, and the same mistake in the fork's choice edge.
+   *
+   * Lifted so its underside rests on the top face, the rim reads the way it
+   * was always meant to - a lip of cyan standing proud of the landing - and
+   * nothing is ever within a hair's breadth of anything else.
+   */
   const ring = engine.addEntity()
   Transform.create(ring, {
-    position: Vector3.create(pad.x, pad.y + 0.37, pad.z),
+    // 0.62 - 0.06 of half-thickness = 0.06 clear of a top face at 0.50.
+    position: Vector3.create(pad.x, pad.y + 0.62, pad.z),
     scale: Vector3.create(pad.size * 1.06, 0.12, pad.size * 1.06)
   })
   MeshRenderer.setCylinder(ring)
