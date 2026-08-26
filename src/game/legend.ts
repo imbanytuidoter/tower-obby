@@ -37,15 +37,36 @@ import {
   SUMMIT_POINTS,
   BOARD_W,
   LEGEND_FORWARD,
-  LEGEND_LATERAL
+  LEGEND_LATERAL,
+  HAUL_TARGET
 } from './config'
 import { MEANING } from './palette'
 
 const LEGEND_W = BOARD_W
 const ROW_H = 0.9
 const HEADER_H = 1.05
-const LEGEND_H = HEADER_H + 4 * ROW_H + 1.35
-const LEGEND_Y = 3.1
+/**
+ * The band under the last row: the crown's price, then the grove's count.
+ *
+ * It was 1.35 and held one line. The shared line went in underneath and
+ * landed 4 cm off the bottom edge of the panel - measured off a screenshot,
+ * not eyeballed - which is not a margin, it is a near miss. 1.95 is two lines
+ * with room to breathe.
+ */
+const FOOTER_BAND = 1.95
+const LEGEND_H = HEADER_H + 4 * ROW_H + FOOTER_BAND
+
+/**
+ * Derived so the board's FOOT stays put.
+ *
+ * It was the constant 3.1, which happened to equal this expression for the
+ * old height and would have quietly stopped doing so the moment the board
+ * grew: everything inside is laid out downwards from the top edge, so a
+ * height change with a fixed centre moves the bottom into the ground rather
+ * than making room at the bottom, which is where the room was needed.
+ */
+const LEGEND_FOOT = 0.1
+const LEGEND_Y = LEGEND_FOOT + LEGEND_H / 2
 
 /**
  * Moved out from under the torch.
@@ -125,6 +146,19 @@ function onFace(out: number, across: number): { x: number; z: number } {
  * tower's coins used to be, and being still is most of why they read as decor.
  */
 export let legendCoin: Entity | null = null
+
+/** The shared line: how many coins the grove has been given today. */
+export let legendHaul: Entity | null = null
+
+export function setHaul(coins: number) {
+  if (!legendHaul) return
+  const shape = TextShape.getMutableOrNull(legendHaul)
+  if (!shape) return
+  shape.text =
+    coins >= HAUL_TARGET
+      ? 'THE GROVE HAS ALL ' + HAUL_TARGET + ' TODAY. THE CROWN IS LIT'
+      : 'GIVEN TO THE GROVE TODAY:  ' + coins + ' OF ' + HAUL_TARGET
+}
 
 /**
  * One row per thing a player can be confused by, in the order they meet it.
@@ -331,6 +365,31 @@ export function createLegend() {
     outlineWidth: 0.2,
     textAlign: TextAlignMode.TAM_MIDDLE_LEFT
   })
+
+  /**
+   * The one line on this board that is not about you.
+   *
+   * It sits under the footer rather than in the HUD on purpose. A permanent
+   * HUD row is the thing this scene has already been told twice to stop doing
+   * on a phone, and a shared counter is not something anybody needs while they
+   * are mid-jump - it is something to read in the lobby, on the board that
+   * already explains what a coin is.
+   */
+  const haulLine = engine.addEntity()
+  const haulPos = onFace(0.17, -(LEGEND_W / 2 - 0.75))
+  Transform.create(haulLine, {
+    position: Vector3.create(haulPos.x, footerY - 0.62, haulPos.z),
+    rotation
+  })
+  TextShape.create(haulLine, {
+    text: '',
+    fontSize: 1.35,
+    textColor: DIM,
+    outlineColor: Color4.Black(),
+    outlineWidth: 0.2,
+    textAlign: TextAlignMode.TAM_MIDDLE_LEFT
+  })
+  legendHaul = haulLine
 
   const firstRowY = headerY - HEADER_H / 2 - ROW_H * 0.65
   const sampleAcross = -(LEGEND_W / 2 - 0.75)

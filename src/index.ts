@@ -31,6 +31,7 @@ import {
   PairBoard,
   Ghost,
   Wall,
+  Haul,
   protectServerState,
   LeverState,
   Ranking,
@@ -84,8 +85,8 @@ import {
   setShortcutOpen,
   World
 } from './game/build'
-import { legendCoin } from './game/legend'
-import { crownHalo, setCrownRoll, setGreeting } from './game/build'
+import { legendCoin, setHaul } from './game/legend'
+import { crownHalo, lightTheCrown, setCrownRoll, setGreeting } from './game/build'
 import { applyFairness, freezeAfterFall } from './game/fairness'
 import { formatTime } from './game/format'
 import { buildTower } from './game/layout'
@@ -110,6 +111,7 @@ let ghostPath: number[] = []
 let ghostMote: Entity | null = null
 let ghostLabel: Entity | null = null
 let wallStamp = ''
+let haulShown = -1
 
 export function main() {
   protectServerState()
@@ -295,6 +297,13 @@ function sharedRoundSystem(dt: number) {
         wallStamp = stamp
         setCrownRoll([...crown.names], [...crown.seconds])
       }
+    }
+
+    const grove = Haul.getOrNull(entity)
+    if (grove && grove.coins !== haulShown) {
+      haulShown = grove.coins
+      setHaul(grove.coins)
+      lightTheCrown(grove.coins)
     }
 
     const ranking = Ranking.getOrNull(entity)

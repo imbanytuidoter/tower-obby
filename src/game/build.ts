@@ -30,7 +30,8 @@ import {
   FINISH_TOUCH_MARGIN,
   HAZARD_THICKNESS,
   PAD_RADIUS,
-  WALL_SIZE
+  WALL_SIZE,
+  HAUL_TARGET
 } from './config'
 import {
   backdropRing,
@@ -1315,6 +1316,36 @@ export let greeterLine: Entity | null = null
  * invents a name for one.
  */
 export const crownRoll: (Entity | null)[] = []
+
+/**
+ * The grove's day, written on the one object built to be read from the ground.
+ *
+ * The halo above the crown exists purely to be seen from the yard seventy
+ * metres down, which makes it the only place a shared number can be shown to
+ * somebody who is not at the top. It brightens as the day's coins come in and
+ * goes to full when the grove has its target - so a climber in the lobby can
+ * see, without reading anything, whether people have been here today.
+ *
+ * Written only when the count CHANGES. Setting a material every frame is a
+ * component write every frame, for a value that moves a handful of times a
+ * day.
+ */
+export function lightTheCrown(coins: number) {
+  if (!crownHalo) return
+  const share = Math.max(0, Math.min(1, coins / HAUL_TARGET))
+  Material.setPbrMaterial(crownHalo, {
+    albedoColor: FINISH_ALBEDO,
+    emissiveColor: FINISH_EMISSIVE,
+    // Range, not just a nudge. The ring's old fixed value was goal * 3, which
+    // is already near the top of what this material shows: ramping 3 -> 6.5
+    // moved it from bright gold to blown-out white, and the two ends were
+    // hard to tell apart in a screenshot taken deliberately to tell them
+    // apart. Starting at 1.4 gives an unmistakably DIMMER ring at dawn and
+    // keeps the same blaze at the top, so the change is legible from the yard
+    // rather than only to whoever knew to look for it.
+    emissiveIntensity: PAD_EMISSIVE.goal * (1.4 + share * 5.1)
+  })
+}
 
 export function setCrownRoll(names: string[], seconds: number[]) {
   for (let i = 0; i < crownRoll.length; i++) {

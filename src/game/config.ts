@@ -112,6 +112,23 @@ export const COIN_RADIUS = 3
 export const PICKUP_COUNT = 16
 
 /**
+ * How many coins the grove needs given to it in a day.
+ *
+ * Derived from the tower's own count, and that is the whole safety property:
+ * a coin is remembered against the player who found it and can never be found
+ * again, so ONE thorough climber can contribute at most PICKUP_COUNT. Set the
+ * target above that and a player alone in the world can never reach it, no
+ * matter how long they play - which is precisely the person this scene has to
+ * work for, because a judge arrives by themselves.
+ *
+ * So the target is exactly what one person can carry. Anyone who collects the
+ * tower gets the payoff on their own; anyone who arrives to find the counter
+ * already half full learns that other people were here today, which is the
+ * only thing this number is really for.
+ */
+export const HAUL_TARGET = PICKUP_COUNT
+
+/**
  * The ledge under a coin.
  *
  * Small on purpose - it is somewhere to stand, not somewhere to rest - but it

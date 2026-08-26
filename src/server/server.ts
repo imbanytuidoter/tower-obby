@@ -34,6 +34,7 @@ import {
   Ranking,
   Ghost,
   Wall,
+  Haul,
   ServerHeartbeat,
   ShortcutState,
   TandemState
@@ -44,6 +45,9 @@ const DAILY_KEY = 'obby.daily.v1'
 const PAIRS_KEY = 'obby.pairs.v1'
 const PLAYER_KEY = 'obby.stats.v1'
 const WALL_KEY = 'obby.wall.v1'
+const HAUL_KEY = 'obby.haul.v1'
+
+type StoredHaul = { version: 1; day: number; coins: number }
 
 /**
  * The recorded climb, kept in its own key.
@@ -132,6 +136,9 @@ const pendingGhost = new Map<string, { name: string; seconds: number }>()
 
 /** Who last stood on the crown, newest first. Not sorted by time - see Wall. */
 let wall: Entry[] = []
+
+/** Coins given to the grove today, by everybody. Reset with the daily board. */
+let haul = 0
 /**
  * Players whose in-memory stats have run ahead of what is on disk.
  *
@@ -139,6 +146,19 @@ let wall: Entry[] = []
  * written at meaningful checkpoints, never per change.
  */
 const dirtyStats = new Set<string>()
+
+/**
+ * The shared count rides the same debounced flush as the player stats.
+ *
+ * It was written inside persistBoard, which only runs on a FINISH - so a
+ * player who collected coins and left without summiting handed the grove
+ * nothing that survived the server going to sleep. That is the third time
+ * this scene has lost state by writing it on the wrong event: the coins
+ * themselves, then the ghost, now this. The rule that keeps falling over is
+ * always the same one - persist where the value CHANGES, not where some
+ * other value happens to be saved.
+ */
+let haulDirty = false
 let flushTimer = 0
 
 let heartbeatTimer = 0
@@ -154,6 +174,7 @@ export async function startServer() {
   DailyBoard.create(state, { names: [], seconds: [], day: utcDay(Date.now()) })
   PairBoard.create(state, { names: [], seconds: [] })
   Wall.create(state, { names: [], seconds: [] })
+  Haul.create(state, { coins: 0 })
   Ranking.create(state, { names: [], heights: [], climbers: 0 })
   ShortcutState.create(state, { open: false })
   LeverState.create(state, { halted: [] })
@@ -167,6 +188,7 @@ export async function startServer() {
     DailyBoard.componentId,
     PairBoard.componentId,
     Wall.componentId,
+    Haul.componentId,
     Ranking.componentId,
     ShortcutState.componentId,
     LeverState.componentId,
@@ -320,6 +342,13 @@ function rolloverDailyBoard() {
   if (view.day === today) return
 
   daily = []
+  // The grove's day ends with the board's, in the same place, off the same
+  // stamp. Two independent notions of "today" is two things to get out of
+  // step, and this one would drift silently: nothing renders a wrong haul as
+  // an error, it just quietly keeps yesterday's number.
+  haul = 0
+  haulDirty = true
+  Haul.getMutable(state).coins = 0
   const mutable = DailyBoard.getMutable(state)
   mutable.names = []
   mutable.seconds = []
@@ -424,6 +453,20 @@ async function handlePickup(index: number, from: string) {
 
   found.push(index)
   mine.found = found
+
+  /**
+   * The shared count moves on a FIRST find, which is the only kind there is.
+   *
+   * A coin is remembered against the player forever, so a climber returning
+   * to a tower they have already stripped adds nothing here - by design, and
+   * worth saying out loud: today's haul is what NEW hands brought in, not a
+   * measure of traffic. That is why the target is exactly one player's worth
+   * (see HAUL_TARGET) rather than a number scaled to a crowd nobody can
+   * promise will show up.
+   */
+  haul += 1
+  haulDirty = true
+  Haul.getMutable(state).coins = haul
 
   // Answered BEFORE the write. A storage call that stalls must not hold up
   // the one piece of feedback the player is waiting for; the find is already
@@ -702,6 +745,8 @@ function publishBoard() {
   today.names = daily.map((entry) => entry.name)
   today.seconds = daily.map((entry) => entry.seconds)
 
+  Haul.getMutable(state).coins = haul
+
   const crown = Wall.getMutable(state)
   crown.names = wall.map((entry) => entry.name)
   crown.seconds = wall.map((entry) => entry.seconds)
@@ -769,6 +814,21 @@ async function loadStats(rawAddress: string): Promise<PlayerStats> {
  * rather than losing the find silently.
  */
 async function flushStats() {
+  if (haulDirty) {
+    haulDirty = false
+    const ok = await Storage.set<StoredHaul>(HAUL_KEY, {
+      version: 1,
+      day: utcDay(Date.now()),
+      coins: haul
+    })
+    // Left marked on failure, exactly like a player's stats, so the next
+    // flush tries again instead of dropping the day's count in silence.
+    if (!ok) {
+      haulDirty = true
+      console.log("[SERVER] today's haul did not persist, will retry")
+    }
+  }
+
   if (dirtyStats.size === 0) return
   const pending = [...dirtyStats]
   dirtyStats.clear()
@@ -868,6 +928,22 @@ async function restoreBoard() {
     }
   } catch (error) {
     console.log('[SERVER] stored pair board unreadable: ' + error)
+  }
+
+  try {
+    const stored = await Storage.get<StoredHaul>(HAUL_KEY)
+    if (stored && stored.version === 1 && typeof stored.coins === 'number') {
+      // Day-stamped for the same reason the daily board is: a server that
+      // boots after midnight must not inherit yesterday's total.
+      if (stored.day === utcDay(Date.now())) {
+        haul = Math.max(0, Math.floor(stored.coins))
+        console.log('[SERVER] restored ' + haul + " coins in today's haul")
+      } else {
+        console.log("[SERVER] stored haul is from another day, starting at nothing")
+      }
+    }
+  } catch (error) {
+    console.log('[SERVER] stored haul unreadable: ' + error)
   }
 
   try {

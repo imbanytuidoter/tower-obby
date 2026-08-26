@@ -627,6 +627,24 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
    * this check is worthless, so it asserts the INPUT the derivation needs -
    * the width - and not the arithmetic itself.
    */
+  /**
+   * The grove's daily target has to be reachable by ONE person.
+   *
+   * A coin is remembered against the player who found it and can never be
+   * found again, so a single climber can contribute at most PICKUP_COUNT no
+   * matter how long they stay. Raise the target above that - or cut the number
+   * of coins in the tower without looking here - and a player alone in the
+   * world can never light the crown, which makes the one visible payoff of a
+   * shared feature invisible to the only person this scene is guaranteed to
+   * get: somebody arriving by themselves.
+   *
+   * Nothing would report that as an error. The counter would simply stop
+   * short, every day, forever.
+   */
+  note(cfg.HAUL_TARGET <= cfg.PICKUP_COUNT,
+    "the grove's daily target is reachable alone",
+    'target ' + cfg.HAUL_TARGET + ', one climber can carry ' + cfg.PICKUP_COUNT)
+
   const ROLL_GAP = 1.0
   const PLINTH_HALF = 0.75
   const half = finishes.length === 1
@@ -1106,7 +1124,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 72
+const MIN_CHECKS = 73
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 

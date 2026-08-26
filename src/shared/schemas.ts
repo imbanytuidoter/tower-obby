@@ -82,6 +82,17 @@ export const Wall = engine.defineComponent('obby::wall', {
   seconds: Schemas.Array(Schemas.Float)
 })
 
+/**
+ * Coins given to the grove today, by everybody, together.
+ *
+ * The one number in this scene that nobody owns. Every other count is yours -
+ * your time, your coins, your climbs - and a player alone reads all of them
+ * as proof that they are alone. This one arrives already moved.
+ */
+export const Haul = engine.defineComponent('obby::haul', {
+  coins: Schemas.Int
+})
+
 /** Sections whose beam is currently held still by somebody on a lever pad. */
 export const LeverState = engine.defineComponent('obby::levers', {
   halted: Schemas.Array(Schemas.Int)
@@ -142,4 +153,5 @@ export function protectServerState() {
   DailyBoard.validateBeforeChange(serverOnly)
   PairBoard.validateBeforeChange(serverOnly)
   Wall.validateBeforeChange(serverOnly)
+  Haul.validateBeforeChange(serverOnly)
 }
