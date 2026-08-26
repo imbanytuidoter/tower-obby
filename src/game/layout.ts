@@ -273,7 +273,27 @@ type Build = {
   spinners: SpinnerDef[]
   movers: MoverDef[]
   levers: LeverDef[]
+  /**
+   * Solid things that are NOT pads, and therefore invisible to every
+   * clearance test in this file until they are written down here.
+   *
+   * The tandem plate and the ante's three orange slabs are each placed by a
+   * search that checks itself against out.pads - and neither of them is in
+   * out.pads. So each was clear when it was placed, both were correct on
+   * their own, and they came to rest at the same height 0.58 m apart with the
+   * slab's corners standing through the plate's disc. That is the fan of
+   * orange shards in the screenshots, and no amount of staring at pads could
+   * have found it: the two objects were never in the same list.
+   *
+   * Same shape of bug as the shortcut choosing its pads before the coin
+   * perches existed. That one was fixed by ordering; this one cannot be,
+   * because neither object is a pad. A register is the fix that covers both.
+   */
+  extras: Occupied[]
 }
+
+/** Anything that takes up room without being somewhere you land. */
+type Occupied = { x: number; y: number; z: number; size: number }
 
 /**
  * The tower. One of them, permanent, identical for everybody.
@@ -289,7 +309,7 @@ export function buildTower(): Layout {
   // (the practice hops in the yard) before the loop begins.
   const c = curve(0)
 
-  const out: Build = { pads: [], spinners: [], movers: [], levers: [], forks: [] }
+  const out: Build = { pads: [], spinners: [], movers: [], levers: [], forks: [], extras: [] }
   const sectionNames: string[] = []
 
   // Pad zero never moves: the lobby, the gate and the spawn are built around it.
@@ -503,6 +523,9 @@ function buildCoin(out: Build): CoinDef | null {
           section: base.section,
           fromIndex: -1
         })
+        // Written down so whatever is placed next can see it. These slabs are
+        // not pads, so without this they occupy space nothing else knows about.
+        out.extras.push({ x, y, z, size: 2.1 })
       }
       if (!ok || route.length < 3) continue
 
@@ -636,6 +659,7 @@ function buildPlate(out: Build): PlateDef | null {
         if (!inDetourAir(x, z)) continue
         if (!isClear(out, x, start.pad.y, z, size, start.pad)) continue
 
+        out.extras.push({ x, y: start.pad.y + 0.4, z, size })
         return {
           x,
           y: start.pad.y + 0.4,
@@ -781,6 +805,8 @@ function buildShortcut(out: Build, c: ReturnType<typeof curve>): Shortcut | null
           if (!isClear(out, b.x, b.y, b.z, COOP_PAD_SIZE)) continue
           if (Math.hypot(a.x - b.x, a.z - b.z) < COOP_PAD_SIZE + 1) continue
           pads = { padA: a, padB: b }
+          out.extras.push({ x: a.x, y: a.y, z: a.z, size: COOP_PAD_SIZE })
+          out.extras.push({ x: b.x, y: b.y, z: b.z, size: COOP_PAD_SIZE })
           break
         }
       }
@@ -1625,8 +1651,9 @@ function clampSweep(out: Build, x: number, y: number, z: number, length: number)
 }
 
 function isClear(out: Build, x: number, y: number, z: number, size: number, except?: Pad): boolean {
-  for (const pad of out.pads) {
-    if (pad === except) continue
+  // Pads first, then everything else that occupies space without being a pad.
+  for (const pad of [...out.pads, ...out.extras] as (Pad | Occupied)[]) {
+    if (pad === (except as unknown)) continue
     const dy = Math.abs(pad.y - y)
 
     if (dy <= VERTICAL_CLEARANCE) {

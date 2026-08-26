@@ -748,6 +748,60 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     note(worst === 0, 'no sweeping bar slices a pad', where)
   }
 
+  /**
+   * Nothing solid may overlap anything else, pad or not.
+   *
+   * This replaces the narrower co-op check above with the rule it should have
+   * been. The tower has eight solids that are not pads - the tandem plate, the
+   * ante's three slabs, two shortcut pressure pads and two lever discs - and
+   * each is placed by a search that tests itself against out.pads, a list none
+   * of them are in. So each was clear when it was placed, every one of them
+   * was correct on its own, and the plate and an ante slab still came to rest
+   * at the same height 0.58 m apart with the slab's corners standing through
+   * the plate. Four screenshots, three wrong diagnoses.
+   *
+   * A disc sitting on its OWN pad is the point and is excused; anything else
+   * sharing space is the defect.
+   */
+  {
+    const t = buildTower()
+    const solids = []
+    if (t.plate) solids.push({ what: 'the tandem plate', x: t.plate.x, y: t.plate.y, z: t.plate.z, size: 3.6 })
+    if (t.coin) t.coin.route.forEach((r, i) =>
+      solids.push({ what: 'ante slab ' + (i + 1), x: r.x, y: r.y, z: r.z, size: 2.1 }))
+    if (t.shortcut) {
+      solids.push({ what: 'shortcut pad A', ...t.shortcut.padA, size: cfg.COOP_PAD_SIZE })
+      solids.push({ what: 'shortcut pad B', ...t.shortcut.padB, size: cfg.COOP_PAD_SIZE })
+    }
+    t.levers.forEach((l, i) =>
+      solids.push({ what: 'lever ' + (i + 1), x: l.x, y: l.y, z: l.z, size: cfg.COOP_PAD_SIZE }))
+
+    const hit = (a, b, sa, sb) => {
+      if (Math.abs(a.y - b.y) > 0.8) return 0
+      const ox = (sa + sb) / 2 - Math.abs(a.x - b.x)
+      const oz = (sa + sb) / 2 - Math.abs(a.z - b.z)
+      return ox > 0 && oz > 0 ? Math.min(ox, oz) : 0
+    }
+
+    let worst = 0
+    let where = solids.length + ' non-pad solids, none of them touching anything'
+    for (let i = 0; i < solids.length; i++) {
+      for (let j = i + 1; j < solids.length; j++) {
+        const bite = hit(solids[i], solids[j], solids[i].size, solids[j].size)
+        if (bite > worst) { worst = bite; where = solids[i].what + ' overlaps ' + solids[j].what + ' by ' + bite.toFixed(2) + ' m' }
+      }
+      for (const pad of t.pads) {
+        const own = Math.abs(pad.size - solids[i].size) < 0.01 &&
+          Math.hypot(pad.x - solids[i].x, pad.z - solids[i].z) < 0.01
+        if (own) continue
+        const bite = hit(solids[i], pad, solids[i].size, pad.size)
+        if (bite > worst) { worst = bite; where = solids[i].what + ' overlaps a ' + pad.size.toFixed(1) + ' m ' + pad.kind + ' by ' + bite.toFixed(2) + ' m' }
+      }
+    }
+
+    note(worst === 0, 'nothing solid overlaps anything else', where)
+  }
+
   note(rollWidth >= 1.4,
     'the crown banners are wide enough to carry a name',
     rollWidth.toFixed(2) + ' m of cloth per banner, 1.40 m of text')
@@ -1217,7 +1271,15 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   //      ceiling, because pads that used to clip corners are now genuinely
   //      apart, and the lever's own pad is COOP_PAD_SIZE so the disc drawn on
   //      it covers it exactly. Same 137 pads.
-  const PINNED = '7d6e8fbf'
+  //  12. an occupied-volume REGISTER. Eight solids in this tower are not pads
+  //      - the tandem plate, the ante's three slabs, two shortcut pressure
+  //      pads, two lever discs - and every clearance search tested itself
+  //      against out.pads, a list none of them are in. Each was clear when it
+  //      was placed and two of them still came to rest at the same height
+  //      0.58 m apart, corners standing through a disc. out.extras is that
+  //      list; isClear reads it. Coin perches now avoid the ante's slabs,
+  //      which is what moved the fingerprint.
+  const PINNED = '4b81d1e9'
   note(fingerprint === PINNED, 'the tower is the tower the records were set on',
     'fingerprint ' + fingerprint)
 }
@@ -1232,7 +1294,7 @@ note(once === twice, 'deterministic across builds', once.length + ' bytes')
 // region-replace edit: the value-separation rule and then the whole tree
 // block, both cut out along with the code they happened to sit between, both
 // unnoticed until a screenshot showed the damage. Raise this when you add one.
-const MIN_CHECKS = 75
+const MIN_CHECKS = 76
 note(checks >= MIN_CHECKS, 'no invariant has gone missing',
   checks + ' checks ran, floor is ' + MIN_CHECKS)
 
