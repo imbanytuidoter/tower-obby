@@ -23,7 +23,7 @@
  * between the old 76 m and the engine's 94.
  */
 export const BASE_ZONES = 20
-export const TOWER_ZONES = 30
+export const TOWER_ZONES = 26
 
 /** Kept only so the tower is reproducible; the seed never changes. */
 export const TOWER_SEED = 20260904
@@ -270,10 +270,10 @@ export const BANDS = [
  * many single-primitive plants. A jungle is dense undergrowth with a few tall
  * things in it, which is exactly the shape that fits this budget.
  */
-export const UNDERGROWTH_COUNT = 32
+export const UNDERGROWTH_COUNT = 12
 export const UNDERGROWTH_INNER = 21
 export const UNDERGROWTH_OUTER = 35
-export const PALM_COUNT = 5
+export const PALM_COUNT = 2
 export const PALM_RING_RADIUS = 27
 
 /**
@@ -298,11 +298,11 @@ export const PALM_RING_RADIUS = 27
  * a checkpoint would collide with the banked-green that checkpoints already
  * use to say "this one is yours".
  */
-export const TRUNK_GROWTH_COUNT = 14
+export const TRUNK_GROWTH_COUNT = 5
 export const TRUNK_GROWTH_LOW = 5
 export const TRUNK_GROWTH_HIGH = 58
 
-export const FRINGE_COUNT = 18
+export const FRINGE_COUNT = 6
 export const FRINGE_MARGIN = 2.4
 
 export const TREE_RING_RADIUS = 30

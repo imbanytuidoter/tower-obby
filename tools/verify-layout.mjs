@@ -840,7 +840,20 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   // because the catalog does not publish primitive counts.
   const cost = plants.length
 
-  note(plants.length > 20, 'the jungle floor is actually planted',
+  /**
+   * Twelve, not twenty-one.
+   *
+   * Planting and pads compete for the same budget, and the mobile client bills
+   * one material per mesh with a soft cap at 400. The tower grew from 137 pads
+   * to 189 and the scene measured 462 materials - over the cap, which on a
+   * handset is a scene that struggles to load at all. Something had to go, and
+   * between a climb with more of it and a floor with more on it, the climb is
+   * the game.
+   *
+   * The floor still has to read as a jungle floor rather than a lawn with
+   * three ferns, so the number is lowered deliberately rather than removed.
+   */
+  note(plants.length >= 12, 'the jungle floor is actually planted',
     plants.length + ' plants on the floor')
   note(inShaftCount === 0, 'no plant grows inside the climb',
     inShaftCount + ' inside the ' + cfg.SHAFT_MAX_RADIUS + ' m shaft')
@@ -922,7 +935,8 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
     }
   }
 
-  note(growth.length >= 8, 'the tower itself is planted', growth.length + ' plants on the trunk')
+  // Five, for the same reason the floor is twelve: pads took the budget.
+  note(growth.length >= 5, 'the tower itself is planted', growth.length + ' plants on the trunk')
   note(worst > 0, 'trunk growth never reaches a pad',
     'closest approach ' + worst.toFixed(2) + ' m')
   note(tallest > 40, 'the growth climbs with the player',
@@ -1306,18 +1320,17 @@ note(overReach === 0, 'client within server tolerance', `reach <= ${cfg.FINISH_R
   //      0.58 m apart, corners standing through a disc. out.extras is that
   //      list; isClear reads it. Coin perches now avoid the ante's slabs,
   //      which is what moved the fingerprint.
-  //  13. a WIDER tower, not a denser one. The first attempt doubled the zones
-  //      alone: 221 pads squeezed into a shaft 17 m across read as noise and
-  //      crowded the start gate. The scene is 80 m wide with its walls at 38
-  //      and the climb was using a ring 6-17, so the room was sideways, not
-  //      upward - the engine caps height at log2(26)*20 = 94 m and the old
-  //      climb already stood at 76.
-  //      Ring 6-21 (trees sit at 23.7, which is the ceiling on that), zones
-  //      20 -> 30, rise cut to 0.42-0.66 so the extra sections spread instead
-  //      of piling at the top. 137 -> 205 pads, 76.3 -> 84.1 m, checkpoints
-  //      6 -> 9, hazards 20. Median gap to the nearest pad at the same height
-  //      is 3.13 m, which is what stops it reading as a heap.
-  const PINNED = 'cf1ede11'
+  //  13. a WIDER tower, and then a smaller one again. The first try doubled
+  //      the zones alone and packed 221 pads into a ring 17 m across, which
+  //      read as noise. The room was sideways: the scene is 80 m wide with
+  //      walls at 38, and the engine caps height at log2(26)*20 = 94.
+  //      Ring 6-21, zones 20 -> 26, rise 0.42-0.66 so the sections spread.
+  //      Then the SCENE was measured rather than the layout: 462 materials
+  //      against a mobile cap of 400, because the client bills one material
+  //      per mesh and every pad is a mesh. Vegetation cut hard - undergrowth
+  //      32 -> 12, fringe 18 -> 6, trunk growth 14 -> 5, palms 5 -> 2 - and
+  //      the zone count trimmed until it fit. 137 -> 189 pads, 76.3 -> 82 m.
+  const PINNED = 'e234b50a'
   note(fingerprint === PINNED, 'the tower is the tower the records were set on',
     'fingerprint ' + fingerprint)
 }
