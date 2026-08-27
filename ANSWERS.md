@@ -1,6 +1,7 @@
 # Submission questionnaire — prepared answers
 
-Fill the ones marked YOU yourself. Everything else is written from what the
+Some fields cap at 960 characters. Every long answer below is written to fit,
+with its count in the heading. Fill the ones marked YOU yourself. Everything else is written from what the
 project actually does, with numbers taken from the harness and a running client.
 
 ---
@@ -31,59 +32,25 @@ https://github.com/imbanytuidoter/tower-obby
 
 ---
 
-**8. How was the project designed and optimized for mobile?**
+**8. How was the project designed and optimized for mobile?**  *(955 chars, cap 960)*
 
-Mobile was the constraint the whole scene was built inside, not a pass at the end.
+Mobile was the constraint the scene was built inside, not a final pass.
 
-On a phone the entire HUD is removed. The clock, coins, score and live ranking are
-seven lines of chrome that covered half a handset screen, so on mobile the screen
-belongs to the tower. The UI uses two virtual resolutions and two type scales
-picked by device, rather than one desktop layout scaled down.
+On a phone the entire HUD is removed — clock, coins, score and ranking were seven lines covering half a handset screen. The UI picks one of two virtual resolutions and type scales by device, rather than scaling a desktop layout down.
 
-There are no dynamic lights anywhere in the scene. They do not exist on mobile, so
-every glow — checkpoint beacons, the crown, the lit rim of the leaderboard — is
-emissive geometry. Both platforms render the same place instead of the phone
-getting the flat version.
+No dynamic lights anywhere: they do not exist on mobile, so every glow is emissive geometry and both platforms render the same place.
 
-The hard limit is materials: a phone allows 400 and every distinct colour costs
-one. An early build hit 462 and was silently over budget. Height fading and
-platform colour are now quantised into a few steps instead of a smooth gradient,
-vegetation was cut back, and the tower was trimmed from 30 zones to 26. It now
-sits at **390 of 400**, measured in a running client, with 476 entities and 28,164
-triangles.
+The hard limit is materials. A phone allows 400 and every distinct colour costs one. An early build sat at 462, silently over — no warning in the editor, none on deploy, and desktop rendered it perfectly. Height fading is now quantised into steps, vegetation was cut and the tower trimmed from 30 zones to 26. It measures 390 of 400 in a running client, with 28,164 triangles.
 
-Jump distances are checked against a documented ability budget rather than tuned
-by feel, because a jump that is comfortable with a keyboard can be unreachable
-with a touch stick. A test harness measures 74 invariants over the generated tower
-and fails the build if a single required jump goes outside that budget.
+Jumps are checked against a documented ability budget, since a jump that is easy on a keyboard can be out of reach with a touch stick.
 
-**9. How does the project encourage social interaction and repeat visits?**
+**9. How does the project encourage social interaction and repeat visits?**  *(917 chars, cap 960)*
 
-It is one permanent tower that everybody in the World climbs — the same tower every
-visit. That is the decision everything else rests on: a course that regenerates
-cannot be learned, gives nobody a landmark to talk about, and produces times that
-compare to nothing.
+One permanent tower that everyone in the World climbs — the same tower every visit, so times compare and the route can be learned.
 
-Interaction:
-- A live ranking names who is highest in the tower right now, so you can see who
-  you are racing without asking.
-- When somebody reaches the crown, the whole World is told, the crown lights up
-  for everyone, and their name goes on the arch up there for the next arrival.
-- A plate near the top rises only with two *different* people standing on it.
-- A lever holds a sweeping beam still for everybody else — but whoever holds it is
-  not climbing. It is a favour that costs the person doing it, which is the part
-  that makes strangers talk.
+Interaction: a live ranking names who is highest right now. When someone reaches the crown the whole World is told, the crown lights up, and their name goes on the arch for the next arrival. A plate near the top rises only with two DIFFERENT people on it. A lever holds a sweeping beam still for everybody else — but whoever holds it is not climbing. A favour that costs the person doing it is what makes strangers speak.
 
-Returning:
-- Two boards in the lobby and neither ever resets. One ranks the fastest climbs,
-  one ranks lifetime points — 100 a checkpoint, 300 a coin, 500 the crown.
-- Points accrue without ever finishing, so somebody who arrived an hour ago has a
-  ladder they can actually climb, and a patient explorer can top a board without
-  being fast.
-- Personal bests and collected coins are kept per wallet, so the tower remembers
-  you between visits.
-- A ghost of the record run walks the route as a mote of light, so the best climb
-  is present even when its owner is not.
+Returning: two boards, and neither ever resets. One ranks the fastest climbs, one ranks lifetime points — 100 a checkpoint, 300 a coin, 500 the crown. Points count even if you never finish, so somebody who arrived an hour ago has a ladder they can actually climb. Personal bests and collected coins are kept per wallet, so the tower remembers you between visits.
 
 **10. Mobile devices tested on** — YOU
 Android phone or iPhone — pick whichever you and the second tester actually used.
@@ -98,36 +65,25 @@ compiles the layout module standalone and measures 74 geometric invariants. The
 Decentraland desktop client driven over its MCP interface, to read the running
 scene's entity transforms and material counts rather than trusting the source.
 
-**12. Biggest blocker building or testing for mobile**
+**12. Biggest blocker building or testing for mobile**  *(804 chars, cap 960)*
 
-The material limit, and the fact that nothing tells you when you cross it.
+The material limit, and that nothing tells you when you cross it.
 
-A phone allows 400 materials and every distinct colour is one. The tower had a
-smooth height fade and full vegetation, which put it at 462 — over budget, with no
-warning in the editor, no warning on deploy, and a desktop client that renders it
-perfectly. It surfaced only by reading the content stats out of a running client.
-The fix was to quantise the fade into steps, cut vegetation and trim four zones.
+A phone allows 400 materials and every distinct colour is one. The tower had a smooth height fade and full vegetation, which put it at 462 — over budget, with no warning in the editor, none on deploy, and a desktop client that rendered it perfectly. It surfaced only by reading the content stats out of a running client. The fix was quantising the fade into steps, cutting vegetation and trimming four zones.
 
-The second blocker was the same shape: mobile problems are invisible from a desk.
-Half the layout issues that mattered — a HUD covering the screen, text too small,
-a jump that a touch stick cannot make — could not be seen on desktop at all and
-had to be found by holding a phone.
+The second blocker was the same shape: mobile problems are invisible from a desk. A HUD covering half the screen, text too small to read, a jump a touch stick cannot make — none of that shows on a monitor. Every one of them had to be found by holding a phone, which meant the real test loop was deploy, pick up the phone, look.
 
 **13. Do you plan to continue after the Buildathon?** — YOU
 
-**14. Known issues, limitations or special testing instructions**
+**14. Known issues, limitations or special testing instructions**  *(668 chars, cap 960)*
 
-- **Two mechanics need two players.** The plate near the top only rises with two
-  different people on it, and the lever only matters to somebody else in the
-  section below. Alone, both are visible and inert. Testing them needs a second
-  person in the World.
-- **The server sleeps when the World empties** and takes about 15 seconds to cold
-  start. The first visitor after a quiet period sees the boards fill in a moment
-  late; the scene shows a "waking up" notice while that happens.
-- Everything the boards record is server-side, so a climb only counts if the
-  server saw you cross the gate line. Teleporting into the middle of the tower
-  will not produce a time.
-- No known crashes or blocking bugs.
+Two mechanics need two players. The plate near the top rises only with two different people on it, and the lever only matters to somebody in the section below. Alone, both are visible and inert — testing them needs a second person in the World.
+
+The server sleeps when the World empties and takes about 15 seconds to cold start, so the first visitor after a quiet period sees the boards fill a moment late. The scene shows a waking-up notice while that happens.
+
+Everything the boards record is server-side: a climb counts only if the server saw you cross the gate line, so teleporting into the middle of the tower produces no time.
+
+No known crashes or blocking bugs.
 
 **15. Decentraland experience before Friendzone** — YOU
 **How did you hear about Friendzone?** — YOU
