@@ -175,6 +175,22 @@ const dirtyStats = new Set<string>()
  * other value happens to be saved.
  */
 let haulDirty = false
+
+/**
+ * The points board is written on the same debounced flush as everything else.
+ *
+ * It used to write inside rankScorer, which runs when a player crosses a
+ * checkpoint altitude, picks up a coin, or finishes - so a busy tower fired a
+ * storage write every few seconds per climber. Storage caps concurrent writes
+ * and resolves the excess to `false` rather than throwing, and that call
+ * discarded its result with `void`. The board that is meant to hold the best
+ * scores OF ALL TIME would have stopped persisting under exactly the load it
+ * exists for, and said nothing.
+ */
+let pointsDirty = false
+
+/** Set when a leaderboard write fails, so the next flush tries it again. */
+let boardsDirty = false
 let flushTimer = 0
 
 let heartbeatTimer = 0
@@ -821,7 +837,7 @@ async function loadStats(rawAddress: string): Promise<PlayerStats> {
    */
   let fresh: PlayerStats = { version: 1, bestSeconds: 0, climbs: 0 }
   try {
-    const stored = await Storage.player.get<PlayerStats>(rawAddress, PLAYER_KEY)
+    const stored = decoded<PlayerStats>(await Storage.player.get<unknown>(rawAddress, PLAYER_KEY))
     if (stored && stored.version === 1) {
       fresh = { ...stored, version: 1 }
       if (typeof fresh.bestSeconds !== 'number') fresh.bestSeconds = 0
@@ -876,7 +892,7 @@ function rankScorer(name: string, mine: PlayerStats) {
     .sort((a, b) => b.points - a.points)
     .slice(0, BOARD_SIZE)
   publishBoard()
-  void Storage.set<{ version: 1; board: Scorer[] }>(POINTS_KEY, { version: 1, board: scorers })
+  pointsDirty = true
 }
 
 async function flushStats() {
@@ -892,6 +908,25 @@ async function flushStats() {
       haulDirty = true
       console.log("[SERVER] today's haul did not persist, will retry")
     }
+  }
+
+  if (pointsDirty) {
+    pointsDirty = false
+    const ok = await Storage.set<{ version: 1; board: Scorer[] }>(POINTS_KEY, {
+      version: 1,
+      board: scorers
+    })
+    // Marked again on failure so the next flush retries, the same way the
+    // haul and a player's own stats do.
+    if (!ok) {
+      pointsDirty = true
+      console.log('[SERVER] points board did not persist, will retry')
+    }
+  }
+
+  if (boardsDirty) {
+    boardsDirty = false
+    await persistBoard()
   }
 
   if (dirtyStats.size === 0) return
@@ -918,7 +953,12 @@ async function recordClimb(address: string, seconds: number) {
   rankScorer(names.get(address) ?? 'Guest', mine)
 
   const ok = await Storage.player.set<PlayerStats>(address, PLAYER_KEY, mine)
-  if (!ok) console.log('[SERVER] stats did not persist for ' + address)
+  if (!ok) {
+    // A finish is the single most valuable write a player makes - the climb
+    // count and the personal best both live in it. Retried, not just logged.
+    dirtyStats.add(address)
+    console.log('[SERVER] stats did not persist for ' + address + ', will retry')
+  }
 
   room.send(
     'stats',
@@ -927,21 +967,66 @@ async function recordClimb(address: string, seconds: number) {
   )
 }
 
+/**
+ * Storage returns exactly what was written, parsing nothing of its own - the
+ * SDK's scene store hands back `data.value` untouched. The server always
+ * writes objects, but `sdk-commands storage scene set` can only ever write a
+ * STRING: its `--value` is a command-line argument, placed in the request body
+ * verbatim. So any key repaired by hand from a terminal comes back as JSON
+ * TEXT, every `stored.version !== 1` guard below rejects it, and the board
+ * restores empty with no error anywhere.
+ *
+ * That is not hypothetical. Clearing one player from the leaderboard by hand
+ * is what silently emptied the all-time board of its only surviving entry.
+ * Accepting both shapes costs one branch and turns an out-of-band write back
+ * into a repair instead of a way to erase a board.
+ */
+function decoded<T>(raw: unknown): T | null {
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as T
+    } catch (error) {
+      console.log('[SERVER] stored text is not JSON: ' + error)
+      return null
+    }
+  }
+  return (raw as T) ?? null
+}
+
 type Stored = { version: number; board: Entry[] }
 
-/** Written only when a round is won, never per tick: storage writes are capped. */
+/**
+ * Written only when a round is won, never per tick: storage writes are capped.
+ *
+ * A win is nonetheless the busiest instant this server has - three board
+ * writes here, the finisher's own stats, and any coin flush still pending -
+ * which is precisely the burst that makes a capped write resolve to `false`.
+ * Each failure used to be a log line and nothing else, so the run that earned
+ * the record was the run most likely to lose it. Now a failure marks the
+ * boards dirty and the next flush writes them again.
+ */
 async function persistBoard() {
-  const ok = await Storage.set<Stored>(STORAGE_KEY, { version: 1, board })
-  if (!ok) console.log('[SERVER] all-time board did not persist')
+  let failed = false
 
-  // Kept in its own key with the day stamped on it, so a server that boots
-  // the next morning restores an empty board rather than yesterday's times.
+  const ok = await Storage.set<Stored>(STORAGE_KEY, { version: 1, board })
+  if (!ok) {
+    failed = true
+    console.log('[SERVER] all-time board did not persist, will retry')
+  }
 
   const okWall = await Storage.set<Stored>(WALL_KEY, { version: 1, board: wall })
-  if (!okWall) console.log('[SERVER] crown wall did not persist')
+  if (!okWall) {
+    failed = true
+    console.log('[SERVER] crown wall did not persist, will retry')
+  }
 
   const okPairs = await Storage.set<Stored>(PAIRS_KEY, { version: 1, board: pairs })
-  if (!okPairs) console.log('[SERVER] pair board did not persist')
+  if (!okPairs) {
+    failed = true
+    console.log('[SERVER] pair board did not persist, will retry')
+  }
+
+  boardsDirty = failed
 }
 
 /**
@@ -950,7 +1035,7 @@ async function persistBoard() {
  */
 async function restoreBoard() {
   try {
-    const stored = await Storage.get<Stored>(STORAGE_KEY)
+    const stored = decoded<Stored>(await Storage.get<unknown>(STORAGE_KEY))
     if (!stored || stored.version !== 1 || !Array.isArray(stored.board)) return
 
     board = stored.board
@@ -963,7 +1048,7 @@ async function restoreBoard() {
 
 
   try {
-    const stored = await Storage.get<Stored>(PAIRS_KEY)
+    const stored = decoded<Stored>(await Storage.get<unknown>(PAIRS_KEY))
     if (stored && stored.version === 1 && Array.isArray(stored.board)) {
       pairs = stored.board
         .filter((entry) => typeof entry?.name === 'string' && typeof entry?.seconds === 'number')
@@ -975,7 +1060,7 @@ async function restoreBoard() {
   }
 
   try {
-    const stored = await Storage.get<{ version: number; board: Scorer[] }>(POINTS_KEY)
+    const stored = decoded<{ version: number; board: Scorer[] }>(await Storage.get<unknown>(POINTS_KEY))
     if (stored && stored.version === 1 && Array.isArray(stored.board)) {
       scorers = stored.board
         .filter((e) => typeof e?.name === 'string' && typeof e?.points === 'number')
@@ -987,7 +1072,7 @@ async function restoreBoard() {
   }
 
   try {
-    const stored = await Storage.get<StoredHaul>(HAUL_KEY)
+    const stored = decoded<StoredHaul>(await Storage.get<unknown>(HAUL_KEY))
     if (stored && stored.version === 1 && typeof stored.coins === 'number') {
       // No day check any more. It used to drop the count whenever the server
       // first booted on a new date, which is the same silent midnight reset
@@ -1001,7 +1086,7 @@ async function restoreBoard() {
   }
 
   try {
-    const stored = await Storage.get<Stored>(WALL_KEY)
+    const stored = decoded<Stored>(await Storage.get<unknown>(WALL_KEY))
     if (stored && stored.version === 1 && Array.isArray(stored.board)) {
       wall = stored.board
         .filter((entry) => typeof entry?.name === 'string' && typeof entry?.seconds === 'number')
@@ -1034,7 +1119,7 @@ async function saveGhost(name: string, seconds: number, path: number[]) {
  */
 async function restoreGhost() {
   try {
-    const stored = await Storage.get<StoredGhost>(GHOST_KEY)
+    const stored = decoded<StoredGhost>(await Storage.get<unknown>(GHOST_KEY))
     if (!stored || stored.version !== 1) return
     if (typeof stored.name !== 'string' || typeof stored.seconds !== 'number') return
     if (!Array.isArray(stored.path)) return
