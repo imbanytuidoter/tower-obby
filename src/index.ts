@@ -192,6 +192,7 @@ function startClient() {
   room.onMessage('stats', (data) => {
     run.personalBest = data.bestSeconds
     run.climbs = data.climbs
+    run.lifetimePoints = data.points
     applyPickups([...data.found])
     greeted = true
   })

@@ -834,7 +834,12 @@ async function sendStats(address: string) {
   const mine = await loadStats(address)
   room.send(
     'stats',
-    { bestSeconds: mine.bestSeconds, climbs: mine.climbs, found: mine.found ?? [] },
+    {
+      bestSeconds: mine.bestSeconds,
+      climbs: mine.climbs,
+      found: mine.found ?? [],
+      points: scoreOf(mine)
+    },
     { to: [address] }
   )
 }
@@ -988,7 +993,12 @@ async function recordClimb(address: string, seconds: number) {
 
   room.send(
     'stats',
-    { bestSeconds: mine.bestSeconds, climbs: mine.climbs, found: mine.found ?? [] },
+    {
+      bestSeconds: mine.bestSeconds,
+      climbs: mine.climbs,
+      found: mine.found ?? [],
+      points: scoreOf(mine)
+    },
     { to: [address] }
   )
 }

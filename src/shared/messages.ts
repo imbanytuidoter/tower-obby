@@ -80,6 +80,17 @@ export const room = registerMessages({
   stats: Schemas.Map({
     bestSeconds: Schemas.Float,
     climbs: Schemas.Int,
-    found: Schemas.Array(Schemas.Int)
+    found: Schemas.Array(Schemas.Int),
+    /**
+     * The lifetime total, scored by the server.
+     *
+     * The client used to add this up itself from coins and summits, and got a
+     * different answer from the board standing ten metres away: the board also
+     * pays for every checkpoint altitude ever reached, which is a fact only the
+     * server holds. A player who had climbed could read "Total: 6200" on the
+     * summit panel while the board credited them 7100. One of the two numbers
+     * had to be the one that counts, and it was never going to be the client's.
+     */
+    points: Schemas.Int
   })
 })

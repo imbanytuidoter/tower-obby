@@ -33,6 +33,7 @@ export const run = {
    * player who has all sixteen still scores nothing extra for a lap.
    */
   pickupsThisRun: 0,
+  lifetimePoints: 0,
   /** Filled from the server-owned component. */
   serverAlive: false,
   /** Fastest climb today, and the fastest anyone has ever done it. */
@@ -92,14 +93,17 @@ export function runScore(): number {
 }
 
 /**
- * Everything this wallet has ever earned.
+ * Everything this wallet has ever earned, as the SERVER scores it.
  *
- * Derived from the two numbers the server already persists rather than kept
- * as a third: a stored total is a number that can drift out of step with the
- * things it is supposed to total, and this one cannot.
+ * This used to be derived on the client from coins and summits, on the
+ * reasoning that a derived number cannot drift from what it totals. It could
+ * and did: the points board also pays for every checkpoint altitude reached,
+ * which the client has no way to know, so the summit panel and the board
+ * disagreed by up to nine hundred points about the same player. Reported by
+ * the server with the stats it already sends.
  */
 export function lifetimeScore(): number {
-  return run.pickupsFound * COIN_POINTS + run.climbs * SUMMIT_POINTS
+  return run.lifetimePoints
 }
 
 export function prepareRound(totalCheckpoints: number, sections: string[]) {

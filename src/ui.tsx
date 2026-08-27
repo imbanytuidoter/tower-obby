@@ -553,8 +553,10 @@ const clearedPanel = () => {
           
           Two numbers rather than one because they answer different questions:
           the first is "was this a good run", the second is "what do I have to
-          show for coming back". The lifetime figure is derived from the coins
-          found and the summits counted, so it cannot disagree with either.
+          show for coming back". The lifetime figure is the server's own score,
+          the same one the points board ranks - it was derived here once, from
+          coins and summits alone, and disagreed with that board by every
+          checkpoint the player had ever reached.
         */}
         <Label
           value={'This climb: ' + runScore() + ' points'}
