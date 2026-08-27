@@ -787,8 +787,17 @@ function createDressing() {
 
   const plate = front(0.7)
   const base = engine.addEntity()
+  // Heights measured from the DECK, not from the ground.
+  //
+  // These three - plinth, trim, light pool - were written as absolute values
+  // for a world where the board stood on open ground, whose surface is 0.05.
+  // The board is inside the lobby deck's footprint, and the deck's surface is
+  // LOBBY_Y = 0.4, so all three ended up between 24 and 30 cm UNDER the floor
+  // the player walks on: no plinth, no glowing edge, no pool of light, and no
+  // error anywhere. Confirmed by photographing the board and seeing it sit
+  // flat on the deck with its frame cut off by the surface.
   Transform.create(base, {
-    position: Vector3.create(plate.x, 0.05, plate.z),
+    position: Vector3.create(plate.x, LOBBY_Y + 0.05, plate.z),
     rotation,
     scale: Vector3.create(BOARD_W + 2.6, 0.1, 3.4)
   })
@@ -803,7 +812,7 @@ function createDressing() {
   const trimPos = front(2.35)
   const trim = engine.addEntity()
   Transform.create(trim, {
-    position: Vector3.create(trimPos.x, 0.13, trimPos.z),
+    position: Vector3.create(trimPos.x, LOBBY_Y + 0.13, trimPos.z),
     rotation,
     scale: Vector3.create(BOARD_W + 2.6, 0.06, 0.12)
   })
@@ -825,7 +834,7 @@ function createDressing() {
   const pool = engine.addEntity()
   const poolPos = front(2.6)
   Transform.create(pool, {
-    position: Vector3.create(poolPos.x, 0.08, poolPos.z),
+    position: Vector3.create(poolPos.x, LOBBY_Y + 0.08, poolPos.z),
     rotation: Quaternion.fromEulerDegrees(0, BOARD_YAW, 0),
     scale: Vector3.create(BOARD_W * 1.15, 0.05, 5.2)
   })
