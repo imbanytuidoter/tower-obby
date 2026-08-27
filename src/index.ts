@@ -859,15 +859,21 @@ function reachForPickups(player: Vector3) {
     if (pickup.taken) continue
     const at = Vector3.create(pickup.def.x, pickup.def.y, pickup.def.z)
     if (Vector3.distance(player, at) > PICKUP_RADIUS) continue
-    if (pendingPickups.has(i)) continue
+    const sentAt = pendingPickups.get(i)
+    if (sentAt !== undefined && Date.now() - sentAt < PICKUP_RETRY_MS) continue
 
     // Marked as sent only once it HAS been sent. Marking first meant a touch
     // that happened while the room was still connecting was recorded as
     // pending and never retried - the pickup became uncollectable for the
     // rest of the session, silently.
-    if (!isStateSyncronized()) continue
+    //
+    // A synced room is not a woken server: the room can be connected while
+    // the server is still cold-starting, and anything sent into that window
+    // is dropped without a trace. serverAlive is the heartbeat, which is the
+    // only thing that actually knows.
+    if (!isStateSyncronized() || !run.serverAlive) continue
     room.send('takePickup', { index: i })
-    pendingPickups.add(i)
+    pendingPickups.set(i, Date.now())
   }
 }
 
@@ -970,7 +976,25 @@ function celebrationSystem(dt: number) {
 }
 
 /** Asked for but not yet confirmed, so one touch does not send every frame. */
-const pendingPickups = new Set<number>()
+/**
+ * Coins claimed but not yet answered for, with the moment each was sent.
+ *
+ * This was a plain Set, and an entry never left it. The server drops a claim
+ * in silence on three paths - it cannot read the player's position yet, the
+ * claim is out of range by its own reckoning, or the message was sent while
+ * the server was still cold-starting and never arrived at all - and it
+ * answers only on success. So one unlucky touch made that coin UNCOLLECTABLE
+ * for the rest of the session, with the coin still hanging there in plain
+ * sight. Exactly the failure the comment in reachForPickups describes; the
+ * marking order was fixed, this cause was not.
+ *
+ * Re-sending is safe by construction: handlePickup rejects an index the
+ * player already owns, so a retry can never pay twice.
+ */
+const pendingPickups = new Map<number, number>()
+
+/** How long a claim waits for an answer before the touch may be retried. */
+const PICKUP_RETRY_MS = 2000
 
 /**
  * The server's answer: everything this player has ever found. Hides them, and
