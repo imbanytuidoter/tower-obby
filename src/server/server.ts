@@ -132,6 +132,13 @@ let pairs: Entry[] = []
  * two people actually got each other somewhere - standing on it together for
  * an instant is not cooperation. Cleared when the climb ends or is abandoned,
  * so a partnership cannot be banked and cashed in on a later solo run.
+ *
+ * Holds the partner's NAME, not their address. It used to hold the address
+ * and look the name up at the finish, by which time a partner who had left
+ * was gone from the name map too - so the pair board, the one board that
+ * exists to say two named people did this together, recorded "Guest". The
+ * name is still the server's own, never the claiming client's; it is simply
+ * taken while the person is still standing there.
  */
 const rodeWith = new Map<string, string>()
 
@@ -418,7 +425,7 @@ function handleClaim(name: string, from: string) {
   const partner = rodeWith.get(address)
   if (partner) {
     const together: Entry = {
-      name: entry.name + '  +  ' + (names.get(partner) ?? 'Guest'),
+      name: entry.name + '  +  ' + partner,
       seconds
     }
     pairs = [...pairs, together].sort((a, b) => a.seconds - b.seconds).slice(0, BOARD_SIZE)
@@ -561,6 +568,14 @@ function publishRanking() {
   forget(startedClimb, present)
   forgetSet(tookCoin, present)
   forget(pendingGhost, present)
+  // rodeWith was missing from this list. It is cleared on a finish and on an
+  // abandon, so the entry that survived belonged to somebody who rode the
+  // plate and then LEFT mid-climb - and it was still there when they came
+  // back. Their next climb, made alone, would have been written onto the pair
+  // board beside a partner who was no longer in the world. On the one board
+  // that exists to record that two people did something together, that is the
+  // worst possible entry to invent.
+  forget(rodeWith, present)
 
   climbers.sort((a, b) => b.height - a.height)
   const top = climbers.slice(0, RANKING_SIZE)
@@ -702,8 +717,20 @@ function noteGateCrossing(address: string, position: Vector3) {
 }
 
 /** Drops cache entries for players who have left. */
+/**
+ * Drops everyone who is no longer here.
+ *
+ * The size guard this used to open with - `if (cache.size <= present.size)
+ * return` - assumed that an equal count meant equal membership, and it does
+ * not. Three visitors with three cached entries can be two who are here plus
+ * one who left, and that entry then survived every sweep until the crowd
+ * happened to grow. A stale startedClimb is the one that bites: the owner
+ * comes back, watchGate sees a climb already in progress and never re-stamps
+ * the gate, and their next finish is timed from a visit that ended hours ago.
+ *
+ * These maps hold one entry per person in a scene. Walking them is free.
+ */
 function forget<T>(cache: Map<string, T>, present: Set<string>) {
-  if (cache.size <= present.size) return
   for (const address of cache.keys()) {
     if (!present.has(address)) cache.delete(address)
   }
@@ -711,7 +738,6 @@ function forget<T>(cache: Map<string, T>, present: Set<string>) {
 
 /** Same prune, for the caches that only need membership. */
 function forgetSet(cache: Set<string>, present: Set<string>) {
-  if (cache.size <= present.size) return
   for (const address of cache) {
     if (!present.has(address)) cache.delete(address)
   }
@@ -766,7 +792,7 @@ function watchPlate(dt: number) {
     const riders = [...aboard]
     for (const rider of riders) {
       const partner = riders.find((other) => other !== rider)
-      if (partner) rodeWith.set(rider, partner)
+      if (partner) rodeWith.set(rider, names.get(partner) ?? 'Guest')
     }
   }
 

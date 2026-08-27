@@ -717,7 +717,13 @@ function ghostSystem(dt: number) {
 
   ghostClock += dt
   const frames = ghostPath.length / 3
-  const span = frames * GHOST_SAMPLE_SECONDS
+  // N samples describe N-1 intervals, not N. Spanning the loop over `frames`
+  // gave the walk one interval more than the path has, so for the last half
+  // second `f` ran past 1 and the mote extrapolated PAST the final sample -
+  // sailing off the top of the route at climbing speed before snapping back
+  // to the bottom. The clamp on `i` kept the reads in bounds, which is why it
+  // never threw; it just drew a path nobody climbed.
+  const span = (frames - 1) * GHOST_SAMPLE_SECONDS
   const t = (ghostClock % span) / GHOST_SAMPLE_SECONDS
   const i = Math.min(frames - 2, Math.floor(t))
   const f = t - i
