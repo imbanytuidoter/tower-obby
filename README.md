@@ -3,8 +3,8 @@
 **One tower. Everyone climbs it. Fastest time today wins.**
 
 A timed parkour climb for Decentraland, live at **`imbanana.dcl.eth`**. Players arrive
-in a yard beneath an 80 metre tower, walk through a gate that starts their own clock,
-and climb 132 platforms through twenty zones that get harder the higher they go.
+in a yard beneath a 73 metre tower, walk through a gate that starts their own clock,
+and climb 185 platforms through twenty-six zones that get harder the higher they go.
 
 Built for the Friendzone Mobile Buildathon: mobile-first, social, deployed to a
 Decentraland World.
@@ -38,7 +38,7 @@ started with the flag keeps the trees until it is restarted.
 
 ## How the course is built
 
-The tower is a **stack of twenty zones**, in the spirit of Roblox's Tower of Hell, but
+The tower is a **stack of twenty-six zones**, in the spirit of Roblox's Tower of Hell, but
 permanent. It is generated once from a fixed seed, so every client builds byte-identical
 geometry — a client that built a different tower would drop its player through somebody
 else's floor. Difficulty is read from **altitude**: `curve(progress)` is evaluated per
@@ -106,11 +106,16 @@ runs a Decentraland Multiplayer Server (`@dcl/sdk@auth-server`), branched with
   capped — and personal bests are kept per wallet, so they survive the server shutting
   down when the scene empties.
 
-There are **two boards**. The all-time list holds the ten fastest climbs ever recorded.
-The daily list holds today's, and empties at midnight UTC. That second one is the point:
-an all-time board is unreachable for somebody who arrived an hour ago, and a target
-nobody can hit is a target nobody looks at. A board that empties every night is winnable
-tonight.
+There are **two boards, and neither resets**. The first ranks the fastest climbs ever
+recorded. The second ranks lifetime POINTS - 100 a checkpoint, 300 a coin, 500 the crown -
+and that one is the answer to a real problem: a speed board is unreachable for somebody
+who arrived an hour ago, and a target nobody can hit is a target nobody looks at. Points
+accrue without ever finishing, so a patient explorer can top a board without being fast.
+
+An earlier version emptied a second board at midnight UTC to give newcomers a winnable
+target. It was removed: a player who set a time in the evening came back to find their
+name gone, with nothing on the board explaining why. A ladder you can climb slowly beats
+a ladder that is swept every night.
 
 The server watches the gate plane itself, every frame, rather than taking a client's word
 for when its climb began — a client that reported late would be handing itself a better
@@ -143,10 +148,13 @@ with the metrics panel open.
 Measured geometry, which is what the checks in *Verifying changes* assert:
 
 ```
-pads 132   height 0.4 to 79.5 m of 85 m
-worst horizontal gap 3.50 m of a 3.85 m budget (70% of the ability)
-worst vertical rise  1.40 m of a 1.40 m budget (70% of doubleJumpHeight)
-overlapping pads 0   |   clean climb model 212 s
+pads 185   height 0.4 to 72.9 m of 92 m
+worst horizontal gap 4.60 m of a 4.79 m budget (87% of the ability)
+worst vertical rise  1.74 m of a 1.74 m budget (87% of doubleJumpHeight)
+overlapping pads 0   |   clean climb model 297 s
+
+measured in a running client: 390 materials of the 400 a phone allows,
+476 entities, 28,164 triangles, 223 colliders
 ```
 
 Two quantisations exist purely to bound the material count, since every distinct albedo

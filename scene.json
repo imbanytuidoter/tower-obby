@@ -7,10 +7,10 @@
     "favicon": "favicon_asset",
     "navmapThumbnail": "images/scene-thumbnail.png"
   },
-  "owner": "",
+  "owner": "Serhii Vasylevskyi",
   "contact": {
     "name": "Serhii Vasylevskyi",
-    "email": ""
+    "email": "svasilevskij95@gmail.com"
   },
   "main": "bin/index.js",
   "tags": [
