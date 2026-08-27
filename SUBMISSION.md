@@ -86,15 +86,15 @@ overlapping pads 0   |   clean climb model 297 s
 ## Links
 
 - World: https://play.decentraland.org/?realm=imbanana.dcl.eth
-- GitHub: TODO - public repository required
+- GitHub: https://github.com/imbanytuidoter/tower-obby
 - Social: TODO - at least one link required by the form
 - Demo video: optional, recommended
 
 ## Still to do before submitting
 
-- [ ] Push to a public GitHub repository (hard eligibility requirement)
+- [x] Public repository: https://github.com/imbanytuidoter/tower-obby
 - [ ] At least one social link for the form
-- [ ] 480x480 logo, JPEG or PNG under 2 MB
+- [x] 480x480 logo: `images/buidl-logo.png`, 32 KB, drawn from the scene palette
 - [ ] Replace `images/scene-thumbnail.png` - it shows an older tower, with
       collar rings up the whole trunk that were removed
 - [ ] Keep the World deployed and public through 11 September (judging)
