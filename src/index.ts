@@ -27,7 +27,6 @@ import './game/props'
 import { room } from './shared/messages'
 import {
   Board,
-  DailyBoard,
   PointsBoard,
   Ghost,
   Wall,
@@ -324,9 +323,16 @@ function sharedRoundSystem(dt: number) {
       showClimbers(ranking.heights.map((h) => h))
     }
 
-    // Today's board is the one on the monument. The all-time list is the
-    // trophy cabinet; the daily list is the thing a newcomer can actually win.
-    const today = DailyBoard.getOrNull(entity)
+    /**
+     * The monument shows the ALL-TIME board now.
+     *
+     * It showed today's, on the reasoning that a daily list is something a
+     * newcomer can actually win. What that meant in practice was a board that
+     * emptied itself at midnight UTC: a player finished, showed a friend, and
+     * by the time the friend looked the table was blank for everybody. Asked
+     * for plainly - it should not reset at all.
+     */
+    const today = Board.getOrNull(entity)
     const allTime = Board.getOrNull(entity)
     if (today) {
       // The second half of the monument ranks lifetime points now, not pairs.
@@ -338,7 +344,6 @@ function sharedRoundSystem(dt: number) {
           points: ranked?.points[index] ?? 0
         }))
       )
-      run.dailyBest = today.seconds[0] ?? 0
     }
     if (allTime) {
       run.towerRecord = allTime.seconds[0] ?? 0

@@ -37,8 +37,7 @@ import {
   SUMMIT_POINTS,
   BOARD_W,
   LEGEND_FORWARD,
-  LEGEND_LATERAL,
-  HAUL_TARGET
+  LEGEND_LATERAL
 } from './config'
 import { MEANING } from './palette'
 
@@ -180,10 +179,15 @@ export function setHaul(coins: number) {
   if (!legendHaul) return
   const shape = TextShape.getMutableOrNull(legendHaul)
   if (!shape) return
-  shape.text =
-    coins >= HAUL_TARGET
-      ? 'THE GROVE HAS ALL ' + HAUL_TARGET + ' TODAY. THE CROWN IS LIT'
-      : 'GIVEN TO THE GROVE TODAY:  ' + coins + ' OF ' + HAUL_TARGET
+  /**
+   * It said TODAY, and there is no today any more.
+   *
+   * The count reset at midnight UTC along with the board, and both resets are
+   * gone: a number that empties itself while nobody is watching teaches people
+   * that nothing they do here is kept. So this is now every coin ever found in
+   * this tower by anybody, and it only goes up.
+   */
+  shape.text = 'COINS FOUND HERE:  ' + coins
 }
 
 /**

@@ -533,7 +533,17 @@ const clearedPanel = () => {
         */}
         {run.climbs > 0 && (
           <Label
-            value={run.climbs === 1 ? 'Your first summit.' : 'Summit number ' + run.climbs + '.'}
+            /*
+              "Summit number 4" was read as "fourth place" by the first player
+              who saw it, which is a fair reading of those words next to a
+              leaderboard. It is a personal tally, not a ranking, and it has to
+              say so without being counted against anybody else.
+            */
+            value={
+              run.climbs === 1
+                ? 'Your first climb.'
+                : 'You have climbed this tower ' + run.climbs + ' times.'
+            }
             fontSize={s.body}
             color={GOLD}
           />

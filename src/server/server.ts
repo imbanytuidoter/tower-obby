@@ -31,7 +31,6 @@ import { buildTower, checkpointAltitudes } from '../game/layout'
 import { room } from '../shared/messages'
 import {
   Board,
-  DailyBoard,
   LeverState,
   PairBoard,
   Ranking,
@@ -45,7 +44,6 @@ import {
 } from '../shared/schemas'
 
 const STORAGE_KEY = 'obby.board.v2'
-const DAILY_KEY = 'obby.daily.v1'
 const PAIRS_KEY = 'obby.pairs.v1'
 const PLAYER_KEY = 'obby.stats.v1'
 const WALL_KEY = 'obby.wall.v1'
@@ -54,7 +52,7 @@ const POINTS_KEY = 'obby.points.v1'
 
 type Scorer = { name: string; points: number }
 
-type StoredHaul = { version: 1; day: number; coins: number }
+type StoredHaul = { version: 1; coins: number }
 
 /**
  * The recorded climb, kept in its own key.
@@ -75,11 +73,6 @@ const GHOST_KEY = 'obby.ghost.v1'
 type StoredGhost = { version: 1; name: string; seconds: number; path: number[] }
 
 type Entry = { name: string; seconds: number }
-
-/** Whole days since the epoch, UTC. The daily board resets when this changes. */
-function utcDay(at: number): number {
-  return Math.floor(at / 86400000)
-}
 
 /** Versioned from day one: storage outlives deploys, so old shapes will turn up. */
 type PlayerStats = {
@@ -130,7 +123,6 @@ const startedClimb = new Map<string, number>()
 
 let state = engine.addEntity()
 let board: Entry[] = []
-let daily: Entry[] = []
 let pairs: Entry[] = []
 
 /**
@@ -158,7 +150,7 @@ const pendingGhost = new Map<string, { name: string; seconds: number }>()
 /** Who last stood on the crown, newest first. Not sorted by time - see Wall. */
 let wall: Entry[] = []
 
-/** Coins given to the grove today, by everybody. Reset with the daily board. */
+/** Coins given to the grove by everybody, ever. Nothing resets it. */
 let haul = 0
 
 /** Lifetime points, best per player. Coins found once each, plus summits. */
@@ -195,7 +187,6 @@ export async function startServer() {
   // before it can tell the server is alive.
   ServerHeartbeat.create(state, { at: Date.now() })
   Board.create(state, { names: [], seconds: [] })
-  DailyBoard.create(state, { names: [], seconds: [], day: utcDay(Date.now()) })
   PairBoard.create(state, { names: [], seconds: [] })
   Wall.create(state, { names: [], seconds: [] })
   PointsBoard.create(state, { names: [], points: [] })
@@ -210,7 +201,6 @@ export async function startServer() {
   syncEntity(state, [
     ServerHeartbeat.componentId,
     Board.componentId,
-    DailyBoard.componentId,
     PairBoard.componentId,
     Wall.componentId,
     PointsBoard.componentId,
@@ -353,35 +343,19 @@ function serverSystem(dt: number) {
     publishRanking()
   }
 
-  rolloverDailyBoard()
 }
 
 /**
- * Midnight UTC empties the daily board. Checked every frame because the server
- * can stay up for days, so a rollover will land mid-session.
+ * Nothing resets at midnight any more.
+ *
+ * The daily board emptied itself every UTC midnight, and so did the grove's
+ * coin count with it. What that looked like from inside the game: a player
+ * finished, went to show somebody, and the table was blank by the time they
+ * came back - blank for everybody, with no explanation on the board itself.
+ *
+ * Asked for plainly: it should not reset. The monument ranks all time now,
+ * both halves of it, and the day stamp is gone along with the reset it drove.
  */
-function rolloverDailyBoard() {
-  const view = DailyBoard.getOrNull(state)
-  if (!view) return
-
-  const today = utcDay(Date.now())
-  if (view.day === today) return
-
-  daily = []
-  // The grove's day ends with the board's, in the same place, off the same
-  // stamp. Two independent notions of "today" is two things to get out of
-  // step, and this one would drift silently: nothing renders a wrong haul as
-  // an error, it just quietly keeps yesterday's number.
-  haul = 0
-  haulDirty = true
-  Haul.getMutable(state).coins = 0
-  const mutable = DailyBoard.getMutable(state)
-  mutable.names = []
-  mutable.seconds = []
-  mutable.day = today
-  console.log('[SERVER] daily board reset for day ' + today)
-  void Storage.set(DAILY_KEY, JSON.stringify({ day: today, entries: [] }))
-}
 
 /**
  * A claim is only ever a claim. The server knows where the crown is - it runs
@@ -414,7 +388,6 @@ function handleClaim(name: string, from: string) {
   // is the entire reason the rotating rounds had to go.
   const record = board.length === 0 || seconds < board[0].seconds
   board = [...board, entry].sort((a, b) => a.seconds - b.seconds).slice(0, BOARD_SIZE)
-  daily = [...daily, entry].sort((a, b) => a.seconds - b.seconds).slice(0, BOARD_SIZE)
 
   // The crown's list is the one place a slow climber can appear, so it is
   // ordered by WHEN and not by how fast. One row per person: without the
@@ -442,7 +415,8 @@ function handleClaim(name: string, from: string) {
 
   // Only the day's leader gets asked for a path, so the ghost is always the
   // run people are actually chasing.
-  if (daily.length > 0 && daily[0] === entry) {
+  // The ghost follows the ALL-TIME leader now that there is no daily board.
+  if (board.length > 0 && board[0] === entry) {
     pendingGhost.set(address, { name: entry.name, seconds })
   }
 
@@ -798,9 +772,6 @@ function publishBoard() {
   all.names = board.map((entry) => entry.name)
   all.seconds = board.map((entry) => entry.seconds)
 
-  const today = DailyBoard.getMutable(state)
-  today.names = daily.map((entry) => entry.name)
-  today.seconds = daily.map((entry) => entry.seconds)
 
   Haul.getMutable(state).coins = haul
 
@@ -913,7 +884,6 @@ async function flushStats() {
     haulDirty = false
     const ok = await Storage.set<StoredHaul>(HAUL_KEY, {
       version: 1,
-      day: utcDay(Date.now()),
       coins: haul
     })
     // Left marked on failure, exactly like a player's stats, so the next
@@ -958,7 +928,6 @@ async function recordClimb(address: string, seconds: number) {
 }
 
 type Stored = { version: number; board: Entry[] }
-type StoredDaily = { version: number; day: number; board: Entry[] }
 
 /** Written only when a round is won, never per tick: storage writes are capped. */
 async function persistBoard() {
@@ -967,12 +936,6 @@ async function persistBoard() {
 
   // Kept in its own key with the day stamped on it, so a server that boots
   // the next morning restores an empty board rather than yesterday's times.
-  const okDaily = await Storage.set<StoredDaily>(DAILY_KEY, {
-    version: 1,
-    day: utcDay(Date.now()),
-    board: daily
-  })
-  if (!okDaily) console.log('[SERVER] daily board did not persist')
 
   const okWall = await Storage.set<Stored>(WALL_KEY, { version: 1, board: wall })
   if (!okWall) console.log('[SERVER] crown wall did not persist')
@@ -998,21 +961,6 @@ async function restoreBoard() {
     console.log('[SERVER] stored board unreadable, starting empty: ' + error)
   }
 
-  try {
-    const stored = await Storage.get<StoredDaily>(DAILY_KEY)
-    if (stored && stored.version === 1 && Array.isArray(stored.board)) {
-      if (stored.day === utcDay(Date.now())) {
-        daily = stored.board
-          .filter((entry) => typeof entry?.name === 'string' && typeof entry?.seconds === 'number')
-          .slice(0, BOARD_SIZE)
-        console.log('[SERVER] restored ' + daily.length + " of today's entries")
-      } else {
-        console.log('[SERVER] stored daily board is from another day, starting empty')
-      }
-    }
-  } catch (error) {
-    console.log('[SERVER] stored daily board unreadable: ' + error)
-  }
 
   try {
     const stored = await Storage.get<Stored>(PAIRS_KEY)
@@ -1041,14 +989,12 @@ async function restoreBoard() {
   try {
     const stored = await Storage.get<StoredHaul>(HAUL_KEY)
     if (stored && stored.version === 1 && typeof stored.coins === 'number') {
-      // Day-stamped for the same reason the daily board is: a server that
-      // boots after midnight must not inherit yesterday's total.
-      if (stored.day === utcDay(Date.now())) {
-        haul = Math.max(0, Math.floor(stored.coins))
-        console.log('[SERVER] restored ' + haul + " coins in today's haul")
-      } else {
-        console.log("[SERVER] stored haul is from another day, starting at nothing")
-      }
+      // No day check any more. It used to drop the count whenever the server
+      // first booted on a new date, which is the same silent midnight reset
+      // the board had - just less visible, because nobody watches a number
+      // going back to zero as closely as they watch their name leaving a list.
+      haul = Math.max(0, Math.floor(stored.coins))
+      console.log('[SERVER] restored ' + haul + ' coins given to the grove')
     }
   } catch (error) {
     console.log('[SERVER] stored haul unreadable: ' + error)
@@ -1068,8 +1014,6 @@ async function restoreBoard() {
 
   await restoreGhost()
 
-  const view = DailyBoard.getOrNull(state)
-  if (view) DailyBoard.getMutable(state).day = utcDay(Date.now())
   publishBoard()
 }
 

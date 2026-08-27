@@ -638,7 +638,7 @@ function createBoard() {
   const headingPos = front(0.17)
   Transform.create(heading, { position: Vector3.create(headingPos.x, headerY, headingPos.z), rotation })
   TextShape.create(heading, {
-    text: "TODAY'S FASTEST",
+    text: 'FASTEST EVER',
     fontSize: 3.6,
     textColor: Color4.White(),
     outlineColor: Color4.Black(),

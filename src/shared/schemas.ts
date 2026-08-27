@@ -120,20 +120,6 @@ export const Board = engine.defineComponent('obby::board', {
   seconds: Schemas.Array(Schemas.Float)
 })
 
-/**
- * The ten fastest climbs today, cleared at midnight UTC.
- *
- * The all-time board is unreachable for somebody who arrived an hour ago, and
- * a target nobody can hit is a target nobody looks at. A board that empties
- * every night is winnable tonight - which is the actual reason to come back
- * tomorrow.
- */
-export const DailyBoard = engine.defineComponent('obby::daily', {
-  names: Schemas.Array(Schemas.String),
-  seconds: Schemas.Array(Schemas.Float),
-  /** UTC day number this board belongs to, so clients can spot a rollover. */
-  day: Schemas.Int
-})
 
 /**
  * The fastest climbs made as a PAIR.
@@ -166,7 +152,6 @@ export function protectServerState() {
   Ghost.validateBeforeChange(serverOnly)
   ServerHeartbeat.validateBeforeChange(serverOnly)
   Board.validateBeforeChange(serverOnly)
-  DailyBoard.validateBeforeChange(serverOnly)
   PairBoard.validateBeforeChange(serverOnly)
   Wall.validateBeforeChange(serverOnly)
   PointsBoard.validateBeforeChange(serverOnly)
