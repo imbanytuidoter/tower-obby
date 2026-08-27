@@ -592,7 +592,7 @@ function runSystem(dt: number) {
     if (run.path.length >= 12) room.send('ghostPath', { path: run.path })
 
     // The panel is optimistic, the sound is not: it plays when the server
-    // confirms the finish over roundWon, so it can never celebrate a claim
+    // confirms the finish over 'summit', so it can never celebrate a claim
     // that was rejected.
     const improved = run.personalBest === 0 || run.time < run.personalBest
     completeRound(improved)
